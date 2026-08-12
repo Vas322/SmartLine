@@ -1,0 +1,29 @@
+{% extends "core/base.html" %}
+{% block title %}Telegram-сообщения{% endblock %}
+{% block content %}
+<h1>Telegram-сообщения</h1>
+<table>
+    <tr>
+        <th>Chat ID</th>
+        <th>Message ID</th>
+        <th>User ID</th>
+        <th>Username</th>
+        <th>Текст</th>
+        <th>Дата сообщения</th>
+        <th>Статус</th>
+    </tr>
+    {% for message in telegram_messages %}
+    <tr>
+        <td>{{ message.telegram_chat_id }}</td>
+        <td>{{ message.telegram_message_id }}</td>
+        <td>{{ message.telegram_user_id|default:"-" }}</td>
+        <td>{{ message.telegram_username|default:"-" }}</td>
+        <td>{{ message.text }}</td>
+        <td>{{ message.message_date|date:"d.m.Y H:i" }}</td>
+        <td>{{ message.status }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">Сообщений нет.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

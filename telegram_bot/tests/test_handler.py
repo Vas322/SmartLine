@@ -1,0 +1,63 @@
+"""Tests for the Telegram update handler."""
+from datetime import datetime
+from unittest import mock
+
+from django.test import SimpleTestCase
+
+from telegram_bot.handler import handle_update
+
+
+def _make_update(
+    *,
+    update_id=1,
+    message_id=10,
+    chat_id=1000,
+    text="+1 | деф | Swettka | Первая волна",
+    has_from=True,
+    has_text=True,
+    has_message=True,
+):
+    message = {}
+    if has_message:
+        message["message_id"] = message_id
+        message["chat"] = {"id": chat_id}
+        message["date"] = 1750000000
+        if has_from:
+            message["from"] = {"id": 500, "username": "swettka"}
+        if has_text:
+            message["text"] = text
+        else:
+            message.pop("text", None)
+    return {"update_id": update_id, "message": message}
+
+
+class HandleUpdateTests(SimpleTestCase):
+    @mock.patch("telegram_bot.handler.process_telegram_message", return_value=mock.Mock(status=mock.Mock(value="OK")))
+    def test_valid_update_calls_service(self, mock_process):
+        handle_update(_make_update())
+        mock_process.assert_called_once()
+        kwargs = mock_process.call_args.kwargs
+        self.assertEqual(kwargs["chat_id"], 1000)
+        self.assertEqual(kwargs["message_id"], 10)
+        self.assertEqual(kwargs["user_id"], 500)
+        self.assertEqual(kwargs["username"], "swettka")
+        self.assertEqual(kwargs["text"], "+1 | деф | Swettka | Первая волна")
+        self.assertIsInstance(kwargs["message_date"], datetime)
+
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_update_without_message_is_ignored(self, mock_process):
+        handle_update({"update_id": 1})
+        mock_process.assert_not_called()
+
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_message_without_text_is_ignored(self, mock_process):
+        handle_update(_make_update(has_text=False))
+        mock_process.assert_not_called()
+
+    @mock.patch("telegram_bot.handler.process_telegram_message", return_value=mock.Mock(status=mock.Mock(value="OK")))
+    def test_missing_username_passes_empty(self, mock_process):
+        update = _make_update()
+        update["message"]["from"] = {"id": 500}
+        handle_update(update)
+        kwargs = mock_process.call_args.kwargs
+        self.assertEqual(kwargs["username"], "")

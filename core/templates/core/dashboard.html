@@ -1,0 +1,18 @@
+{% extends "core/base.html" %}
+{% block title %}Дашборд{% endblock %}
+{% block content %}
+<h1>Дашборд</h1>
+<form method="get" action="{% url 'dashboard' %}">
+    {{ form.as_p }}
+    <button type="submit" class="btn">Применить</button>
+</form>
+<p>Период: {{ date_from|date:"d.m.Y H:i" }} — {{ date_to|date:"d.m.Y H:i" }}</p>
+<div class="stats">
+    <div class="stat-card"><h3>Активностей</h3><div class="value">{{ stats.total_activities }}</div></div>
+    <div class="stat-card"><h3>Игроков</h3><div class="value">{{ stats.players_count }}</div></div>
+    <div class="stat-card"><h3>DEF (часов)</h3><div class="value">{{ stats.def_hours }}</div></div>
+    <div class="stat-card"><h3>FARM (часов)</h3><div class="value">{{ stats.farm_hours }}</div></div>
+    <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ total_hours }}</div></div>
+    <div class="stat-card"><h3>Оплачиваемые часы</h3><div class="value">{{ paid_hours }}</div></div>
+</div>
+{% endblock %}
