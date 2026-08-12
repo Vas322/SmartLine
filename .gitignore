@@ -1,0 +1,19 @@
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Logs
+logs/
+
+# Virtual environment
+.venv/
+
+# IDE
+.idea/
+
+# opencode local dependencies
+.opencode/node_modules/
