@@ -17,3 +17,6 @@ logs/
 
 # opencode local dependencies
 .opencode/node_modules/
+
+# opencode agents (local workflow config)
+.opencode/agents/
