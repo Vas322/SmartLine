@@ -14,6 +14,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("dashboard/", views.dashboard, name="dashboard_url"),
     path("players/", views.players, name="players"),
+    path("player/<int:pk>/", views.player_detail, name="player_detail"),
     path("players/toggle/<int:pk>/", views.toggle_player, name="player_toggle"),
     path("activities/", views.activities, name="activities"),
     path("telegram-messages/", views.telegram_messages, name="telegram_messages"),

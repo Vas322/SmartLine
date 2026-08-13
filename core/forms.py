@@ -83,16 +83,21 @@ class PeriodForm(forms.Form):
         required=False,
         initial="today",
         label="Период",
+        widget=forms.Select(attrs={"class": "period-select"}),
     )
     date_from = forms.DateField(
         required=False,
         label="Дата с",
-        widget=forms.DateInput(attrs={"type": "date"}),
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "period-date"}
+        ),
     )
     date_to = forms.DateField(
         required=False,
         label="Дата по",
-        widget=forms.DateInput(attrs={"type": "date"}),
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "period-date"}
+        ),
     )
 
     def clean(self) -> dict:
@@ -105,14 +110,14 @@ class PeriodForm(forms.Form):
                 self.add_error("date_from", "Дата начала позже даты окончания")
         return cleaned
 
-    def get_date_range(self):
-        """Return an aware (date_from, date_to) range for the chosen period."""
+    def _get_period_dates(self):
+        """Return (start_date, end_date) as date objects for the chosen period."""
         if self.is_valid():
             period = self.cleaned_data.get("period") or "today"
             date_from = self.cleaned_data.get("date_from")
             date_to = self.cleaned_data.get("date_to")
         else:
-            period = "today"
+            period = self.initial.get("period") or "today"
             date_from = None
             date_to = None
 
@@ -125,7 +130,9 @@ class PeriodForm(forms.Form):
             end = today
         elif period == "month":
             start = today.replace(day=1)
-            end = today
+            # Last day of the current calendar month.
+            next_month = start.replace(day=28) + timezone.timedelta(days=4)
+            end = next_month.replace(day=1) - timezone.timedelta(days=1)
         elif period == "custom":
             start = date_from or today
             end = date_to or today
@@ -133,9 +140,19 @@ class PeriodForm(forms.Form):
             start = today
             end = today
 
+        return start, end
+
+    def get_date_range(self):
+        """Return an aware (date_from, date_to) range for the chosen period."""
+        start, end = self._get_period_dates()
         start_dt = timezone.make_aware(datetime.combine(start, time.min))
         end_dt = timezone.make_aware(datetime.combine(end, time.max))
         return start_dt, end_dt
+
+    def get_days_in_period(self) -> int:
+        """Return the number of days in the chosen period."""
+        start, end = self._get_period_dates()
+        return (end - start).days + 1
 
 
 class SettingForm(forms.ModelForm):
