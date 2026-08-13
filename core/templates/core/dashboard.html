@@ -3,16 +3,40 @@
 {% block content %}
 <h1>Дашборд</h1>
 <form method="get" action="{% url 'dashboard' %}">
-    {{ form.as_p }}
+    {{ form.period.label_tag }} {{ form.period }}
+    <div class="period-date-group" style="display:none">
+        {{ form.date_from.label_tag }} {{ form.date_from }}
+        {{ form.date_to.label_tag }} {{ form.date_to }}
+    </div>
     <button type="submit" class="btn">Применить</button>
 </form>
-<p>Период: {{ date_from|date:"d.m.Y H:i" }} — {{ date_to|date:"d.m.Y H:i" }}</p>
-<div class="stats">
-    <div class="stat-card"><h3>Активностей</h3><div class="value">{{ stats.total_activities }}</div></div>
-    <div class="stat-card"><h3>Игроков</h3><div class="value">{{ stats.players_count }}</div></div>
-    <div class="stat-card"><h3>DEF (часов)</h3><div class="value">{{ stats.def_hours }}</div></div>
-    <div class="stat-card"><h3>FARM (часов)</h3><div class="value">{{ stats.farm_hours }}</div></div>
-    <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ total_hours }}</div></div>
-    <div class="stat-card"><h3>Оплачиваемые часы</h3><div class="value">{{ paid_hours }}</div></div>
-</div>
+<p>Период: {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}</p>
+<p>Дней в периоде: {{ days_in_period }}</p>
+<table>
+    <tr>
+        <th>Ник</th>
+        <th>Всего посещений</th>
+        <th>Адена</th>
+        <th>Дефал</th>
+        <th>Фармил</th>
+        <th>%</th>
+    </tr>
+    {% for row in rows %}
+    <tr>
+        <td><a href="{% url 'player_detail' row.pk %}">{{ row.nickname }}</a></td>
+        <td>{{ row.total_hours }}</td>
+        <td>{{ row.adena }}</td>
+        <td>{{ row.def_hours }}</td>
+        <td>{{ row.farm_hours }}</td>
+        <td>
+            <div style="background: #ecf0f1; border-radius: 4px; width: 120px; display: inline-block; vertical-align: middle;">
+                <div style="width: {{ row.percent|floatformat:0 }}%; background: #2980b9; height: 14px; border-radius: 4px;"></div>
+            </div>
+            {{ row.percent }}
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">Игроков пока нет.</td></tr>
+    {% endfor %}
+</table>
 {% endblock %}

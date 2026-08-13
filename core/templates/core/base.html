@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -48,5 +49,6 @@
     <main>
         {% block content %}{% endblock %}
     </main>
+    <script src="{% static 'core/period_form.js' %}"></script>
 </body>
 </html>

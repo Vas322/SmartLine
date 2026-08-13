@@ -1,0 +1,36 @@
+{% extends "core/base.html" %}
+{% block title %}{{ player.nickname }}{% endblock %}
+{% block content %}
+<h1>{{ player.nickname }}</h1>
+<form method="get" action="{% url 'player_detail' player.pk %}">
+    {{ form.period.label_tag }} {{ form.period }}
+    <div class="period-date-group" style="display:none">
+        {{ form.date_from.label_tag }} {{ form.date_from }}
+        {{ form.date_to.label_tag }} {{ form.date_to }}
+    </div>
+    <button type="submit" class="btn">Применить</button>
+</form>
+<div class="stats">
+    <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
+    <div class="stat-card"><h3>Адена</h3><div class="value">{{ summary.adena }}</div></div>
+    <div class="stat-card"><h3>DEF</h3><div class="value">{{ summary.def_hours }}</div></div>
+    <div class="stat-card"><h3>FARM</h3><div class="value">{{ summary.farm_hours }}</div></div>
+    <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
+</div>
+<h2>По дням</h2>
+<table>
+    <tr>
+        <th>Дата</th>
+        <th>Часов</th>
+    </tr>
+    {% for day, hours in daily %}
+    <tr>
+        <td>{{ day|date:"d.m.Y" }}</td>
+        <td>{{ hours }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="2" class="muted">Записей за период нет.</td></tr>
+    {% endfor %}
+</table>
+<p><a href="{% url 'dashboard' %}">← К дашборду</a></p>
+{% endblock %}

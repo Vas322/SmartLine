@@ -81,9 +81,26 @@ class WebInterfaceTests(TestCase):
         response = self.client.get(reverse("dashboard"), {"period": "today"})
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn("Активностей", content)
-        # only today's activity counted
-        self.assertIn(">1</div>", content)
+        self.assertIn("Swettka", content)
+        # only today's activity counted: def hours column shows 1, not 2
+        self.assertIn("<td>1</td>", content)
+        self.assertNotIn("<td>2</td>", content)
+
+    def test_player_detail_page_available_after_login(self):
+        self._login()
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("По дням", response.content.decode())
+
+    def test_dashboard_shows_percent_and_columns(self):
+        self._login()
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for text in ["Ник", "Адена", "Дефал", "Фармил", "%"]:
+            self.assertIn(text, content)
 
     def test_excel_export_returns_xlsx_after_login(self):
         self._login()

@@ -1,8 +1,11 @@
 """Thin views for the Smartline web interface."""
+import decimal
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q, Sum
+from django.db.models import Q, Sum
+from django.db.models.functions import TruncDate
 from django.forms import modelformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -13,17 +16,101 @@ from core.models import Activity, Player, ProcessingError, Setting, TelegramMess
 SettingFormSet = modelformset_factory(Setting, form=SettingForm, extra=0)
 
 
+def _get_hourly_rate() -> Decimal:
+    """Return the DEF hourly rate from the Setting, falling back to zero."""
+    rate_value = (
+        Setting.objects.filter(key="def_hourly_rate")
+        .values_list("value", flat=True)
+        .first()
+    )
+    try:
+        return Decimal(rate_value)
+    except (TypeError, ValueError, decimal.InvalidOperation):
+        return Decimal("0")
+
+
+def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
+    """Attendance percent with a hard cap of 100, rounded to 2 places."""
+    denominator = Decimal(days_in_period * 5)
+    if denominator <= 0:
+        return Decimal("0")
+    percent = (total_hours / denominator) * Decimal("100")
+    if percent > Decimal("100"):
+        percent = Decimal("100")
+    return percent.quantize(Decimal("0.01"))
+
+
 @login_required
 def dashboard(request):
-    form = PeriodForm(request.GET or None)
+    form = PeriodForm(request.GET or None, initial={"period": "month"})
     date_from, date_to = form.get_date_range()
+    days_in_period = form.get_days_in_period()
+    rate = _get_hourly_rate()
 
-    activities_qs = Activity.objects.filter(
-        created_at__range=(date_from, date_to)
+    aggregates = (
+        Activity.objects.filter(created_at__range=(date_from, date_to))
+        .values("player_id")
+        .annotate(
+            def_hours=Sum(
+                "amount",
+                filter=Q(activity_type=Activity.ActivityType.DEF),
+            ),
+            farm_hours=Sum(
+                "amount",
+                filter=Q(activity_type=Activity.ActivityType.FARM),
+            ),
+        )
     )
-    stats = activities_qs.aggregate(
-        total_activities=Count("id"),
-        players_count=Count("player", distinct=True),
+
+    totals_by_player: dict[int, dict] = {}
+    for row in aggregates:
+        totals_by_player[row["player_id"]] = {
+            "def_hours": row["def_hours"] or Decimal("0"),
+            "farm_hours": row["farm_hours"] or Decimal("0"),
+        }
+
+    rows = []
+    active_players = Player.objects.filter(is_active=True)
+    for player in active_players:
+        totals = totals_by_player.get(player.pk, {})
+        def_hours = totals.get("def_hours", Decimal("0"))
+        farm_hours = totals.get("farm_hours", Decimal("0"))
+        total_hours = def_hours + farm_hours
+        rows.append(
+            {
+                "pk": player.pk,
+                "nickname": player.nickname,
+                "total_hours": total_hours,
+                "def_hours": def_hours,
+                "farm_hours": farm_hours,
+                "adena": def_hours * rate,
+                "percent": _percent(total_hours, days_in_period),
+            }
+        )
+
+    rows.sort(key=lambda row: row["percent"], reverse=True)
+
+    context = {
+        "form": form,
+        "date_from": date_from,
+        "date_to": date_to,
+        "days_in_period": days_in_period,
+        "rows": rows,
+    }
+    return render(request, "core/dashboard.html", context)
+
+
+@login_required
+def player_detail(request, pk: int):
+    player = get_object_or_404(Player, pk=pk)
+    form = PeriodForm(request.GET or None, initial={"period": "month"})
+    date_from, date_to = form.get_date_range()
+    days_in_period = form.get_days_in_period()
+    rate = _get_hourly_rate()
+
+    totals = Activity.objects.filter(
+        player=player, created_at__range=(date_from, date_to)
+    ).aggregate(
         def_hours=Sum(
             "amount",
             filter=Q(activity_type=Activity.ActivityType.DEF),
@@ -33,23 +120,47 @@ def dashboard(request):
             filter=Q(activity_type=Activity.ActivityType.FARM),
         ),
     )
-
-    def_hours = stats["def_hours"] or Decimal("0")
-    farm_hours = stats["farm_hours"] or Decimal("0")
-    stats["def_hours"] = def_hours
-    stats["farm_hours"] = farm_hours
+    def_hours = totals["def_hours"] or Decimal("0")
+    farm_hours = totals["farm_hours"] or Decimal("0")
     total_hours = def_hours + farm_hours
-    paid_hours = def_hours
+
+    summary = {
+        "total_hours": total_hours,
+        "adena": def_hours * rate,
+        "def_hours": def_hours,
+        "farm_hours": farm_hours,
+        "percent": _percent(total_hours, days_in_period),
+    }
+
+    daily_rows = (
+        Activity.objects.filter(
+            player=player, created_at__range=(date_from, date_to)
+        )
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(hours=Sum("amount"))
+    )
+    hours_by_day = {
+        row["day"]: row["hours"] or Decimal("0") for row in daily_rows
+    }
+
+    daily = []
+    current = date_from.date()
+    last = date_to.date()
+    while current <= last:
+        daily.append((current, hours_by_day.get(current, Decimal("0"))))
+        current += timedelta(days=1)
 
     context = {
         "form": form,
+        "player": player,
         "date_from": date_from,
         "date_to": date_to,
-        "stats": stats,
-        "total_hours": total_hours,
-        "paid_hours": paid_hours,
+        "days_in_period": days_in_period,
+        "summary": summary,
+        "daily": daily,
     }
-    return render(request, "core/dashboard.html", context)
+    return render(request, "core/player_detail.html", context)
 
 
 @login_required
