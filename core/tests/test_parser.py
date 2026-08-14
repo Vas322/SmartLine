@@ -111,3 +111,38 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1 | деф | Swettka |")
         self.assertEqual(parsed.description, "")
         self.assertEqual(parsed.amount, Decimal("1"))
+
+    def test_hyphen_separator(self):
+        parsed = parse_activity_message("+1-деф-Swettka-Первая волна")
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nickname, "Swettka")
+        self.assertEqual(parsed.description, "Первая волна")
+
+    def test_em_dash_separator(self):
+        parsed = parse_activity_message("+0,5—деф—Swettka—описание")
+        self.assertEqual(parsed.amount, Decimal("0.5"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nickname, "Swettka")
+
+    def test_en_dash_separator(self):
+        parsed = parse_activity_message("+2–фарм–Swettka–две волны")
+        self.assertEqual(parsed.amount, Decimal("2"))
+        self.assertEqual(parsed.activity_type, "FARM")
+        self.assertEqual(parsed.nickname, "Swettka")
+
+    def test_mixed_separators(self):
+        parsed = parse_activity_message("+1|деф-Swettka|описание")
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nickname, "Swettka")
+        self.assertEqual(parsed.description, "описание")
+
+    def test_description_keeps_separator_chars(self):
+        parsed = parse_activity_message("+1-деф-Swettka-описание с дефисом-тест")
+        self.assertEqual(parsed.nickname, "Swettka")
+        self.assertEqual(parsed.description, "описание с дефисом-тест")
+
+    def test_hyphen_uppercase_type(self):
+        parsed = parse_activity_message("+1—ДЕФ—Swettka—описание")
+        self.assertEqual(parsed.activity_type, "DEF")

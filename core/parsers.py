@@ -3,6 +3,7 @@
 The parser is a pure function: no ORM, no Telegram API. It converts a raw
 message string into a :class:`ParsedActivity` or raises :class:`ParserError`.
 """
+import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -12,6 +13,8 @@ _ACTIVITY_TYPE_MAP = {
     "фарм": "FARM",
     "farm": "FARM",
 }
+
+_SEP_RE = re.compile(r'(?:\||-|–|—)')
 
 
 class ParserError(ValueError):
@@ -58,7 +61,7 @@ def parse_activity_message(text: str) -> ParsedActivity:
         raise ParserError("message_does_not_start_with_plus")
 
     rest = stripped[1:]
-    parts = [part.strip() for part in rest.split("|", maxsplit=3)]
+    parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=3)]
     if len(parts) < 4:
         raise ParserError("invalid_format")
 
