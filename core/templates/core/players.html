@@ -20,11 +20,15 @@
         <td>{{ player.is_active|yesno:"Да,Нет" }}</td>
         <td>{{ player.created_at|date:"d.m.Y H:i" }}</td>
         <td>
-            <form action="{% url 'player_toggle' player.pk %}" method="post" style="display:inline; background:none; border:none; padding:0; margin:0;">
+            <form action="{% url 'player_toggle' player.pk %}" method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" class="btn">
                     {{ player.is_active|yesno:"Деактивировать,Активировать" }}
                 </button>
+            </form>
+            <form action="{% url 'player_delete' player.pk %}" method="post" class="inline-form">
+                {% csrf_token %}
+                <button type="button" class="btn delete-btn" data-player-name="{{ player.nickname }}">Удалить</button>
             </form>
         </td>
     </tr>

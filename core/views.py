@@ -186,6 +186,14 @@ def toggle_player(request, pk: int):
 
 
 @login_required
+@require_POST
+def delete_player(request, pk: int):
+    player = get_object_or_404(Player, pk=pk)
+    player.delete()
+    return redirect("players")
+
+
+@login_required
 def activities(request):
     form = ActivityFilterForm(request.GET or None)
     activities_qs = (

@@ -52,7 +52,7 @@ class Activity(models.Model):
 
     player = models.ForeignKey(
         Player,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="activities",
     )
     telegram_message = models.OneToOneField(
