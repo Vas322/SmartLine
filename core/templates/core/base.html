@@ -5,30 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Smartline{% endblock %}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #f5f6f7; color: #222; }
-        header { background: #2c3e50; color: #fff; padding: 12px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-        header .brand { color: #fff; text-decoration: none; font-weight: bold; font-size: 18px; margin-right: 16px; }
-        header a { color: #d5dce4; text-decoration: none; margin-right: 14px; }
-        header a:hover { color: #fff; }
-        main { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
-        h1 { font-size: 22px; }
-        table { border-collapse: collapse; width: 100%; background: #fff; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; vertical-align: top; }
-        th { background: #ecf0f1; }
-        form { background: #fff; padding: 16px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
-        input, select, textarea { margin: 4px 4px 4px 0; padding: 6px; }
-        .btn { display: inline-block; background: #2980b9; color: #fff; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 14px; }
-        .btn:hover { background: #2471a3; }
-        .btn-danger { background: #c0392b; }
-        .btn-danger:hover { background: #a93226; }
-        .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
-        .stat-card { background: #fff; padding: 16px; border-radius: 4px; flex: 1; min-width: 160px; border: 1px solid #e0e0e0; }
-        .stat-card h3 { margin: 0 0 8px; font-size: 13px; color: #555; }
-        .stat-card .value { font-size: 24px; font-weight: bold; }
-        .error { color: #c0392b; }
-        .muted { color: #777; }
-    </style>
+    <link rel="stylesheet" href="{% static 'core/styles.css' %}">
 </head>
 <body>
     <header>
@@ -49,6 +26,15 @@
     <main>
         {% block content %}{% endblock %}
     </main>
-    <script src="{% static 'core/period_form.js' %}"></script>
+    <div id="confirm-modal" class="modal-overlay" hidden>
+        <div class="modal-box">
+            <p id="confirm-modal-text" class="modal-text"></p>
+            <div class="modal-actions">
+                <button type="button" id="confirm-ok" class="btn">Подтвердить</button>
+                <button type="button" id="confirm-cancel" class="btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+    <script src="{% static 'core/app.js' %}"></script>
 </body>
 </html>
