@@ -71,3 +71,10 @@ class InstructionsAccessTests(TestCase):
         response = self.client.get(reverse("instructions"))
         self.assertContains(response, "&lt;script&gt;")
         self.assertNotContains(response, "<script>alert(1)</script>")
+
+    def test_seeded_instruction_has_no_invalid_space_only_example(self):
+        self.client.force_login(User.objects.create_user("kl", password="p"))
+        response = self.client.get(reverse("instructions"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "+1 ДЕФ Swettka описание")
+        self.assertContains(response, "+1 - ДЕФ - Swettka - описание")
