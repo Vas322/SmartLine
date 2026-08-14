@@ -124,6 +124,12 @@ LOGGING = {
         "verbose": {
             "format": "{levelname} {asctime} {name} {message}",
             "style": "{",
+            "class": "core.logging_utils.RedactingFormatter",
+        },
+    },
+    "filters": {
+        "secret_redact": {
+            "()": "core.logging_utils.RedactingFilter",
         },
     },
     "handlers": {
@@ -135,12 +141,14 @@ LOGGING = {
     "root": {
         "handlers": ["console"],
         "level": "INFO",
+        "filters": ["secret_redact"],
     },
     "loggers": {
         "django": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
+            "filters": ["secret_redact"],
         },
     },
 }
