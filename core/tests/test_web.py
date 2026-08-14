@@ -135,3 +135,52 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(response.status_code, 405)
         player.refresh_from_db()
         self.assertTrue(player.is_active)
+
+    def test_player_delete_removes_player(self):
+        self._login()
+        response = self.client.post(reverse("player_delete", args=[self.player.pk]))
+        self.assertRedirects(response, reverse("players"))
+        self.assertFalse(Player.objects.filter(pk=self.player.pk).exists())
+
+    def test_player_delete_cascades_activities(self):
+        self._login()
+        message = TelegramMessage.objects.create(
+            telegram_chat_id=11,
+            telegram_message_id=21,
+            telegram_user_id=101,
+            telegram_username="ostin",
+            text="+1 | деф | Ostin | Первая волна",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        activity = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            description="Первая волна",
+        )
+        activity_pk = activity.pk
+
+        response = self.client.post(reverse("player_delete", args=[self.player.pk]))
+
+        self.assertRedirects(response, reverse("players"))
+        self.assertFalse(Player.objects.filter(pk=self.player.pk).exists())
+        self.assertFalse(Activity.objects.filter(pk=activity_pk).exists())
+
+    def test_players_page_has_delete_button_with_confirm(self):
+        self._login()
+        response = self.client.get(reverse("players"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # форма удаления с CSRF-токеном
+        self.assertIn("players/delete/", content)
+        self.assertIn("csrfmiddlewaretoken", content)
+        # кнопка удаления открывает подтверждение: класс delete-btn + data-player-name
+        self.assertIn('class="btn delete-btn"', content)
+        self.assertIn(f'data-player-name="{self.player.nickname}"', content)
+
+    def test_player_delete_requires_login(self):
+        response = self.client.post(reverse("player_delete", args=[self.player.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)

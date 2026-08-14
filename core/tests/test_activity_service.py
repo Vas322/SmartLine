@@ -1,6 +1,7 @@
 """Tests for the activity processing service."""
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -160,3 +161,56 @@ class ProcessTelegramMessageTests(TestCase):
             Decimal("0"),
         )
         self.assertEqual(total, Decimal("1.0"))
+
+
+class PlayerDeletionTests(TestCase):
+    """Tests for deleting/deactivating players with activity history."""
+
+    def setUp(self):
+        self.player = Player.objects.create(nickname="Swettka")
+        self.message = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=20,
+            telegram_user_id=100,
+            telegram_username="swettka",
+            text="+1 | деф | Swettka | Первая волна",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        self.activity = Activity.objects.create(
+            player=self.player,
+            telegram_message=self.message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            description="Первая волна",
+        )
+
+    def test_player_delete_cascades_activities(self):
+        self.player.delete()
+
+        self.assertEqual(Player.objects.count(), 0)
+        self.assertEqual(Activity.objects.count(), 0)
+        # TelegramMessage is not tied to Player, so the audit trail survives.
+        self.assertEqual(TelegramMessage.objects.count(), 1)
+
+    def test_player_deactivate_keeps_activities(self):
+        self.player.is_active = False
+        self.player.save()
+
+        self.assertEqual(Player.objects.count(), 1)
+        self.assertEqual(Activity.objects.count(), 1)
+        self.assertFalse(Player.objects.get(pk=self.player.pk).is_active)
+
+    def test_admin_can_delete_player_with_activities(self):
+        User.objects.create_superuser(
+            username="admin",
+            password="test-password-123",
+        )
+        self.client.login(username="admin", password="test-password-123")
+
+        url = f"/admin/core/player/{self.player.pk}/delete/"
+        response = self.client.post(url, {"post": "yes"})
+
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(Player.objects.count(), 0)
+        self.assertEqual(Activity.objects.count(), 0)
