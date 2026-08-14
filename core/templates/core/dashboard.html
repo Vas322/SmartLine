@@ -4,7 +4,7 @@
 <h1>Дашборд</h1>
 <form method="get" action="{% url 'dashboard' %}">
     {{ form.period.label_tag }} {{ form.period }}
-    <div class="period-date-group" style="display:none">
+    <div class="period-date-group">
         {{ form.date_from.label_tag }} {{ form.date_from }}
         {{ form.date_to.label_tag }} {{ form.date_to }}
     </div>
