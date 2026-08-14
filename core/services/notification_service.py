@@ -44,7 +44,18 @@ def notify_kl(message_text: str) -> bool:
             response.raise_for_status()
             sent = True
         except requests.RequestException as exc:
-            logger.error("Failed to send Telegram notification to chat_id=%s: %s", chat_id, exc)
+            status = getattr(exc.response, "status_code", None)
+            detail = type(exc).__name__
+            if status is not None:
+                logger.error(
+                    "Failed to send Telegram notification to chat_id=%s: %s (status=%s)",
+                    chat_id, detail, status,
+                )
+            else:
+                logger.error(
+                    "Failed to send Telegram notification to chat_id=%s: %s",
+                    chat_id, detail,
+                )
     return sent
 
 
