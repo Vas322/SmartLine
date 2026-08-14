@@ -1,8 +1,7 @@
-"""Seed the first instruction for Smartline."""
 from django.db import migrations
 
 
-INSTRUCTION_CONTENT = """Запись активности на форте
+CORRECTED_CONTENT = """Запись активности на форте
 
 Сообщение должно начинаться с + и содержать 4 части, разделённые между собой:
 
@@ -29,26 +28,22 @@ INSTRUCTION_CONTENT = """Запись активности на форте
 """
 
 
-def create_instruction(apps, schema_editor):
+def fix_instruction_content(apps, schema_editor):
     Instruction = apps.get_model("core", "Instruction")
-    Instruction.objects.update_or_create(
-        slug="how-to-write-activity",
-        defaults={
-            "title": "Запись активности на форте",
-            "content": INSTRUCTION_CONTENT,
-        },
+    Instruction.objects.filter(slug="how-to-write-activity").update(
+        content=CORRECTED_CONTENT
     )
 
 
-def remove_instruction(apps, schema_editor):
-    Instruction = apps.get_model("core", "Instruction")
-    Instruction.objects.filter(slug="how-to-write-activity").delete()
+def revert_instruction_content(apps, schema_editor):
+    # Обратная миграция намеренно не возвращает некорректный текст.
+    pass
 
 
 class Migration(migrations.Migration):
 
-    dependencies = [("core", "0005_instruction")]
+    dependencies = [("core", "0006_seed_instruction")]
 
     operations = [
-        migrations.RunPython(create_instruction, remove_instruction),
+        migrations.RunPython(fix_instruction_content, revert_instruction_content),
     ]
