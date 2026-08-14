@@ -33,9 +33,20 @@ class TelegramBot:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise TelegramAPIError(
-                f"Telegram getUpdates failed: {type(exc).__name__}"
-            ) from exc
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+                try:
+                    body = response.json()
+                except Exception:
+                    body = None
+                desc = body.get("description") if isinstance(body, dict) else None
+                if desc:
+                    detail += f": {desc}"
+            raise TelegramAPIError(f"Telegram getUpdates failed: {detail}") from exc
         data = response.json()
         if not data.get("ok"):
             raise TelegramAPIError(
@@ -53,9 +64,20 @@ class TelegramBot:
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise TelegramAPIError(
-                f"Telegram sendMessage failed: {type(exc).__name__}"
-            ) from exc
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+                try:
+                    body = response.json()
+                except Exception:
+                    body = None
+                desc = body.get("description") if isinstance(body, dict) else None
+                if desc:
+                    detail += f": {desc}"
+            raise TelegramAPIError(f"Telegram sendMessage failed: {detail}") from exc
         data = response.json()
         if not data.get("ok"):
             raise TelegramAPIError(

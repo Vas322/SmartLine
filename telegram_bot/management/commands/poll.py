@@ -28,5 +28,5 @@ class Command(BaseCommand):
                 self.stdout.write("Stopping Telegram bot polling.")
                 break
             except Exception as exc:
-                logger.error("Telegram polling error: %s", type(exc).__name__)
+                logger.error("Telegram polling error: %s", exc)
                 time.sleep(10)
