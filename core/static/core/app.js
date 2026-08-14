@@ -15,16 +15,19 @@
         periodSelect.addEventListener("change", toggleDateFields);
     }
 
-    // --- Модальное окно подтверждения удаления ---
+    // --- Модальное окно подтверждения удаления / уведомления ---
     var modal = document.getElementById("confirm-modal");
     var modalText = document.getElementById("confirm-modal-text");
     var okBtn = document.getElementById("confirm-ok");
     var cancelBtn = document.getElementById("confirm-cancel");
     var pendingForm = null;
 
-    function showModal(text, form) {
+    function showModal(text, form, hideCancel) {
         modalText.textContent = text;
-        pendingForm = form;
+        pendingForm = form || null;
+        if (cancelBtn) {
+            cancelBtn.hidden = !!hideCancel;
+        }
         modal.removeAttribute("hidden");
     }
     function hideModal() {
@@ -42,13 +45,15 @@
         var form = trigger.closest("form");
         var message = "Вы уверены, что хотите удалить игрока " + name +
             "? При удалении вся история о нём будет также удалена!";
-        showModal(message, form);
+        showModal(message, form, false);
     });
 
     if (okBtn) {
         okBtn.addEventListener("click", function () {
             if (pendingForm) {
                 pendingForm.submit();
+            } else {
+                hideModal();
             }
         });
     }
@@ -61,5 +66,24 @@
                 hideModal();
             }
         });
+    }
+
+    // --- Инлайн-редактирование инструкций ---
+    document.addEventListener("click", function (event) {
+        var toggle = event.target.closest(".edit-toggle, .edit-cancel");
+        if (!toggle) {
+            return;
+        }
+        var targetId = toggle.getAttribute("data-target");
+        var formEl = document.getElementById(targetId);
+        if (formEl) {
+            formEl.hidden = !formEl.hidden;
+        }
+    });
+
+    // --- Модальное уведомление об успешном редактировании ---
+    var notify = document.getElementById("edit-notify");
+    if (notify && notify.dataset.message) {
+        showModal(notify.dataset.message, null, true);
     }
 })();

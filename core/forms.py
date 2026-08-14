@@ -4,7 +4,7 @@ from datetime import datetime, time
 from django import forms
 from django.utils import timezone
 
-from core.models import Player, Setting
+from core.models import Instruction, Player, Setting
 
 _PERIOD_CHOICES = [
     ("today", "Сегодня"),
@@ -159,3 +159,9 @@ class SettingForm(forms.ModelForm):
     class Meta:
         model = Setting
         fields = ["key", "value", "description"]
+
+
+class InstructionForm(forms.ModelForm):
+    class Meta:
+        model = Instruction
+        fields = ["title", "content"]

@@ -20,5 +20,6 @@ urlpatterns = [
     path("activities/", views.activities, name="activities"),
     path("telegram-messages/", views.telegram_messages, name="telegram_messages"),
     path("processing_errors/", views.processing_errors, name="processing_errors"),
+    path("instructions/", views.instructions, name="instructions"),
     path("settings/", views.settings_view, name="settings"),
 ]
