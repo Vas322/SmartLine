@@ -8,10 +8,11 @@ from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
 from django.forms import modelformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from core.forms import ActivityFilterForm, PeriodForm, PlayerForm, SettingForm
-from core.models import Activity, Player, ProcessingError, Setting, TelegramMessage
+from core.forms import ActivityFilterForm, InstructionForm, PeriodForm, PlayerForm, SettingForm
+from core.models import Activity, Instruction, Player, ProcessingError, Setting, TelegramMessage
 
 SettingFormSet = modelformset_factory(Setting, form=SettingForm, extra=0)
 
@@ -237,3 +238,31 @@ def settings_view(request):
         formset.save()
         return redirect("settings")
     return render(request, "core/settings.html", {"formset": formset})
+
+
+@login_required
+def instructions(request):
+    edit_pk = None
+    edit_form = None
+    if request.method == "POST":
+        pk = request.POST.get("pk")
+        instr = get_object_or_404(Instruction, pk=pk)
+        form = InstructionForm(request.POST, instance=instr)
+        if form.is_valid():
+            saved = form.save(commit=False)
+            saved.updated_by = request.user
+            saved.save()
+            return redirect(reverse("instructions") + "?saved=1")
+        edit_pk = instr.pk
+        edit_form = form
+    instructions_qs = Instruction.objects.order_by("title")
+    return render(
+        request,
+        "core/instructions.html",
+        {
+            "instructions": instructions_qs,
+            "saved": request.GET.get("saved"),
+            "edit_pk": edit_pk,
+            "edit_form": edit_form,
+        },
+    )

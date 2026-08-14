@@ -16,6 +16,7 @@
             <a href="{% url 'activities' %}">Активности</a>
             <a href="{% url 'telegram_messages' %}">Сообщения</a>
             <a href="{% url 'processing_errors' %}">Ошибки</a>
+            <a href="{% url 'instructions' %}">Инструкции</a>
             <a href="{% url 'settings' %}">Настройки</a>
             <form action="{% url 'logout' %}" method="post" style="display:inline; background:none; border:none; padding:0; margin-left:auto; margin-bottom:0;">
                 {% csrf_token %}
