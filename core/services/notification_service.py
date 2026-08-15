@@ -60,7 +60,7 @@ def notify_kl(message_text: str) -> bool:
 
 
 def notify_processing_error(error: ProcessingError) -> None:
-    """Build a notification about a processing error and send it to the KL."""
+    """Build a notification about a processing error and reply in the group."""
     message = error.telegram_message
     text = (
         "Smartline: ошибка обработки Telegram-сообщения\n"
@@ -70,6 +70,35 @@ def notify_processing_error(error: ProcessingError) -> None:
         f"Дата: {message.message_date.isoformat()}\n"
         f"Message ID: {message.telegram_message_id}"
     )
-    if notify_kl(text):
+    if notify_group_reply(message, text):
         error.status = ProcessingError.Status.NOTIFIED
         error.save(update_fields=["status"])
+
+
+def notify_group_reply(telegram_message, text: str) -> bool:
+    """Reply to the original message in the same group.
+
+    Returns True if the reply was sent successfully. Never raises:
+    notification failures are logged and swallowed so the main
+    message-processing flow is not broken.
+    """
+    from telegram_bot.bot import TelegramBot
+
+    token = settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        logger.warning("TELEGRAM_BOT_TOKEN is not configured; group reply skipped")
+        return False
+    try:
+        TelegramBot(token=token).send_message(
+            chat_id=telegram_message.telegram_chat_id,
+            text=text,
+            reply_to_message_id=telegram_message.telegram_message_id,
+        )
+    except Exception as exc:  # никогда не ломает обработку сообщения
+        logger.warning(
+            "Failed to send group reply to message_id=%s: %s",
+            telegram_message.telegram_message_id,
+            type(exc).__name__,
+        )
+        return False
+    return True

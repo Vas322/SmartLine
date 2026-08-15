@@ -56,10 +56,10 @@ class Activity(models.Model):
         on_delete=models.CASCADE,
         related_name="activities",
     )
-    telegram_message = models.OneToOneField(
+    telegram_message = models.ForeignKey(
         TelegramMessage,
         on_delete=models.PROTECT,
-        related_name="activity",
+        related_name="activities",
     )
     amount = models.DecimalField(max_digits=6, decimal_places=2)
     activity_type = models.CharField(max_length=8, choices=ActivityType.choices)

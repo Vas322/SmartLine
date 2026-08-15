@@ -54,12 +54,20 @@ class TelegramBot:
             )
         return data.get("result", [])
 
-    def send_message(self, chat_id: int, text: str) -> dict:
+    def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        reply_to_message_id: Optional[int] = None,
+    ) -> dict:
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+        data = {"chat_id": chat_id, "text": text}
+        if reply_to_message_id is not None:
+            data["reply_to_message_id"] = reply_to_message_id
         try:
             response = requests.post(
                 url,
-                data={"chat_id": chat_id, "text": text},
+                data=data,
                 timeout=10,
             )
             response.raise_for_status()

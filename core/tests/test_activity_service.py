@@ -8,12 +8,24 @@ from django.utils import timezone
 from core.models import Activity, Player, ProcessingError, TelegramMessage
 from core.services.activity_service import (
     ProcessResultStatus,
+    process_telegram_edit,
     process_telegram_message,
 )
 
 
 def _process(text: str, chat_id: int = 1, message_id: int = 1):
     return process_telegram_message(
+        chat_id=chat_id,
+        message_id=message_id,
+        user_id=100,
+        username="test_user",
+        text=text,
+        message_date=timezone.now(),
+    )
+
+
+def _process_edit(text: str, chat_id: int = 1, message_id: int = 1):
+    return process_telegram_edit(
         chat_id=chat_id,
         message_id=message_id,
         user_id=100,
@@ -37,6 +49,7 @@ class ProcessTelegramMessageTests(TestCase):
 
         self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
         activity = Activity.objects.get()
+        self.assertEqual(result.activities[0], activity)
         self.assertEqual(activity.amount, Decimal("1"))
         self.assertEqual(activity.activity_type, "DEF")
         self.assertEqual(activity.player.nickname, "Swettka")
@@ -161,6 +174,161 @@ class ProcessTelegramMessageTests(TestCase):
             Decimal("0"),
         )
         self.assertEqual(total, Decimal("1.0"))
+
+    def test_multi_nickname_creates_activities(self):
+        result = _process("+1 - деф - Swettka, Pocomaxa - Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(Activity.objects.count(), 2)
+        self.assertEqual(len(result.activities), 2)
+        players = set(
+            Activity.objects.values_list("player__nickname", flat=True)
+        )
+        self.assertEqual(players, {"Swettka", "Pocomaxa"})
+        for activity in Activity.objects.all():
+            self.assertEqual(activity.amount, Decimal("1"))
+            self.assertEqual(activity.activity_type, "DEF")
+            self.assertEqual(activity.description, "Первая волна")
+            self.assertEqual(activity.telegram_message_id, result.telegram_message.pk)
+
+    def test_multi_nickname_does_not_bind_to_sender(self):
+        result = _process("+1 - деф - Swettka, Pocomaxa - Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        for player in Player.objects.order_by("nickname"):
+            self.assertIsNone(player.telegram_user_id)
+            self.assertEqual(player.telegram_username, "")
+
+    def test_all_or_nothing_on_player_conflict(self):
+        Player.objects.create(nickname="Swettka", telegram_user_id=999)
+        result = _process("+1 - деф - Swettka - Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
+        self.assertEqual(Activity.objects.count(), 0)
+        error = ProcessingError.objects.get()
+        self.assertTrue(
+            error.reason.startswith("nickname_registered_to_other_telegram")
+        )
+
+    def test_multi_nickname_same_amount_for_each_player(self):
+        _process("+0,5 | фарм | Swettka, Pocomaxa | вторая волна")
+
+        self.assertEqual(Activity.objects.count(), 2)
+        amounts = set(
+            Activity.objects.values_list("amount", flat=True)
+        )
+        self.assertEqual(amounts, {Decimal("0.5")})
+        types = set(
+            Activity.objects.values_list("activity_type", flat=True)
+        )
+        self.assertEqual(types, {"FARM"})
+
+
+@override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
+class ProcessTelegramEditTests(TestCase):
+    """Tests for re-processing edited Telegram messages."""
+
+    def test_edit_on_error_reprocesses_and_creates_activity(self):
+        first = _process("+abc | деф | Swettka | описание")
+        self.assertEqual(first.status, ProcessResultStatus.PROCESSING_ERROR)
+        self.assertEqual(ProcessingError.objects.count(), 1)
+
+        result = _process_edit("+1 | деф | Swettka | Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(Activity.objects.count(), 1)
+        self.assertEqual(ProcessingError.objects.count(), 0)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.player.nickname, "Swettka")
+        self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.PROCESSED,
+        )
+
+    def test_edit_on_error_with_invalid_text_updates_error(self):
+        first = _process("+abc | деф | Swettka | описание")
+        self.assertEqual(first.status, ProcessResultStatus.PROCESSING_ERROR)
+        old_error = ProcessingError.objects.get()
+        self.assertEqual(old_error.reason, "invalid_amount")
+
+        result = _process_edit("+1 | неизвестный_тип | Swettka | описание")
+
+        self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
+        self.assertEqual(Activity.objects.count(), 0)
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.reason, "invalid_activity_type")
+        self.assertNotEqual(error.pk, old_error.pk)
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.ERROR,
+        )
+
+    def test_edit_on_error_with_player_conflict_persists_new_text(self):
+        Player.objects.create(nickname="Swettka", telegram_user_id=999)
+        _process("+abc | деф | Swettka | описание")
+
+        new_date = timezone.now()
+        result = process_telegram_edit(
+            chat_id=1,
+            message_id=1,
+            user_id=100,
+            username="test_user",
+            text="+1 | деф | Swettka | Новая версия",
+            message_date=new_date,
+        )
+
+        self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
+        self.assertEqual(Activity.objects.count(), 0)
+        tm = TelegramMessage.objects.get()
+        self.assertEqual(tm.text, "+1 | деф | Swettka | Новая версия")
+        self.assertEqual(tm.message_date, new_date)
+        self.assertEqual(tm.status, TelegramMessage.Status.ERROR)
+        error = ProcessingError.objects.get()
+        self.assertTrue(
+            error.reason.startswith("nickname_registered_to_other_telegram")
+        )
+
+    def test_edit_on_processed_message_is_ignored(self):
+        Player.objects.create(nickname="Swettka")
+        first = _process("+1 | деф | Swettka | Первая волна")
+        self.assertEqual(first.status, ProcessResultStatus.ACTIVITY_CREATED)
+
+        result = _process_edit("+2 | фарм | Swettka | Вторая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_IGNORED)
+        self.assertEqual(Activity.objects.count(), 1)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(activity.activity_type, "DEF")
+
+    def test_edit_without_existing_message_processes_as_new(self):
+        Player.objects.create(nickname="Swettka")
+        result = _process_edit("+1 | деф | Swettka | Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(TelegramMessage.objects.count(), 1)
+        self.assertEqual(Activity.objects.count(), 1)
+
+    def test_edit_of_non_activity_text_is_ignored(self):
+        _process("+abc | деф | Swettka | описание")
+
+        result = _process_edit("просто текст без плюса")
+
+        self.assertEqual(result.status, ProcessResultStatus.IGNORED)
+        self.assertEqual(ProcessingError.objects.count(), 1)
+        self.assertEqual(Activity.objects.count(), 0)
+
+    def test_edit_on_error_with_multiple_nicknames(self):
+        _process("+abc | деф | Swettka | описание")
+
+        result = _process_edit("+1 - деф - Swettka, Pocomaxa - Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(Activity.objects.count(), 2)
+        self.assertEqual(ProcessingError.objects.count(), 0)
+        for player in Player.objects.all():
+            self.assertIsNone(player.telegram_user_id)
 
 
 class PlayerDeletionTests(TestCase):

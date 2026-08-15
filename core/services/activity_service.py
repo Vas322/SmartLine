@@ -9,7 +9,10 @@ from django.db import transaction
 
 from core.models import Activity, Player, ProcessingError, TelegramMessage
 from core.parsers import ParserError, parse_activity_message
-from core.services.notification_service import notify_processing_error
+from core.services.notification_service import (
+    notify_group_reply,
+    notify_processing_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +22,14 @@ class ProcessResultStatus(str, Enum):
     ACTIVITY_CREATED = "ACTIVITY_CREATED"
     DUPLICATE = "DUPLICATE"
     PROCESSING_ERROR = "PROCESSING_ERROR"
+    EDIT_IGNORED = "EDIT_IGNORED"
 
 
 @dataclass
 class ProcessResult:
     status: ProcessResultStatus
     telegram_message: Optional[TelegramMessage] = None
-    activity: Optional[Activity] = None
+    activities: Optional[list] = None
     processing_error: Optional[ProcessingError] = None
 
 
@@ -51,15 +55,20 @@ def _resolve_or_create_player(
     nickname: str,
     user_id: Optional[int],
     username: str,
+    bind_to_sender: bool = True,
 ) -> Tuple[Player, bool]:
     """Return a Player for the nickname, auto-creating it on first use.
 
-    Binding rules:
+    Binding rules (when bind_to_sender is True):
     - No player with this nickname (case-insensitive) yet: create one bound to
       the sender, keeping the nickname spelling as provided.
     - Player exists but is unbound: bind it to the current sender.
     - Player exists and is bound to the current sender: reuse it.
     - Player exists and is bound to another Telegram user: raise PlayerConflict.
+
+    When bind_to_sender is False (multi-nick messages) the player is looked up
+    or created only by nickname; no Telegram binding is set and no conflict is
+    raised.
 
     Nicknames are matched case-insensitively (POCOMAXA and pocomaxa are the
     same player), but the stored spelling is the one first seen.
@@ -70,20 +79,24 @@ def _resolve_or_create_player(
     if player is None:
         player = Player.objects.create(
             nickname=nickname,
-            telegram_user_id=user_id,
-            telegram_username=username,
+            telegram_user_id=user_id if bind_to_sender else None,
+            telegram_username=username if bind_to_sender else "",
         )
-        logger.info("Player auto-created nickname=%s user_id=%s", nickname, user_id)
+        logger.info(
+            "Player auto-created nickname=%s user_id=%s",
+            nickname,
+            user_id if bind_to_sender else None,
+        )
         return player, True
 
-    if player.telegram_user_id is None:
+    if bind_to_sender and player.telegram_user_id is None:
         player.telegram_user_id = user_id
         player.telegram_username = username
         player.save(update_fields=["telegram_user_id", "telegram_username", "updated_at"])
         logger.info("Player bound nickname=%s user_id=%s", nickname, user_id)
         return player, False
 
-    if player.telegram_user_id != user_id:
+    if bind_to_sender and player.telegram_user_id != user_id:
         raise PlayerConflictError(
             f"nickname_registered_to_other_telegram:{nickname}"
         )
@@ -153,28 +166,38 @@ def process_telegram_message(
             parsed.activity_type,
         )
 
-        try:
-            player, _created = _resolve_or_create_player(
-                parsed.nickname,
-                user_id=user_id,
-                username=username,
-            )
-        except PlayerConflictError as exc:
-            logger.warning(
-                "Player nickname conflict chat_id=%s message_id=%s: %s",
-                chat_id,
-                message_id,
-                exc,
-            )
-            return _create_processing_error(telegram_message, str(exc))
+        multi = len(parsed.nicknames) > 1
 
-        activity = Activity.objects.create(
-            player=player,
-            telegram_message=telegram_message,
-            amount=parsed.amount,
-            activity_type=parsed.activity_type,
-            description=parsed.description,
-        )
+        players = []
+        for n in parsed.nicknames:
+            try:
+                player, _created = _resolve_or_create_player(
+                    n,
+                    user_id=user_id if not multi else None,
+                    username=username if not multi else "",
+                    bind_to_sender=not multi,
+                )
+            except PlayerConflictError as exc:
+                logger.warning(
+                    "Player nickname conflict chat_id=%s message_id=%s: %s",
+                    chat_id,
+                    message_id,
+                    exc,
+                )
+                return _create_processing_error(telegram_message, str(exc))
+            players.append(player)
+
+        activities = []
+        for player in players:
+            activity = Activity.objects.create(
+                player=player,
+                telegram_message=telegram_message,
+                amount=parsed.amount,
+                activity_type=parsed.activity_type,
+                description=parsed.description,
+            )
+            activities.append(activity)
+
         telegram_message.status = TelegramMessage.Status.PROCESSED
         telegram_message.save(update_fields=["status"])
 
@@ -189,7 +212,102 @@ def process_telegram_message(
         return ProcessResult(
             status=ProcessResultStatus.ACTIVITY_CREATED,
             telegram_message=telegram_message,
-            activity=activity,
+            activities=activities,
+        )
+
+
+def process_telegram_edit(
+    *,
+    chat_id: int,
+    message_id: int,
+    user_id: Optional[int] = None,
+    username: str = "",
+    text: str,
+    message_date: datetime,
+) -> ProcessResult:
+    """Re-process an edited Telegram message without double counting.
+
+    - If the edited text is not an activity message, the edit is ignored.
+    - If the original message was never processed, treat the edit as a new
+      message.
+    - If the original message was already PROCESSED, the edit is ignored to
+      avoid double counting.
+    - If the original message was in ERROR state, delete the old error and
+      re-process the edited text.
+    """
+    stripped = text.strip()
+    if not stripped.startswith("+"):
+        return ProcessResult(status=ProcessResultStatus.IGNORED)
+
+    tm = TelegramMessage.objects.filter(
+        telegram_chat_id=chat_id,
+        telegram_message_id=message_id,
+    ).first()
+    if tm is None:
+        return process_telegram_message(
+            chat_id=chat_id,
+            message_id=message_id,
+            user_id=user_id,
+            username=username,
+            text=text,
+            message_date=message_date,
+        )
+
+    # уже засчитано -> не пересчитывать
+    if tm.status == TelegramMessage.Status.PROCESSED:
+        notify_group_reply(tm, "Сообщение уже учтено — правка игнорируется.")
+        return ProcessResult(
+            status=ProcessResultStatus.EDIT_IGNORED,
+            telegram_message=tm,
+        )
+
+    # было ERROR -> переобработать
+    with transaction.atomic():
+        ProcessingError.objects.filter(telegram_message=tm).delete()
+        tm.text = stripped
+        tm.message_date = message_date
+        try:
+            parsed = parse_activity_message(stripped)
+        except ParserError as exc:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            return _create_processing_error(tm, str(exc))
+
+        multi = len(parsed.nicknames) > 1
+        players = []
+        for n in parsed.nicknames:
+            try:
+                player, _c = _resolve_or_create_player(
+                    n,
+                    user_id=user_id if not multi else None,
+                    username=username if not multi else "",
+                    bind_to_sender=not multi,
+                )
+            except PlayerConflictError as exc:
+                tm.text = stripped
+                tm.message_date = message_date
+                tm.save(update_fields=["text", "message_date"])
+                return _create_processing_error(tm, str(exc))
+            players.append(player)
+
+        for player in players:
+            Activity.objects.create(
+                player=player,
+                telegram_message=tm,
+                amount=parsed.amount,
+                activity_type=parsed.activity_type,
+                description=parsed.description,
+            )
+        tm.status = TelegramMessage.Status.PROCESSED
+        tm.save(update_fields=["status", "text", "message_date"])
+        return ProcessResult(
+            status=ProcessResultStatus.ACTIVITY_CREATED,
+            telegram_message=tm,
+            activities=(
+                players
+                and list(Activity.objects.filter(telegram_message=tm))
+                or None
+            ),
         )
 
 
