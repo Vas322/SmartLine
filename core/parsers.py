@@ -54,8 +54,9 @@ def _normalize_activity_type(raw: str) -> str:
 def parse_activity_message(text: str) -> ParsedActivity:
     """Parse a Telegram activity message into structured data.
 
-    Expected format: ``+X | TYPE | NICK | DESCRIPTION``. Additional ``|``
-    symbols inside DESCRIPTION are preserved.
+    Expected format: ``+X | TYPE | NICK`` (DESCRIPTION optional). Field order is
+    strict: amount, then type, then nicknames. DESCRIPTION may be omitted; any
+    additional ``|`` symbols inside DESCRIPTION are preserved.
     """
     stripped = text.strip()
     if not stripped.startswith("+"):
