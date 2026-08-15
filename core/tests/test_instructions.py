@@ -78,3 +78,10 @@ class InstructionsAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "+1 ДЕФ Swettka описание")
         self.assertContains(response, "+1 - ДЕФ - Swettka - описание")
+
+    def test_instruction_explains_multinick(self):
+        self.client.force_login(User.objects.create_user("kl", password="p"))
+        response = self.client.get(reverse("instructions"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мульти-ник")
+        self.assertContains(response, "Swettka, Vas, Dimas, Pocomaxa")
