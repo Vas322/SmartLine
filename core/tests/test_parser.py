@@ -98,10 +98,12 @@ class ParseActivityMessageTests(SimpleTestCase):
             parse_activity_message("+1 | деф | | описание")
         self.assertEqual(str(ctx.exception), "empty_nickname")
 
-    def test_too_few_fields(self):
-        with self.assertRaises(ParserError) as ctx:
-            parse_activity_message("+1 | деф | Swettka")
-        self.assertEqual(str(ctx.exception), "invalid_format")
+    def test_three_parts_without_description(self):
+        parsed = parse_activity_message("+1 | деф | Swettka")
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.description, "")
 
     def test_no_separators(self):
         with self.assertRaises(ParserError):
@@ -183,3 +185,25 @@ class ParseActivityMessageTests(SimpleTestCase):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 | деф | | описание")
         self.assertEqual(str(ctx.exception), "empty_nickname")
+
+    def test_user_example_without_description(self):
+        parsed = parse_activity_message("+0,5 | фарм | Ostin, Pocomaxa")
+        self.assertEqual(parsed.amount, Decimal("0.5"))
+        self.assertEqual(parsed.activity_type, "FARM")
+        self.assertEqual(parsed.nicknames, ["Ostin", "Pocomaxa"])
+        self.assertEqual(parsed.description, "")
+
+    def test_wrong_order_type_first(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+фарм | 0,5 | Ostin")
+        self.assertEqual(str(ctx.exception), "invalid_amount")
+
+    def test_wrong_order_nickname_first(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+Ostin | фарм | 0,5")
+        self.assertEqual(str(ctx.exception), "invalid_amount")
+
+    def test_wrong_order_type_in_nick_position(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+0,5 | Ostin | фарм")
+        self.assertEqual(str(ctx.exception), "invalid_activity_type")

@@ -85,3 +85,4 @@ class InstructionsAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Мульти-ник")
         self.assertContains(response, "Swettka, Vas, Dimas, Pocomaxa")
+        self.assertContains(response, "0,5 | фарм | Ostin, Pocomaxa")
