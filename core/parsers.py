@@ -6,6 +6,7 @@ message string into a :class:`ParsedActivity` or raises :class:`ParserError`.
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import List
 
 _ACTIVITY_TYPE_MAP = {
     "деф": "DEF",
@@ -25,7 +26,7 @@ class ParserError(ValueError):
 class ParsedActivity:
     amount: Decimal
     activity_type: str  # 'DEF' | 'FARM'
-    nickname: str
+    nicknames: List[str]
     description: str
 
 
@@ -72,9 +73,23 @@ def parse_activity_message(text: str) -> ParsedActivity:
     if not nickname:
         raise ParserError("empty_nickname")
 
+    nick_parts = [n.strip() for n in nickname.split(",")]
+    nicknames: list[str] = []
+    seen = set()
+    for n in nick_parts:
+        if not n:
+            continue
+        key = n.lower()
+        if key in seen:
+            continue  # тихий дедуп case-insensitive
+        seen.add(key)
+        nicknames.append(n)
+    if not nicknames:
+        raise ParserError("empty_nickname")
+
     return ParsedActivity(
         amount=amount,
         activity_type=activity_type,
-        nickname=nickname,
+        nicknames=nicknames,
         description=description,
     )

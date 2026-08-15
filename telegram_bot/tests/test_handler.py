@@ -31,11 +31,23 @@ def _make_update(
     return {"update_id": update_id, "message": message}
 
 
+def _make_edit_update(**kwargs):
+    update = _make_update(**kwargs)
+    update["edited_message"] = update.pop("message")
+    update["edited_message"]["edit_date"] = 1750000001
+    return update
+
+
 class HandleUpdateTests(SimpleTestCase):
-    @mock.patch("telegram_bot.handler.process_telegram_message", return_value=mock.Mock(status=mock.Mock(value="OK")))
-    def test_valid_update_calls_service(self, mock_process):
+    @mock.patch("telegram_bot.handler.process_telegram_edit")
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_message",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    def test_valid_update_calls_service(self, mock_process, mock_edit):
         handle_update(_make_update())
         mock_process.assert_called_once()
+        mock_edit.assert_not_called()
         kwargs = mock_process.call_args.kwargs
         self.assertEqual(kwargs["chat_id"], 1000)
         self.assertEqual(kwargs["message_id"], 10)
@@ -54,10 +66,41 @@ class HandleUpdateTests(SimpleTestCase):
         handle_update(_make_update(has_text=False))
         mock_process.assert_not_called()
 
-    @mock.patch("telegram_bot.handler.process_telegram_message", return_value=mock.Mock(status=mock.Mock(value="OK")))
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_message",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
     def test_missing_username_passes_empty(self, mock_process):
         update = _make_update()
         update["message"]["from"] = {"id": 500}
         handle_update(update)
         kwargs = mock_process.call_args.kwargs
         self.assertEqual(kwargs["username"], "")
+
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_edit",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_edited_message_calls_edit_service(self, mock_process, mock_edit):
+        handle_update(_make_edit_update())
+        mock_edit.assert_called_once()
+        mock_process.assert_not_called()
+        kwargs = mock_edit.call_args.kwargs
+        self.assertEqual(kwargs["chat_id"], 1000)
+        self.assertEqual(kwargs["message_id"], 10)
+        self.assertEqual(kwargs["user_id"], 500)
+        self.assertEqual(kwargs["username"], "swettka")
+        self.assertEqual(kwargs["text"], "+1 | деф | Swettka | Первая волна")
+        self.assertIsInstance(kwargs["message_date"], datetime)
+
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_edit",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_edited_message_without_text_is_ignored(self, mock_process, mock_edit):
+        update = _make_edit_update(has_text=False)
+        handle_update(update)
+        mock_edit.assert_not_called()
+        mock_process.assert_not_called()
