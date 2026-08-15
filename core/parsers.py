@@ -63,10 +63,11 @@ def parse_activity_message(text: str) -> ParsedActivity:
 
     rest = stripped[1:]
     parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=3)]
-    if len(parts) < 4:
+    if len(parts) < 3:
         raise ParserError("invalid_format")
 
-    amount_part, type_part, nickname, description = parts
+    amount_part, type_part, nickname = parts[0], parts[1], parts[2]
+    description = parts[3] if len(parts) > 3 else ""
     amount = _parse_amount(amount_part)
     activity_type = _normalize_activity_type(type_part)
 
