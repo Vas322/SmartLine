@@ -81,15 +81,15 @@ class TestPollErrorLogging(unittest.TestCase):
         from django.core.management import call_command
 
         with mock.patch(
-            "telegram_bot.management.commands.poll.TelegramBot"
+            "telegram_bot.polling.TelegramBot"
         ) as bot_mock, mock.patch(
-            "telegram_bot.management.commands.poll.time.sleep",
+            "telegram_bot.polling.time.sleep",
             side_effect=KeyboardInterrupt,
         ):
             instance = bot_mock.return_value
             instance.get_updates.side_effect = TelegramAPIError("HTTP 401: Unauthorized")
             with self.assertLogs(
-                "telegram_bot.management.commands.poll", level="ERROR"
+                "telegram_bot.polling", level="ERROR"
             ) as cm:
                 try:
                     call_command("poll")
