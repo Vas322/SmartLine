@@ -13,6 +13,8 @@
         <th>Игрок</th>
         <th>Тип</th>
         <th>Часы</th>
+        <th>Время волны</th>
+        <th>Выплата, кк</th>
         <th>Описание</th>
         <th>Исходное сообщение</th>
     </tr>
@@ -22,11 +24,13 @@
         <td>{{ activity.player.nickname }}</td>
         <td>{{ activity.activity_type }}</td>
         <td>{{ activity.amount }}</td>
+        <td>{% if activity.wave_start_time %}{{ activity.wave_start_time|time:"H:i" }}{% else %}—{% endif %}</td>
+        <td>{% if activity.payment_kk is not None %}{{ activity.payment_kk }}{% else %}—{% endif %}</td>
         <td>{{ activity.description }}</td>
         <td>{{ activity.telegram_message.text }}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">Активностей нет.</td></tr>
+    <tr><td colspan="8" class="muted">Активностей нет.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}

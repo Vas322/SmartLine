@@ -1,5 +1,5 @@
 """Tests for the Smartline web interface."""
-from datetime import timedelta
+from datetime import time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Activity, Player, TelegramMessage
+from core.models import Activity, Player, Rate, TelegramMessage
 
 _XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -99,7 +99,7 @@ class WebInterfaceTests(TestCase):
         response = self.client.get(reverse("dashboard"), {"period": "month"})
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        for text in ["Ник", "Адена", "Дефал", "Фармил", "%"]:
+        for text in ["Ник", "Выплата, кк", "Дефал", "Фармил", "%"]:
             self.assertIn(text, content)
 
     def test_excel_export_returns_xlsx_after_login(self):
@@ -184,3 +184,57 @@ class WebInterfaceTests(TestCase):
         response = self.client.post(reverse("player_delete", args=[self.player.pk]))
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
+
+    def test_settings_shows_rates_section(self):
+        self._login()
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Тарифы по времени", response.content.decode())
+
+    def test_settings_add_rate(self):
+        self._login()
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "start_time": "08:00",
+                "end_time": "16:00",
+                "rate_kk": "75.00",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+        rate = Rate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
+        self.assertEqual(rate.rate_kk, Decimal("75.00"))
+        self.assertTrue(rate.active)
+        self.assertEqual(rate.order, 0)
+
+    def test_settings_edit_rate(self):
+        self._login()
+        # The 0013_seed_default_rates migration inserts default rates; clear
+        # them so the count assertion below checks only this test's data.
+        Rate.objects.all().delete()
+        rate = Rate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("100"),
+        )
+
+        response = self.client.get(reverse("settings") + f"?edit={rate.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="edit_rate"', response.content.decode())
+
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "edit_rate": str(rate.pk),
+                "start_time": "09:00",
+                "end_time": "17:00",
+                "rate_kk": "80",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+
+        rate.refresh_from_db()
+        self.assertEqual(rate.start_time, time(9, 0))
+        self.assertEqual(rate.end_time, time(17, 0))
+        self.assertEqual(rate.rate_kk, Decimal("80"))
+        self.assertEqual(Rate.objects.count(), 1)

@@ -77,7 +77,7 @@ class InstructionsAccessTests(TestCase):
         response = self.client.get(reverse("instructions"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "+1 ДЕФ Swettka описание")
-        self.assertContains(response, "+1 - ДЕФ - Swettka - описание")
+        self.assertContains(response, "+1 - деф - Swettka - 11:56 - Первая волна")
 
     def test_instruction_explains_multinick(self):
         self.client.force_login(User.objects.create_user("kl", password="p"))

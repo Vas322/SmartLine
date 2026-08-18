@@ -2,6 +2,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional, Tuple
 
@@ -13,6 +14,7 @@ from core.services.notification_service import (
     notify_group_reply,
     notify_processing_error,
 )
+from core.services.rates import payment_kk
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +189,12 @@ def process_telegram_message(
                 return _create_processing_error(telegram_message, str(exc))
             players.append(player)
 
+        payment = (
+            Decimal("0")
+            if parsed.activity_type == "FARM"
+            else payment_kk(parsed.wave_start, parsed.amount)
+        )
+
         activities = []
         for player in players:
             activity = Activity.objects.create(
@@ -195,6 +203,8 @@ def process_telegram_message(
                 amount=parsed.amount,
                 activity_type=parsed.activity_type,
                 description=parsed.description,
+                wave_start_time=parsed.wave_start,
+                payment_kk=payment,
             )
             activities.append(activity)
 
@@ -290,6 +300,12 @@ def process_telegram_edit(
                 return _create_processing_error(tm, str(exc))
             players.append(player)
 
+        payment = (
+            Decimal("0")
+            if parsed.activity_type == "FARM"
+            else payment_kk(parsed.wave_start, parsed.amount)
+        )
+
         for player in players:
             Activity.objects.create(
                 player=player,
@@ -297,6 +313,8 @@ def process_telegram_edit(
                 amount=parsed.amount,
                 activity_type=parsed.activity_type,
                 description=parsed.description,
+                wave_start_time=parsed.wave_start,
+                payment_kk=payment,
             )
         tm.status = TelegramMessage.Status.PROCESSED
         tm.save(update_fields=["status", "text", "message_date"])

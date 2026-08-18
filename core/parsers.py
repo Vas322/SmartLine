@@ -5,6 +5,7 @@ message string into a :class:`ParsedActivity` or raises :class:`ParserError`.
 """
 import re
 from dataclasses import dataclass
+from datetime import time
 from decimal import Decimal, InvalidOperation
 from typing import List
 
@@ -16,6 +17,7 @@ _ACTIVITY_TYPE_MAP = {
 }
 
 _SEP_RE = re.compile(r'(?:\||-|–|—)')
+_WAVE_TIME_RE = re.compile(r'^(\d{1,2})[.:](\d{2})$')
 
 
 class ParserError(ValueError):
@@ -27,6 +29,7 @@ class ParsedActivity:
     amount: Decimal
     activity_type: str  # 'DEF' | 'FARM'
     nicknames: List[str]
+    wave_start: time
     description: str
 
 
@@ -51,26 +54,40 @@ def _normalize_activity_type(raw: str) -> str:
     return activity_type
 
 
+def _parse_wave_time(raw: str) -> time:
+    match = _WAVE_TIME_RE.match(raw)
+    if match is None:
+        raise ParserError("invalid_wave_time")
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    if hour > 23 or minute > 59:
+        raise ParserError("invalid_wave_time")
+    return time(hour=hour, minute=minute)
+
+
 def parse_activity_message(text: str) -> ParsedActivity:
     """Parse a Telegram activity message into structured data.
 
-    Expected format: ``+X | TYPE | NICK`` (DESCRIPTION optional). Field order is
-    strict: amount, then type, then nicknames. DESCRIPTION may be omitted; any
-    additional ``|`` symbols inside DESCRIPTION are preserved.
+    Expected format: ``+X | TYPE | NICK | TIME | DESCRIPTION``. Field order is
+    strict: amount, then type, then nicknames, then wave start time, then
+    description. DESCRIPTION may be omitted; any additional ``|`` symbols
+    inside DESCRIPTION are preserved.
     """
     stripped = text.strip()
     if not stripped.startswith("+"):
         raise ParserError("message_does_not_start_with_plus")
 
     rest = stripped[1:]
-    parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=3)]
-    if len(parts) < 3:
-        raise ParserError("invalid_format")
+    parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=4)]
+    if len(parts) < 5:
+        raise ParserError("missing_wave_time")
 
     amount_part, type_part, nickname = parts[0], parts[1], parts[2]
-    description = parts[3] if len(parts) > 3 else ""
+    time_part = parts[3]
+    description = parts[4]
     amount = _parse_amount(amount_part)
     activity_type = _normalize_activity_type(type_part)
+    wave_start = _parse_wave_time(time_part)
 
     if not nickname:
         raise ParserError("empty_nickname")
@@ -93,5 +110,6 @@ def parse_activity_message(text: str) -> ParsedActivity:
         amount=amount,
         activity_type=activity_type,
         nicknames=nicknames,
+        wave_start=wave_start,
         description=description,
     )

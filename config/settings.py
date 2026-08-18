@@ -1,6 +1,5 @@
 """Django settings for Smartline project."""
 import os
-from decimal import Decimal
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -115,7 +114,6 @@ LOGOUT_REDIRECT_URL = "/login/"
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 ADMIN_TELEGRAM_CHAT_IDS = os.getenv("ADMIN_TELEGRAM_CHAT_IDS", "")
-DEF_HOURLY_RATE = Decimal(os.getenv("DEF_HOURLY_RATE", "0"))
 
 LOGGING = {
     "version": 1,
