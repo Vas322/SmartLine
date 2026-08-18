@@ -5,7 +5,9 @@ from datetime import datetime
 from core.services.activity_service import (
     process_telegram_edit,
     process_telegram_message,
+    ProcessResultStatus,
 )
+from core.services.notification_service import notify_activity_reaction
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,8 @@ def handle_update(update: dict) -> None:
             text=text,
             message_date=message_date,
         )
+    if result.status == ProcessResultStatus.ACTIVITY_CREATED:
+        notify_activity_reaction(result.telegram_message, "✅")
     logger.info(
         "Processed message chat_id=%s message_id=%s status=%s",
         chat_id,

@@ -92,3 +92,32 @@ class TelegramBot:
                 f"Telegram API error in sendMessage: {data.get('description', 'unknown')}"
             )
         return data
+
+    def set_message_reaction(
+        self, chat_id: int, message_id: int, emoji: str
+    ) -> dict:
+        url = f"https://api.telegram.org/bot{self.token}/setMessageReaction"
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "reaction": [{"type": "emoji", "emoji": emoji}],
+        }
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+            raise TelegramAPIError(
+                f"Telegram setMessageReaction failed: {detail}"
+            ) from exc
+        data = response.json()
+        if not data.get("ok"):
+            raise TelegramAPIError(
+                f"Telegram API error in setMessageReaction: {data.get('description', 'unknown')}"
+            )
+        return data
