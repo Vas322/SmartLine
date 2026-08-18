@@ -1,33 +1,34 @@
 """Thin views for the Smartline web interface."""
-import decimal
 from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models.functions import Coalesce, TruncDate
 from django.forms import modelformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from core.forms import ActivityFilterForm, InstructionForm, PeriodForm, PlayerForm, SettingForm
-from core.models import Activity, Instruction, Player, ProcessingError, Setting, TelegramMessage
+from core.forms import (
+    ActivityFilterForm,
+    InstructionForm,
+    PeriodForm,
+    PlayerForm,
+    RateForm,
+    SettingForm,
+)
+from core.models import (
+    Activity,
+    Instruction,
+    Player,
+    ProcessingError,
+    Rate,
+    Setting,
+    TelegramMessage,
+)
 
 SettingFormSet = modelformset_factory(Setting, form=SettingForm, extra=0)
-
-
-def _get_hourly_rate() -> Decimal:
-    """Return the DEF hourly rate from the Setting, falling back to zero."""
-    rate_value = (
-        Setting.objects.filter(key="def_hourly_rate")
-        .values_list("value", flat=True)
-        .first()
-    )
-    try:
-        return Decimal(rate_value)
-    except (TypeError, ValueError, decimal.InvalidOperation):
-        return Decimal("0")
 
 
 def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
@@ -46,7 +47,6 @@ def dashboard(request):
     form = PeriodForm(request.GET or None, initial={"period": "month"})
     date_from, date_to = form.get_date_range()
     days_in_period = form.get_days_in_period()
-    rate = _get_hourly_rate()
 
     aggregates = (
         Activity.objects.filter(created_at__range=(date_from, date_to))
@@ -60,6 +60,13 @@ def dashboard(request):
                 "amount",
                 filter=Q(activity_type=Activity.ActivityType.FARM),
             ),
+            payment=Coalesce(
+                Sum(
+                    "payment_kk",
+                    filter=Q(activity_type=Activity.ActivityType.DEF),
+                ),
+                Decimal("0"),
+            ),
         )
     )
 
@@ -68,6 +75,7 @@ def dashboard(request):
         totals_by_player[row["player_id"]] = {
             "def_hours": row["def_hours"] or Decimal("0"),
             "farm_hours": row["farm_hours"] or Decimal("0"),
+            "payment": row["payment"] or Decimal("0"),
         }
 
     rows = []
@@ -84,7 +92,7 @@ def dashboard(request):
                 "total_hours": total_hours,
                 "def_hours": def_hours,
                 "farm_hours": farm_hours,
-                "adena": def_hours * rate,
+                "adena": totals.get("payment") or Decimal("0"),
                 "percent": _percent(total_hours, days_in_period),
             }
         )
@@ -107,7 +115,6 @@ def player_detail(request, pk: int):
     form = PeriodForm(request.GET or None, initial={"period": "month"})
     date_from, date_to = form.get_date_range()
     days_in_period = form.get_days_in_period()
-    rate = _get_hourly_rate()
 
     totals = Activity.objects.filter(
         player=player, created_at__range=(date_from, date_to)
@@ -120,6 +127,13 @@ def player_detail(request, pk: int):
             "amount",
             filter=Q(activity_type=Activity.ActivityType.FARM),
         ),
+        payment=Coalesce(
+            Sum(
+                "payment_kk",
+                filter=Q(activity_type=Activity.ActivityType.DEF),
+            ),
+            Decimal("0"),
+        ),
     )
     def_hours = totals["def_hours"] or Decimal("0")
     farm_hours = totals["farm_hours"] or Decimal("0")
@@ -127,7 +141,7 @@ def player_detail(request, pk: int):
 
     summary = {
         "total_hours": total_hours,
-        "adena": def_hours * rate,
+        "adena": totals["payment"] or Decimal("0",),
         "def_hours": def_hours,
         "farm_hours": farm_hours,
         "percent": _percent(total_hours, days_in_period),
@@ -234,10 +248,51 @@ def settings_view(request):
         request.POST or None,
         queryset=Setting.objects.order_by("key"),
     )
+
+    edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
+
+    if request.method == "POST":
+        rate_pk = request.POST.get("delete_rate")
+        if rate_pk:
+            try:
+                Rate.objects.filter(pk=rate_pk).delete()
+            except (TypeError, ValueError):
+                pass
+            return redirect("settings")
+
+        if request.POST.get("edit_rate"):
+            rate = Rate.objects.filter(pk=request.POST["edit_rate"]).first()
+            if rate:
+                rate_form = RateForm(request.POST, instance=rate)
+                if rate_form.is_valid():
+                    rate_form.save()
+                    return redirect("settings")
+            else:
+                rate_form = RateForm()
+        else:
+            rate_form = RateForm(request.POST)
+            if rate_form.is_valid():
+                rate_form.save()
+                return redirect("settings")
+    else:
+        rate = Rate.objects.filter(pk=edit_rate_pk).first() if edit_rate_pk else None
+        rate_form = RateForm(instance=rate) if rate else RateForm()
+
     if request.method == "POST" and formset.is_valid():
         formset.save()
         return redirect("settings")
-    return render(request, "core/settings.html", {"formset": formset})
+
+    rates = Rate.objects.all()
+    return render(
+        request,
+        "core/settings.html",
+        {
+            "formset": formset,
+            "rate_form": rate_form,
+            "rates": rates,
+            "edit_rate_pk": edit_rate_pk,
+        },
+    )
 
 
 @login_required

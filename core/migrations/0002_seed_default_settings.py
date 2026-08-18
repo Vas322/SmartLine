@@ -1,22 +1,19 @@
-"""Seed default settings for Smartline."""
-from django.conf import settings
+"""Seed default settings for Smartline.
+
+The legacy ``def_hourly_rate`` setting is obsolete: hourly DEF payment is now
+derived from the ``core.Rate`` model. The functions are kept as no-ops so the
+migration history stays stable for databases that already ran this migration.
+"""
 from django.db import migrations
 
 
 def seed_default_settings(apps, schema_editor):
-    Setting = apps.get_model("core", "Setting")
-    Setting.objects.get_or_create(
-        key="def_hourly_rate",
-        defaults={
-            "value": str(settings.DEF_HOURLY_RATE),
-            "description": "Ставка оплаты за час DEF",
-        },
-    )
+    # def_hourly_rate is no longer seeded; rates live in core.Rate.
+    pass
 
 
 def remove_default_settings(apps, schema_editor):
-    Setting = apps.get_model("core", "Setting")
-    Setting.objects.filter(key="def_hourly_rate").delete()
+    pass
 
 
 class Migration(migrations.Migration):

@@ -46,6 +46,20 @@ class TelegramMessage(models.Model):
         return f"{self.telegram_chat_id}:{self.telegram_message_id}"
 
 
+class Rate(models.Model):
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    rate_kk = models.DecimalField(max_digits=10, decimal_places=2)
+    active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "start_time"]
+
+    def __str__(self) -> str:
+        return f"{self.start_time:%H:%M}-{self.end_time:%H:%M}: {self.rate_kk} kk"
+
+
 class Activity(models.Model):
     class ActivityType(models.TextChoices):
         DEF = "DEF", "DEF"
@@ -63,6 +77,13 @@ class Activity(models.Model):
     )
     amount = models.DecimalField(max_digits=6, decimal_places=2)
     activity_type = models.CharField(max_length=8, choices=ActivityType.choices)
+    wave_start_time = models.TimeField(null=True, blank=True)
+    payment_kk = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
