@@ -118,6 +118,14 @@ class ParseActivityMessageTests(SimpleTestCase):
         self.assertEqual(parsed.nicknames, ["Swettka"])
         self.assertEqual(parsed.description, "")
 
+    def test_four_fields_no_description_parses(self):
+        parsed = parse_activity_message("+1 - деф - presli - 13:00")
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nicknames, ["presli"])
+        self.assertEqual(parsed.wave_start, time(13, 0))
+        self.assertEqual(parsed.description, "")
+
     def test_no_separators(self):
         with self.assertRaises(ParserError):
             parse_activity_message("+1 деф Swettka описание")
@@ -129,7 +137,7 @@ class ParseActivityMessageTests(SimpleTestCase):
 
     def test_missing_wave_time(self):
         with self.assertRaises(ParserError) as ctx:
-            parse_activity_message("+1 | деф | Swettka | описание")
+            parse_activity_message("+1 | деф | Swettka")
         self.assertEqual(str(ctx.exception), "missing_wave_time")
 
     def test_invalid_wave_time_text(self):

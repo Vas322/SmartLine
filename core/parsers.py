@@ -79,12 +79,12 @@ def parse_activity_message(text: str) -> ParsedActivity:
 
     rest = stripped[1:]
     parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=4)]
-    if len(parts) < 5:
+    if len(parts) < 4:
         raise ParserError("missing_wave_time")
 
     amount_part, type_part, nickname = parts[0], parts[1], parts[2]
     time_part = parts[3]
-    description = parts[4]
+    description = parts[4] if len(parts) > 4 else ""
     amount = _parse_amount(amount_part)
     activity_type = _normalize_activity_type(type_part)
     wave_start = _parse_wave_time(time_part)
