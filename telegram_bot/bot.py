@@ -112,6 +112,21 @@ class TelegramBot:
                 status = getattr(response, "status_code", None)
                 if status is not None:
                     detail += f" (HTTP {status})"
+                text = ""
+                try:
+                    text = (response.text or "").strip()
+                except Exception:
+                    text = ""
+                if text:
+                    detail += f": {text}"
+                else:
+                    try:
+                        body = response.json()
+                    except Exception:
+                        body = None
+                    desc = body.get("description") if isinstance(body, dict) else None
+                    if desc:
+                        detail += f": {desc}"
             raise TelegramAPIError(
                 f"Telegram setMessageReaction failed: {detail}"
             ) from exc
