@@ -16,7 +16,7 @@
     </tr>
     {% for instr in instructions %}
     <tr>
-        <td><a href="{% url 'instruction_edit' instr.pk %}">{{ instr.title }}</a></td>
+        <td><a href="{% url 'instruction_detail' instr.pk %}">{{ instr.title }}</a></td>
         <td>{{ instr.updated_at|date:"d.m.Y H:i" }}</td>
         <td>{{ instr.updated_by.username|default:"—" }}</td>
         <td>

@@ -23,6 +23,11 @@ urlpatterns = [
     path("instructions/", views.instructions, name="instructions"),
     path(
         "instructions/<int:pk>/",
+        views.instruction_detail,
+        name="instruction_detail",
+    ),
+    path(
+        "instructions/<int:pk>/edit/",
         views.instruction_edit,
         name="instruction_edit",
     ),

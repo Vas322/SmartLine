@@ -1,0 +1,12 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block title %}{{ instruction.title }}{% endblock %}
+{% block content %}
+<h1>{{ instruction.title }}</h1>
+<div class="instruction-detail">
+    {{ instruction.content|linebreaks }}
+</div>
+<p class="instruction-meta">Слаг: {{ instruction.slug }} · Обновлено: {{ instruction.updated_at|date:"d.m.Y H:i" }}</p>
+<a class="btn" href="{% url 'instruction_edit' instruction.pk %}">Редактировать</a>
+<p><a href="{% url 'instructions' %}">← Назад к списку</a></p>
+{% endblock %}
