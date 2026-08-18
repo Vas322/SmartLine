@@ -249,3 +249,40 @@ class ParseActivityMessageTests(SimpleTestCase):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+0,5 | Ostin | фарм | 11.56 | описание")
         self.assertEqual(str(ctx.exception), "invalid_activity_type")
+
+    def test_wave_time_flexible_description_after_time(self):
+        parsed = parse_activity_message(
+            "+1 - farm - Pocomaxa - 18:00. Тестовое сообщение"
+        )
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "FARM")
+        self.assertEqual(parsed.nicknames, ["Pocomaxa"])
+        self.assertEqual(parsed.wave_start, time(18, 0))
+        self.assertEqual(parsed.description, "Тестовое сообщение")
+
+    def test_wave_time_flexible_description_without_punctuation(self):
+        parsed = parse_activity_message(
+            "+1 - farm - Pocomaxa - 18.00 Тестовое сообщение"
+        )
+        self.assertEqual(parsed.wave_start, time(18, 0))
+        self.assertEqual(parsed.description, "Тестовое сообщение")
+
+    def test_wave_time_flexible_no_description(self):
+        parsed = parse_activity_message("+1 - farm - Pocomaxa - 18:00")
+        self.assertEqual(parsed.wave_start, time(18, 0))
+        self.assertEqual(parsed.description, "")
+
+    def test_wave_time_flexible_separate_description_field(self):
+        parsed = parse_activity_message(
+            "+1 - farm - Pocomaxa - 18:00 - отдельное описание"
+        )
+        self.assertEqual(parsed.wave_start, time(18, 0))
+        self.assertEqual(parsed.description, "отдельное описание")
+
+    def test_wave_time_flexible_rejects_invalid_hour(self):
+        with self.assertRaisesRegex(ParserError, "invalid_wave_time"):
+            parse_activity_message("+1 - farm - Pocomaxa - 99:99")
+
+    def test_wave_time_flexible_rejects_garbage(self):
+        with self.assertRaisesRegex(ParserError, "invalid_wave_time"):
+            parse_activity_message("+1 - farm - Pocomaxa - бессмыслица")

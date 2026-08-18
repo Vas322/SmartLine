@@ -18,6 +18,7 @@ _ACTIVITY_TYPE_MAP = {
 
 _SEP_RE = re.compile(r'(?:\||-|–|—)')
 _WAVE_TIME_RE = re.compile(r'^(\d{1,2})[.:](\d{2})$')
+_TIME_WITH_REST_RE = re.compile(r'^(\d{1,2})[.:](\d{2})(?:[.,;]?\s*(.*))?$')
 
 
 class ParserError(ValueError):
@@ -65,6 +66,23 @@ def _parse_wave_time(raw: str) -> time:
     return time(hour=hour, minute=minute)
 
 
+def _parse_wave_time_flexible(raw: str):
+    raw = raw.strip()
+    try:
+        return _parse_wave_time(raw), ""
+    except ParserError:
+        pass
+    match = _TIME_WITH_REST_RE.match(raw)
+    if match is None:
+        raise ParserError("invalid_wave_time")
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    if hour > 23 or minute > 59:
+        raise ParserError("invalid_wave_time")
+    rest = (match.group(3) or "").strip()
+    return time(hour=hour, minute=minute), rest
+
+
 def parse_activity_message(text: str) -> ParsedActivity:
     """Parse a Telegram activity message into structured data.
 
@@ -84,10 +102,14 @@ def parse_activity_message(text: str) -> ParsedActivity:
 
     amount_part, type_part, nickname = parts[0], parts[1], parts[2]
     time_part = parts[3]
-    description = parts[4] if len(parts) > 4 else ""
     amount = _parse_amount(amount_part)
     activity_type = _normalize_activity_type(type_part)
-    wave_start = _parse_wave_time(time_part)
+    wave_start, time_extra = _parse_wave_time_flexible(time_part)
+
+    if len(parts) > 4:
+        description = (time_extra + " " + parts[4]).strip()
+    else:
+        description = time_extra
 
     if not nickname:
         raise ParserError("empty_nickname")
