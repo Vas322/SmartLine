@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block title %}Редактирование инструкции{% endblock %}
+{% block content %}
+<h1>Редактирование инструкции</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Сохранить</button>
+    <a href="{% url 'instructions' %}" class="btn">Отмена</a>
+</form>
+{% endblock %}

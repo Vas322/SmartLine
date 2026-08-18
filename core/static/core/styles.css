@@ -170,3 +170,7 @@ input, select, textarea {
 .muted {
     color: #777;
 }
+.field-content {
+    width: 100%;
+    box-sizing: border-box;
+}

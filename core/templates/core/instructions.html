@@ -2,33 +2,35 @@
 {% block title %}Инструкции{% endblock %}
 {% block content %}
 <h1>Инструкции</h1>
-{% for instr in instructions %}
-    <section class="instruction">
-        <h2>{{ instr.title }}</h2>
-        <p class="meta">Последнее редактирование: {% if instr.updated_by %}{{ instr.updated_by.username }}, {{ instr.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</p>
-        <div class="instruction-content">{{ instr.content|linebreaks }}</div>
-        {% if edit_pk == instr.pk and edit_form %}
-        <form method="post" action="{% url 'instructions' %}">
-            {% csrf_token %}
-            <input type="hidden" name="pk" value="{{ instr.pk }}">
-            {{ edit_form.as_p }}
-            <button type="submit" class="btn">Сохранить</button>
-            <a class="btn" href="{% url 'instructions' %}">Отмена</a>
-        </form>
-        {% else %}
-        <button type="button" class="btn edit-toggle" data-target="edit-form-{{ instr.pk }}">Редактировать</button>
-        <form id="edit-form-{{ instr.pk }}" class="edit-form" method="post" action="{% url 'instructions' %}" hidden>
-            {% csrf_token %}
-            <input type="hidden" name="pk" value="{{ instr.pk }}">
-            <input type="text" name="title" value="{{ instr.title }}" class="edit-title">
-            <textarea name="content" rows="10" class="edit-content">{{ instr.content }}</textarea>
-            <button type="submit" class="btn">Сохранить</button>
-            <button type="button" class="btn edit-cancel" data-target="edit-form-{{ instr.pk }}">Отмена</button>
-        </form>
-        {% endif %}
-    </section>
-{% empty %}
-    <p class="muted">Инструкций пока нет.</p>
-{% endfor %}
+<form method="post" action="{% url 'instructions' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add">
+    <button type="submit" class="btn">Добавить инструкцию</button>
+</form>
+<table>
+    <tr>
+        <th>Название</th>
+        <th>Обновлено</th>
+        <th>Кем</th>
+        <th>Действие</th>
+    </tr>
+    {% for instr in instructions %}
+    <tr>
+        <td><a href="{% url 'instruction_edit' instr.pk %}">{{ instr.title }}</a></td>
+        <td>{{ instr.updated_at|date:"d.m.Y H:i" }}</td>
+        <td>{{ instr.updated_by.username|default:"—" }}</td>
+        <td>
+            <form method="post" action="{% url 'instructions' %}" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="pk" value="{{ instr.pk }}">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Удалить инструкцию «{{ instr.title }}»?')">Удалить</button>
+            </form>
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="muted">Инструкций пока нет.</td></tr>
+    {% endfor %}
+</table>
 {% if saved %}<div id="edit-notify" hidden data-message="Инструкция успешно отредактирована"></div>{% endif %}
 {% endblock %}
