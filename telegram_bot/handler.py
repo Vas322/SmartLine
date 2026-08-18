@@ -67,7 +67,7 @@ def handle_update(update: dict) -> None:
             message_date=message_date,
         )
     if result.status == ProcessResultStatus.ACTIVITY_CREATED:
-        notify_activity_reaction(result.telegram_message, "👍")
+        notify_activity_reaction(result.telegram_message, "🎉")
     logger.info(
         "Processed message chat_id=%s message_id=%s status=%s",
         chat_id,
