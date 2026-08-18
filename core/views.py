@@ -3,10 +3,12 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from core.forms import (
@@ -35,6 +37,17 @@ def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
     if percent > Decimal("100"):
         percent = Decimal("100")
     return percent.quantize(Decimal("0.01"))
+
+
+def _unique_instruction_slug(base: str) -> str:
+    """Return a slug that does not collide with existing Instruction slugs."""
+    slug = slugify(base) or "instruction"
+    original = slug
+    n = 2
+    while Instruction.objects.filter(slug=slug).exists():
+        slug = f"{original}-{n}"
+        n += 1
+    return slug
 
 
 @login_required
@@ -282,27 +295,46 @@ def settings_view(request):
 
 @login_required
 def instructions(request):
-    edit_pk = None
-    edit_form = None
     if request.method == "POST":
-        pk = request.POST.get("pk")
-        instr = get_object_or_404(Instruction, pk=pk)
+        action = request.POST.get("action")
+        if action == "add":
+            slug = _unique_instruction_slug("instruction")
+            instr = None
+            for _ in range(5):
+                try:
+                    instr = Instruction.objects.create(title="Новая инструкция", slug=slug)
+                    break
+                except IntegrityError:
+                    slug = _unique_instruction_slug("instruction")
+            if instr is None:
+                return redirect("instructions")
+            return redirect("instruction_edit", pk=instr.pk)
+        if action == "delete":
+            pk = request.POST.get("pk")
+            Instruction.objects.filter(pk=pk).delete()
+            return redirect("instructions")
+    instructions_qs = Instruction.objects.order_by("title")
+    return render(
+        request,
+        "core/instructions.html",
+        {"instructions": instructions_qs, "saved": request.GET.get("saved")},
+    )
+
+
+@login_required
+def instruction_edit(request, pk: int):
+    instr = get_object_or_404(Instruction, pk=pk)
+    if request.method == "POST":
         form = InstructionForm(request.POST, instance=instr)
         if form.is_valid():
             saved = form.save(commit=False)
             saved.updated_by = request.user
             saved.save()
             return redirect(reverse("instructions") + "?saved=1")
-        edit_pk = instr.pk
-        edit_form = form
-    instructions_qs = Instruction.objects.order_by("title")
+    else:
+        form = InstructionForm(instance=instr)
     return render(
         request,
-        "core/instructions.html",
-        {
-            "instructions": instructions_qs,
-            "saved": request.GET.get("saved"),
-            "edit_pk": edit_pk,
-            "edit_form": edit_form,
-        },
+        "core/instruction_edit.html",
+        {"form": form, "instruction": instr},
     )

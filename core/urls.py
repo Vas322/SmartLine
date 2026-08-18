@@ -21,5 +21,10 @@ urlpatterns = [
     path("telegram-messages/", views.telegram_messages, name="telegram_messages"),
     path("processing_errors/", views.processing_errors, name="processing_errors"),
     path("instructions/", views.instructions, name="instructions"),
+    path(
+        "instructions/<int:pk>/",
+        views.instruction_edit,
+        name="instruction_edit",
+    ),
     path("settings/", views.settings_view, name="settings"),
 ]

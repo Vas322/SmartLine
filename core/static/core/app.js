@@ -86,4 +86,15 @@
     if (notify && notify.dataset.message) {
         showModal(notify.dataset.message, null, true);
     }
+
+    // --- Авто-рост текстовых полей под содержимое ---
+    function autoGrow(el) {
+        el.style.height = "auto";
+        el.style.height = el.scrollHeight + "px";
+    }
+    var growables = document.querySelectorAll("textarea.auto-grow");
+    Array.prototype.forEach.call(growables, function (el) {
+        autoGrow(el);
+        el.addEventListener("input", function () { autoGrow(el); });
+    });
 })();

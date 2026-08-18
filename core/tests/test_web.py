@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Activity, Player, Rate, TelegramMessage
+from core.models import Activity, Instruction, Player, Rate, TelegramMessage
 
 _XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -238,3 +238,64 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(rate.end_time, time(17, 0))
         self.assertEqual(rate.rate_kk, Decimal("80"))
         self.assertEqual(Rate.objects.count(), 1)
+
+    def test_instructions_list_table(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="how-to", title="Test Instruction", content="Body"
+        )
+        response = self.client.get(reverse("instructions"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Test Instruction", content)
+        self.assertIn(
+            reverse("instruction_edit", args=[instr.pk]), content
+        )
+
+    def test_instructions_add_creates_and_redirects(self):
+        self._login()
+        count_before = Instruction.objects.count()
+        response = self.client.post(
+            reverse("instructions"), {"action": "add"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Instruction.objects.count(), count_before + 1)
+        instr = Instruction.objects.latest("id")
+        self.assertEqual(instr.title, "Новая инструкция")
+        self.assertTrue(instr.slug.startswith("instruction"))
+
+    def test_instructions_edit_saves(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="x", title="Old", content="Old body"
+        )
+        response = self.client.post(
+            reverse("instruction_edit", args=[instr.pk]),
+            {"slug": "x", "title": "New", "content": "Body"},
+        )
+        self.assertRedirects(
+            response, reverse("instructions") + "?saved=1"
+        )
+        instr.refresh_from_db()
+        self.assertEqual(instr.title, "New")
+        self.assertEqual(instr.content, "Body")
+        self.assertEqual(instr.updated_by, self.user)
+
+    def test_instructions_delete(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="del-me", title="X", content="c"
+        )
+        response = self.client.post(
+            reverse("instructions"),
+            {"action": "delete", "pk": instr.pk},
+        )
+        self.assertRedirects(response, reverse("instructions"))
+        self.assertFalse(Instruction.objects.filter(pk=instr.pk).exists())
+
+    def test_instruction_edit_404(self):
+        self._login()
+        response = self.client.get(
+            reverse("instruction_edit", args=[999999])
+        )
+        self.assertEqual(response.status_code, 404)
