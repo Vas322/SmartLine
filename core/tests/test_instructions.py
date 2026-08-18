@@ -51,3 +51,28 @@ class InstructionsAccessTests(TestCase):
         response = self.client.get(reverse("instructions") + "?saved=1")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="edit-notify"')
+
+
+class InstructionWebTests(TestCase):
+    def _login(self):
+        self.client.force_login(User.objects.create_user("kl", password="p"))
+
+    def test_detail_page_renders_content(self):
+        instr = Instruction.objects.create(slug="d1", title="DT", content="Detail body")
+        self._login()
+        response = self.client.get(reverse("instruction_detail", args=[instr.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Detail body")
+        self.assertContains(response, "DT")
+        self.assertContains(response, reverse("instruction_edit", args=[instr.pk]))
+
+    def test_detail_page_404_unknown_pk(self):
+        self._login()
+        response = self.client.get(reverse("instruction_detail", args=[999999]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_list_title_links_to_detail(self):
+        instr = Instruction.objects.create(slug="d2", title="LT", content="LC")
+        self._login()
+        response = self.client.get(reverse("instructions"))
+        self.assertContains(response, reverse("instruction_detail", args=[instr.pk]))

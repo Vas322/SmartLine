@@ -249,6 +249,9 @@ class WebInterfaceTests(TestCase):
         content = response.content.decode()
         self.assertIn("Test Instruction", content)
         self.assertIn(
+            reverse("instruction_detail", args=[instr.pk]), content
+        )
+        self.assertNotIn(
             reverse("instruction_edit", args=[instr.pk]), content
         )
 

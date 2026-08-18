@@ -68,19 +68,6 @@
         });
     }
 
-    // --- Инлайн-редактирование инструкций ---
-    document.addEventListener("click", function (event) {
-        var toggle = event.target.closest(".edit-toggle, .edit-cancel");
-        if (!toggle) {
-            return;
-        }
-        var targetId = toggle.getAttribute("data-target");
-        var formEl = document.getElementById(targetId);
-        if (formEl) {
-            formEl.hidden = !formEl.hidden;
-        }
-    });
-
     // --- Модальное уведомление об успешном редактировании ---
     var notify = document.getElementById("edit-notify");
     if (notify && notify.dataset.message) {

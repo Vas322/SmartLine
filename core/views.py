@@ -322,6 +322,16 @@ def instructions(request):
 
 
 @login_required
+def instruction_detail(request, pk: int):
+    instr = get_object_or_404(Instruction, pk=pk)
+    return render(
+        request,
+        "core/instruction_detail.html",
+        {"instruction": instr},
+    )
+
+
+@login_required
 def instruction_edit(request, pk: int):
     instr = get_object_or_404(Instruction, pk=pk)
     if request.method == "POST":
