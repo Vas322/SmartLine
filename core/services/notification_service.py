@@ -127,6 +127,6 @@ def notify_activity_reaction(telegram_message, emoji: str = "✅") -> bool:
         logger.warning(
             "Failed to set reaction on message_id=%s: %s",
             telegram_message.telegram_message_id,
-            type(exc).__name__,
+            exc,
         )
         return False
