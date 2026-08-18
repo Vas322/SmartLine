@@ -41,7 +41,7 @@ class HandlerReactionTests(SimpleTestCase):
     )
     def test_activity_created_triggers_reaction(self, mock_process, mock_reaction):
         handle_update(_make_update())
-        mock_reaction.assert_called_once_with(FAKE_MESSAGE, "✅")
+        mock_reaction.assert_called_once_with(FAKE_MESSAGE, "👍")
 
     @mock.patch("telegram_bot.handler.notify_activity_reaction")
     @mock.patch(
@@ -65,4 +65,4 @@ class HandlerReactionTests(SimpleTestCase):
         self, mock_process, mock_edit, mock_reaction
     ):
         handle_update(_make_edit_update())
-        mock_reaction.assert_called_once_with(FAKE_MESSAGE, "✅")
+        mock_reaction.assert_called_once_with(FAKE_MESSAGE, "👍")

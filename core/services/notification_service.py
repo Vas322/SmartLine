@@ -105,7 +105,7 @@ def notify_group_reply(telegram_message, text: str) -> bool:
     return True
 
 
-def notify_activity_reaction(telegram_message, emoji: str = "✅") -> bool:
+def notify_activity_reaction(telegram_message, emoji: str = "👍") -> bool:
     """Put a reaction emoji on the original message to signal success.
 
     Best-effort: never raises, so message processing is never broken.

@@ -26,7 +26,7 @@ class NotifyActivityReactionTests(SimpleTestCase):
         mock_reaction.assert_called_once_with(
             chat_id=-100,
             message_id=5,
-            emoji="✅",
+            emoji="👍",
         )
 
     @override_settings(TELEGRAM_BOT_TOKEN="")
