@@ -6,6 +6,7 @@ import requests
 from django.conf import settings
 
 from core.models import ProcessingError
+from core.error_messages import friendly_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ def notify_processing_error(error: ProcessingError) -> None:
     message = error.telegram_message
     text = (
         "Smartline: ошибка обработки Telegram-сообщения\n"
-        f"Причина: {error.reason}\n"
+        f"Причина: {friendly_error_message(error.reason)}\n"
         f"Текст: {message.text}\n"
         f"Username: {message.telegram_username or '-'}\n"
         f"Дата: {message.message_date.isoformat()}\n"
@@ -102,3 +103,30 @@ def notify_group_reply(telegram_message, text: str) -> bool:
         )
         return False
     return True
+
+
+def notify_activity_reaction(telegram_message, emoji: str = "✅") -> bool:
+    """Put a reaction emoji on the original message to signal success.
+
+    Best-effort: never raises, so message processing is never broken.
+    """
+    from telegram_bot.bot import TelegramBot
+
+    token = settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        logger.warning("TELEGRAM_BOT_TOKEN is not configured; reaction skipped")
+        return False
+    try:
+        TelegramBot(token=token).set_message_reaction(
+            chat_id=telegram_message.telegram_chat_id,
+            message_id=telegram_message.telegram_message_id,
+            emoji=emoji,
+        )
+        return True
+    except Exception as exc:  # никогда не ломает обработку сообщения
+        logger.warning(
+            "Failed to set reaction on message_id=%s: %s",
+            telegram_message.telegram_message_id,
+            type(exc).__name__,
+        )
+        return False
