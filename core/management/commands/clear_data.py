@@ -1,4 +1,4 @@
-"""Clear local test data, keep config (Instruction, Rate, Setting) and users."""
+"""Clear local test data, keep config (Instruction, Rate) and users."""
 from django.core.management.base import BaseCommand
 
 from core.models import Activity, Player, ProcessingError, TelegramMessage
