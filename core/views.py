@@ -5,7 +5,6 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
-from django.forms import modelformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -16,7 +15,6 @@ from core.forms import (
     PeriodForm,
     PlayerForm,
     RateForm,
-    SettingForm,
 )
 from core.models import (
     Activity,
@@ -24,11 +22,8 @@ from core.models import (
     Player,
     ProcessingError,
     Rate,
-    Setting,
     TelegramMessage,
 )
-
-SettingFormSet = modelformset_factory(Setting, form=SettingForm, extra=0)
 
 
 def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
@@ -244,11 +239,6 @@ def processing_errors(request):
 
 @login_required
 def settings_view(request):
-    formset = SettingFormSet(
-        request.POST or None,
-        queryset=Setting.objects.order_by("key"),
-    )
-
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
 
     if request.method == "POST":
@@ -278,16 +268,11 @@ def settings_view(request):
         rate = Rate.objects.filter(pk=edit_rate_pk).first() if edit_rate_pk else None
         rate_form = RateForm(instance=rate) if rate else RateForm()
 
-    if request.method == "POST" and formset.is_valid():
-        formset.save()
-        return redirect("settings")
-
     rates = Rate.objects.all()
     return render(
         request,
         "core/settings.html",
         {
-            "formset": formset,
             "rate_form": rate_form,
             "rates": rates,
             "edit_rate_pk": edit_rate_pk,

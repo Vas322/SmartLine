@@ -2,25 +2,6 @@
 {% block title %}Настройки{% endblock %}
 {% block content %}
 <h1>Настройки</h1>
-<form method="post">
-    {% csrf_token %}
-    {{ formset.management_form }}
-    <table>
-        <tr>
-            <th>Ключ</th>
-            <th>Адена за посещение</th>
-            <th>Описание</th>
-        </tr>
-        {% for form in formset %}
-        <tr>
-            <td>{{ form.id }}{{ form.key }}</td>
-            <td>{{ form.value }}</td>
-            <td>{{ form.description }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    <button type="submit" class="btn">Сохранить</button>
-</form>
 
 <h2>Тарифы по времени</h2>
 <table>

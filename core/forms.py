@@ -4,7 +4,7 @@ from datetime import datetime, time
 from django import forms
 from django.utils import timezone
 
-from core.models import Instruction, Player, Rate, Setting
+from core.models import Instruction, Player, Rate
 
 _PERIOD_CHOICES = [
     ("today", "Сегодня"),
@@ -153,12 +153,6 @@ class PeriodForm(forms.Form):
         """Return the number of days in the chosen period."""
         start, end = self._get_period_dates()
         return (end - start).days + 1
-
-
-class SettingForm(forms.ModelForm):
-    class Meta:
-        model = Setting
-        fields = ["key", "value", "description"]
 
 
 class RateForm(forms.ModelForm):

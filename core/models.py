@@ -114,15 +114,6 @@ class ProcessingError(models.Model):
         return f"{self.telegram_message} {self.reason}"
 
 
-class Setting(models.Model):
-    key = models.CharField(max_length=64, unique=True)
-    value = models.CharField(max_length=255)
-    description = models.CharField(max_length=255, blank=True)
-
-    def __str__(self) -> str:
-        return self.key
-
-
 class Instruction(models.Model):
     slug = models.CharField(max_length=64, unique=True)
     title = models.CharField(max_length=128)

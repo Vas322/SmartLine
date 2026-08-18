@@ -1,7 +1,7 @@
 """Django admin registration for the core models."""
 from django.contrib import admin
 
-from core.models import Activity, Player, ProcessingError, Setting, TelegramMessage
+from core.models import Activity, Player, ProcessingError, TelegramMessage
 
 
 @admin.register(Player)
@@ -35,9 +35,3 @@ class ActivityAdmin(admin.ModelAdmin):
 class ProcessingErrorAdmin(admin.ModelAdmin):
     list_display = ("reason", "status", "created_at")
     list_filter = ("status",)
-
-
-@admin.register(Setting)
-class SettingAdmin(admin.ModelAdmin):
-    list_display = ("key", "value", "description")
-    search_fields = ("key",)
