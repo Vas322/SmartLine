@@ -146,6 +146,21 @@ class ParseActivityMessageTests(SimpleTestCase):
             parse_activity_message("+1 | деф | Swettka")
         self.assertEqual(str(ctx.exception), "missing_wave_time")
 
+    def test_missing_activity_type_when_type_omitted(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 - Росомаха - 20.00 текст для теста вот такое сообщение")
+        self.assertEqual(str(ctx.exception), "missing_activity_type")
+
+    def test_missing_activity_type_with_pipe_separators(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | Росомаха | 20.00")
+        self.assertEqual(str(ctx.exception), "missing_activity_type")
+
+    def test_missing_nickname_when_type_and_time_present(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | деф | 20.00")
+        self.assertEqual(str(ctx.exception), "empty_nickname")
+
     def test_invalid_wave_time_text(self):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 | деф | Swettka | вечером | описание")
