@@ -21,6 +21,9 @@ def run_poll_loop() -> None:
                     handle_update(update)
                 except Exception:
                     logger.exception("Error handling telegram update")
+                    # Keep the failed update's offset so Telegram redelivers
+                    # it (at-least-once); duplicates are blocked by DB unique
+                    # constraint on chat_id + message_id.
                     break
                 offset = update["update_id"] + 1
         except Exception as exc:
