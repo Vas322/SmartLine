@@ -103,7 +103,19 @@ def parse_activity_message(text: str) -> ParsedActivity:
         # misleading.
         raise ParserError("missing_field_separators")
     if len(parts) < 4:
-        raise ParserError("missing_wave_time")
+        # Message has separators but fewer than the 4 structural fields
+        # (amount, type, nick, time). Instead of always blaming the wave
+        # time, inspect the available parts to name the actually missing
+        # role (type / time / nickname).
+        remaining = parts[1:]
+        has_type = any(p.strip().lower() in _ACTIVITY_TYPE_MAP for p in remaining)
+        has_time = any(_TIME_WITH_REST_RE.match(p) for p in remaining)
+        if not has_type:
+            raise ParserError("missing_activity_type")
+        if not has_time:
+            raise ParserError("missing_wave_time")
+        # Type and time are present but there is no room for the nickname.
+        raise ParserError("empty_nickname")
 
     amount_part, type_part, nickname = parts[0], parts[1], parts[2]
     time_part = parts[3]
