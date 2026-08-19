@@ -21,6 +21,7 @@ def run_poll_loop() -> None:
                     handle_update(update)
                 except Exception:
                     logger.exception("Error handling telegram update")
+                    break
                 offset = update["update_id"] + 1
         except Exception as exc:
             logger.error("Telegram polling error: %s", exc)

@@ -1,49 +1,61 @@
 services:
-  db:
-    image: postgres:17
+  smartline-db:
+    image: postgres:16
     environment:
-      POSTGRES_DB: smartline
-      POSTGRES_USER: smartline
-      POSTGRES_PASSWORD: smartline
+      POSTGRES_DB: ${POSTGRES_DB:-smartline}
+      POSTGRES_USER: ${POSTGRES_USER:-smartline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - smartline_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U smartline -d smartline"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - smartline_net
+    restart: unless-stopped
 
-  web:
+  smartline-web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
     env_file: .env
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      DATABASE_ENGINE: postgresql
+    command: sh -c "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2"
     depends_on:
-      db:
+      smartline-db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
+    networks:
+      - smartline_net
+      - caddy_net
+    restart: unless-stopped
 
-  telegram_bot:
+  smartline-bot:
     build: .
+    env_file: .env
     command: python manage.py poll
+    depends_on:
+      smartline-db:
+        condition: service_healthy
+    networks:
+      - smartline_net
+    restart: unless-stopped
+
+  smartline-backup:
+    image: postgres:16
     env_file: .env
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      DATABASE_ENGINE: postgresql
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - .:/app
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      PGUSER: ${POSTGRES_USER:-smartline}
+      PGHOST: ${POSTGRES_HOST:-db}
+      PGDATABASE: ${POSTGRES_DB:-smartline}
+    networks:
+      - smartline_net
+    profiles: ["tools"]
+
+networks:
+  smartline_net:
+  caddy_net:
+    external: true
+    name: app_default
 
 volumes:
-  pgdata:
+  smartline_db_data:
