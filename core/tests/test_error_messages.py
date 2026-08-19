@@ -15,7 +15,10 @@ class FriendlyErrorMessageTests(SimpleTestCase):
         self.assertIn("час", friendly_error_message("invalid_amount"))
 
     def test_invalid_activity_type(self):
-        self.assertIn("деф", friendly_error_message("invalid_activity_type"))
+        self.assertEqual(
+            friendly_error_message("invalid_activity_type"),
+            "Неизвестный тип активности.",
+        )
 
     def test_invalid_wave_time(self):
         self.assertIn("волн", friendly_error_message("invalid_wave_time"))
