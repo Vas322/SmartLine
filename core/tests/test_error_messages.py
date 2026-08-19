@@ -23,6 +23,11 @@ class FriendlyErrorMessageTests(SimpleTestCase):
     def test_missing_wave_time(self):
         self.assertIn("врем", friendly_error_message("missing_wave_time"))
 
+    def test_missing_field_separators_message(self):
+        msg = friendly_error_message("missing_field_separators")
+        self.assertIn("разделител", msg)
+        self.assertIn("|", msg)
+
     def test_empty_nickname(self):
         self.assertIn("ник", friendly_error_message("empty_nickname"))
 

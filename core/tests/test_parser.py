@@ -127,8 +127,14 @@ class ParseActivityMessageTests(SimpleTestCase):
         self.assertEqual(parsed.description, "")
 
     def test_no_separators(self):
-        with self.assertRaises(ParserError):
+        with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 деф Swettka описание")
+        self.assertEqual(str(ctx.exception), "missing_field_separators")
+
+    def test_no_separators_uses_smart_error(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 деф Polako Attacker 13.00")
+        self.assertEqual(str(ctx.exception), "missing_field_separators")
 
     def test_empty_description_allowed(self):
         parsed = parse_activity_message("+1 | деф | Swettka | 11.56 |")

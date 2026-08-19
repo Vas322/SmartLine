@@ -97,6 +97,11 @@ def parse_activity_message(text: str) -> ParsedActivity:
 
     rest = stripped[1:]
     parts = [part.strip() for part in _SEP_RE.split(rest, maxsplit=4)]
+    if len(parts) == 1:
+        # No field separators (| - – —) were used; the whole message is a
+        # single blob, so the generic "missing wave time" error would be
+        # misleading.
+        raise ParserError("missing_field_separators")
     if len(parts) < 4:
         raise ParserError("missing_wave_time")
 
