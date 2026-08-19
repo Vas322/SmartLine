@@ -13,8 +13,11 @@ def _make_update(
     message_id=10,
     chat_id=1000,
     text="+1 | деф | Swettka | Первая волна",
+    caption="+1 | деф | Swettka | Первая волна",
     has_from=True,
     has_text=True,
+    has_caption=False,
+    has_photo=False,
     has_message=True,
 ):
     message = {}
@@ -24,10 +27,16 @@ def _make_update(
         message["date"] = 1750000000
         if has_from:
             message["from"] = {"id": 500, "username": "swettka"}
+        if has_photo:
+            message["photo"] = [{"file_id": "x", "width": 1, "height": 1}]
         if has_text:
             message["text"] = text
         else:
             message.pop("text", None)
+        if has_caption:
+            message["caption"] = caption
+        else:
+            message.pop("caption", None)
     return {"update_id": update_id, "message": message}
 
 
@@ -104,3 +113,65 @@ class HandleUpdateTests(SimpleTestCase):
         handle_update(update)
         mock_edit.assert_not_called()
         mock_process.assert_not_called()
+
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_message",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    def test_photo_with_caption_activity_is_processed(self, mock_process):
+        update = _make_update(
+            has_text=False,
+            has_caption=True,
+            caption="+1 | деф | Swettka | Первая волна",
+            has_photo=True,
+        )
+        handle_update(update)
+        mock_process.assert_called_once()
+        self.assertEqual(
+            mock_process.call_args.kwargs["text"],
+            "+1 | деф | Swettka | Первая волна",
+        )
+
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_message",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    def test_photo_with_caption_non_activity_forwards_to_service(self, mock_process):
+        update = _make_update(
+            has_text=False,
+            has_caption=True,
+            caption="просто текст",
+            has_photo=True,
+        )
+        handle_update(update)
+        mock_process.assert_called_once()
+        self.assertEqual(
+            mock_process.call_args.kwargs["text"],
+            "просто текст",
+        )
+
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_photo_without_caption_is_ignored(self, mock_process):
+        update = _make_update(has_text=False, has_photo=True)
+        handle_update(update)
+        mock_process.assert_not_called()
+
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_edit",
+        return_value=mock.Mock(status=mock.Mock(value="OK")),
+    )
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_edited_photo_with_caption_calls_edit(self, mock_process, mock_edit):
+        update = _make_edit_update(
+            has_text=False,
+            has_caption=True,
+            caption="+1 | деф | Swettka | Первая волна",
+            has_photo=True,
+        )
+        handle_update(update)
+        mock_edit.assert_called_once()
+        mock_process.assert_not_called()
+        self.assertEqual(
+            mock_edit.call_args.kwargs["text"],
+            "+1 | деф | Swettka | Первая волна",
+        )

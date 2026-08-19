@@ -26,7 +26,7 @@ def handle_update(update: dict) -> None:
         )
         return None
 
-    text = message.get("text")
+    text = message.get("text") or message.get("caption")
     if text is None:
         logger.info(
             "Message without text ignored; message_id=%s",
