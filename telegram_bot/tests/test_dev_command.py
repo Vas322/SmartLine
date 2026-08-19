@@ -45,6 +45,70 @@ class PollingLoopTests(TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 polling.run_poll_loop()
 
+    def test_offset_not_advanced_on_handle_error(self):
+        update = {"update_id": 5, "message": {"message_id": 5}}
+        offsets = []
+
+        def fake_get_updates(offset=None, timeout=30):
+            offsets.append(offset)
+            if len(offsets) == 1:
+                return [update]
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            polling.TelegramBot, "get_updates", side_effect=fake_get_updates
+        ), mock.patch.object(
+            polling, "handle_update", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(KeyboardInterrupt):
+                polling.run_poll_loop()
+            self.assertEqual(offsets, [None, None])
+
+    def test_offset_advanced_after_success(self):
+        update = {"update_id": 5, "message": {"message_id": 5}}
+        offsets = []
+
+        def fake_get_updates(offset=None, timeout=30):
+            offsets.append(offset)
+            if len(offsets) == 1:
+                return [update]
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            polling.TelegramBot, "get_updates", side_effect=fake_get_updates
+        ), mock.patch.object(
+            polling, "handle_update", wraps=polling.handle_update
+        ) as spy:
+            with self.assertRaises(KeyboardInterrupt):
+                polling.run_poll_loop()
+            self.assertEqual(offsets, [None, 6])
+            spy.assert_called_once_with(update)
+
+    def test_failed_update_stops_batch(self):
+        u1 = {"update_id": 5, "message": {"message_id": 5}}
+        u2 = {"update_id": 6, "message": {"message_id": 6}}
+        offsets = []
+
+        def fake_get_updates(offset=None, timeout=30):
+            offsets.append(offset)
+            if len(offsets) == 1:
+                return [u1, u2]
+            raise KeyboardInterrupt()
+
+        def fake_handle_update(update):
+            if update is u1:
+                raise RuntimeError("boom")
+
+        with mock.patch.object(
+            polling.TelegramBot, "get_updates", side_effect=fake_get_updates
+        ), mock.patch.object(
+            polling, "handle_update", side_effect=fake_handle_update
+        ) as spy:
+            with self.assertRaises(KeyboardInterrupt):
+                polling.run_poll_loop()
+            self.assertEqual(offsets, [None, None])
+            spy.assert_called_once_with(u1)
+
 
 class DevCommandTests(TestCase):
     def test_dev_command_subclasses_static_runserver(self):
