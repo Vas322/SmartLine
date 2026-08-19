@@ -214,6 +214,29 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1 - деф - Swettka, swettka - 11.56 - в")
         self.assertEqual(parsed.nicknames, ["Swettka"])
 
+    def test_nickname_space_separated(self):
+        parsed = parse_activity_message("+1 - деф - Аттакер Polako - 13.00")
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertEqual(parsed.nicknames, ["Аттакер", "Polako"])
+        self.assertEqual(parsed.wave_start, time(13, 0))
+
+    def test_nickname_mixed_space_and_comma(self):
+        parsed = parse_activity_message(
+            "+1 - деф - Swettka Pocomaxa, Ostin - 11.56 - в"
+        )
+        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa", "Ostin"])
+
+    def test_nickname_multiple_spaces(self):
+        parsed = parse_activity_message(
+            "+1 | деф |  Swettka   Pocomaxa  | 11.56 | в"
+        )
+        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa"])
+
+    def test_single_nickname_unchanged(self):
+        parsed = parse_activity_message("+1 | деф | Swettka | 11.56 | описание")
+        self.assertEqual(parsed.nicknames, ["Swettka"])
+
     def test_multi_nickname_keeps_first_spelling_on_dedup(self):
         parsed = parse_activity_message("+1 - деф - swettka, Swettka - 11.56 - в")
         self.assertEqual(parsed.nicknames, ["swettka"])

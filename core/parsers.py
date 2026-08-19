@@ -114,7 +114,7 @@ def parse_activity_message(text: str) -> ParsedActivity:
     if not nickname:
         raise ParserError("empty_nickname")
 
-    nick_parts = [n.strip() for n in nickname.split(",")]
+    nick_parts = [n for n in re.split(r"[,\s]+", nickname.strip()) if n]
     nicknames: list[str] = []
     seen = set()
     for n in nick_parts:
