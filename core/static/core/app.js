@@ -74,6 +74,9 @@
         showModal(notify.dataset.message, null, true);
     }
 
+    // --- Переключение форм добавления тарифов на странице настроек ---
+    document.querySelectorAll('[data-toggle-form]').forEach(el => el.addEventListener('click', () => { const target = document.getElementById(el.getAttribute('data-toggle-form')); if (!target) return; if (target.hasAttribute('hidden')) target.removeAttribute('hidden'); else target.setAttribute('hidden', ''); }));
+
     // --- Авто-рост текстовых полей под содержимое ---
     function autoGrow(el) {
         el.style.height = "auto";

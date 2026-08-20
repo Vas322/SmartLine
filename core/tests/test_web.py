@@ -295,7 +295,16 @@ class WebInterfaceTests(TestCase):
         content = response.content.decode()
         self.assertIn('id="defAddForm"', content)
         self.assertIn('id="castAddForm"', content)
-        self.assertIn("onclick=\"toggleAdd(", content)
+        # Toggle buttons use a non-inline data attribute hook (no inline JS).
+        self.assertIn(
+            '<button type="button" class="btn" data-toggle-form="defAddForm">',
+            content,
+        )
+        self.assertIn(
+            '<button type="button" class="btn" data-toggle-form="castAddForm">',
+            content,
+        )
+        self.assertNotIn("onclick=", content)
         self.assertRegex(content, r'id="defAddForm"[^>]*\shidden')
         self.assertRegex(content, r'id="castAddForm"[^>]*\shidden')
 
@@ -415,6 +424,23 @@ class WebInterfaceTests(TestCase):
         )
         self.assertRedirects(response, reverse("settings"))
         self.assertEqual(CastRate.objects.count(), 0)
+
+    def test_settings_delete_rate(self):
+        self._login()
+        # The 0013_seed_default_rates migration seeds default Rate rows;
+        # clear them so the count assertion below checks only this test's data.
+        Rate.objects.all().delete()
+        rate = Rate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("100"),
+        )
+        response = self.client.post(
+            reverse("settings"),
+            {"delete_rate": str(rate.pk)},
+        )
+        self.assertRedirects(response, reverse("settings"))
+        self.assertEqual(Rate.objects.count(), 0)
 
     def test_instructions_list_table(self):
         self._login()
