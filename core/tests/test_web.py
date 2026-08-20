@@ -288,6 +288,17 @@ class WebInterfaceTests(TestCase):
         self.assertIn("Тарифы за DEF", content)
         self.assertIn("Тарифы за каст", content)
 
+    def test_settings_add_form_hidden_by_default(self):
+        self._login()
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('id="defAddForm"', content)
+        self.assertIn('id="castAddForm"', content)
+        self.assertIn("onclick=\"toggleAdd(", content)
+        self.assertRegex(content, r'id="defAddForm"[^>]*\shidden')
+        self.assertRegex(content, r'id="castAddForm"[^>]*\shidden')
+
     def test_settings_add_rate(self):
         self._login()
         response = self.client.post(

@@ -265,6 +265,9 @@ def settings_view(request):
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
     edit_cast_rate_pk = request.GET.get("edit_cast") or request.POST.get("edit_cast_rate")
 
+    def_add_open = False
+    cast_add_open = False
+
     rate_form = None
     cast_rate_form = None
 
@@ -286,6 +289,7 @@ def settings_view(request):
             return redirect("settings")
 
         if request.POST.get("add_rate") or request.POST.get("edit_rate"):
+            def_add_open = True
             if request.POST.get("edit_rate"):
                 rate = Rate.objects.filter(pk=request.POST["edit_rate"]).first()
                 if rate:
@@ -301,6 +305,7 @@ def settings_view(request):
                     rate_form.save()
                     return redirect("settings")
         elif request.POST.get("add_cast_rate") or request.POST.get("edit_cast_rate"):
+            cast_add_open = True
             if request.POST.get("edit_cast_rate"):
                 cast_rate = CastRate.objects.filter(pk=request.POST["edit_cast_rate"]).first()
                 if cast_rate:
@@ -336,9 +341,11 @@ def settings_view(request):
             "rate_form": rate_form,
             "rates": rates,
             "edit_rate_pk": edit_rate_pk,
+            "def_add_open": def_add_open,
             "cast_rate_form": cast_rate_form,
             "cast_rates": cast_rates,
             "edit_cast_rate_pk": edit_cast_rate_pk,
+            "cast_add_open": cast_add_open,
         },
     )
 
