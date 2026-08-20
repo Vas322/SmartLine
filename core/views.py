@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -72,6 +72,7 @@ def dashboard(request):
                 "amount",
                 filter=Q(activity_type=Activity.ActivityType.CAST),
             ),
+            cast_count=Count("pk", filter=Q(has_cast=True)),
             payment=Coalesce(
                 Sum("payment_kk"),
                 Decimal("0"),
@@ -85,6 +86,7 @@ def dashboard(request):
             "def_hours": row["def_hours"] or Decimal("0"),
             "farm_hours": row["farm_hours"] or Decimal("0"),
             "cast_hours": row["cast_hours"] or Decimal("0"),
+            "cast_count": row["cast_count"] or 0,
             "payment": row["payment"] or Decimal("0"),
         }
 
@@ -103,6 +105,7 @@ def dashboard(request):
                 "total_hours": total_hours,
                 "def_hours": def_hours,
                 "farm_hours": farm_hours,
+                "cast_count": totals.get("cast_count", 0),
                 "adena": totals.get("payment") or Decimal("0"),
                 "percent": _percent(total_hours, days_in_period),
             }

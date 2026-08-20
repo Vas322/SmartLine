@@ -19,6 +19,7 @@
         <th>Выплата, кк</th>
         <th>Дефал</th>
         <th>Фармил</th>
+        <th>Каст</th>
         <th>%</th>
     </tr>
     {% for row in rows %}
@@ -28,6 +29,7 @@
         <td>{{ row.adena }}</td>
         <td>{{ row.def_hours }}</td>
         <td>{{ row.farm_hours }}</td>
+        <td>{{ row.cast_count }}</td>
         <td>
             <div style="background: #ecf0f1; border-radius: 4px; width: 120px; display: inline-block; vertical-align: middle;">
                 <div style="width: {{ row.percent|floatformat:0 }}%; background: #2980b9; height: 14px; border-radius: 4px;"></div>
@@ -36,7 +38,7 @@
         </td>
     </tr>
     {% empty %}
-    <tr><td colspan="6" class="muted">Игроков пока нет.</td></tr>
+    <tr><td colspan="7" class="muted">Игроков пока нет.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}

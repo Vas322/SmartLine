@@ -117,6 +117,79 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("75", response.content.decode())
 
+    def test_dashboard_counts_cast_activities(self):
+        self._login()
+        ostin = Player.objects.create(nickname="Ostin")
+        # Swettka already has one DEF activity without has_cast (setUp).
+        # Add DEF+CAST and a standalone CAST so Swettka ends with 2 casts.
+        for message_id, text, activity_type in [
+            (31, "+1 | деф | Swettka | деф+каст", Activity.ActivityType.DEF),
+            (32, "+1 | каст | Swettka | каст", Activity.ActivityType.CAST),
+        ]:
+            message = TelegramMessage.objects.create(
+                telegram_chat_id=15,
+                telegram_message_id=message_id,
+                telegram_user_id=100,
+                telegram_username="swettka",
+                text=text,
+                message_date=timezone.now(),
+                status=TelegramMessage.Status.PROCESSED,
+            )
+            Activity.objects.create(
+                player=self.player,
+                telegram_message=message,
+                amount=Decimal("1"),
+                activity_type=activity_type,
+                has_cast=True,
+                description=text,
+            )
+        # Ostin: one FARM without cast and one FARM+CAST.
+        plain_farm = TelegramMessage.objects.create(
+            telegram_chat_id=16,
+            telegram_message_id=33,
+            telegram_user_id=101,
+            telegram_username="ostin",
+            text="+1 | фарм | Ostin | фарм",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=ostin,
+            telegram_message=plain_farm,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.FARM,
+            has_cast=False,
+            description="фарм",
+        )
+        farm_cast = TelegramMessage.objects.create(
+            telegram_chat_id=16,
+            telegram_message_id=34,
+            telegram_user_id=101,
+            telegram_username="ostin",
+            text="+1 | фарм | Ostin | фарм+каст",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=ostin,
+            telegram_message=farm_cast,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.FARM,
+            has_cast=True,
+            description="фарм+каст",
+        )
+
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        rows = {row["nickname"]: row for row in response.context["rows"]}
+        # Only activities with has_cast=True are counted, regardless of type.
+        self.assertEqual(rows["Swettka"]["cast_count"], 2)
+        self.assertEqual(rows["Ostin"]["cast_count"], 1)
+        # Existing hour columns are unchanged.
+        self.assertEqual(rows["Swettka"]["total_hours"], Decimal("3"))
+        self.assertEqual(rows["Ostin"]["total_hours"], Decimal("2"))
+        self.assertEqual(rows["Ostin"]["farm_hours"], Decimal("2"))
+
     def test_excel_export_returns_xlsx_after_login(self):
         self._login()
         response = self.client.get(reverse("export_excel"), {"period": "today"})
