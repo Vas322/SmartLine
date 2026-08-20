@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Настройки</h1>
 
-<h2>Тарифы по времени</h2>
+<h2>Тарифы за DEF</h2>
 <table>
     <tr>
         <th>Начало</th>
@@ -52,7 +52,60 @@
     <button type="submit" class="btn">Сохранить</button>
     <a href="{% url 'settings' %}" class="btn">Отмена</a>
     {% else %}
-    <button type="submit" class="btn">Добавить тариф</button>
+    <button type="submit" name="add_rate" class="btn">Добавить тариф</button>
+    {% endif %}
+</form>
+
+<h2>Тарифы за каст</h2>
+<table>
+    <tr>
+        <th>Начало</th>
+        <th>Конец</th>
+        <th>Ставка, кк</th>
+        <th>Активен</th>
+        <th>Порядок</th>
+        <th>Действие</th>
+    </tr>
+    {% for rate in cast_rates %}
+    <tr>
+        <td>{{ rate.start_time|time:"H:i" }}</td>
+        <td>{{ rate.end_time|time:"H:i" }}</td>
+        <td>{{ rate.rate_kk }}</td>
+        <td>{{ rate.active|yesno:"Да,Нет" }}</td>
+        <td>{{ rate.order }}</td>
+        <td>
+            <a href="?edit_cast={{ rate.pk }}" class="btn">Редактировать</a>
+            <form method="post" class="inline-form">
+                {% csrf_token %}
+                <button type="submit" name="delete_cast_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
+            </form>
+        </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="muted">Тарифы не заданы.</td></tr>
+    {% endfor %}
+</table>
+
+<form method="post">
+    {% csrf_token %}
+    {% if edit_cast_rate_pk %}<input type="hidden" name="edit_cast_rate" value="{{ edit_cast_rate_pk }}">{% endif %}
+    <table>
+        <tr>
+            <th>Начало</th>
+            <th>Конец</th>
+            <th>Ставка, кк</th>
+        </tr>
+        <tr>
+            <td>{{ cast_rate_form.start_time }}</td>
+            <td>{{ cast_rate_form.end_time }}</td>
+            <td>{{ cast_rate_form.rate_kk }}</td>
+        </tr>
+    </table>
+    {% if edit_cast_rate_pk %}
+    <button type="submit" class="btn">Сохранить</button>
+    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    {% else %}
+    <button type="submit" name="add_cast_rate" class="btn">Добавить тариф</button>
     {% endif %}
 </form>
 {% endblock %}
