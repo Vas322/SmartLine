@@ -2,13 +2,16 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY environment variable must be set (see .env.example).")
 
 DEBUG = os.getenv("DEBUG", "False").lower() in ("1", "true", "yes")
 
@@ -70,14 +73,22 @@ if DATABASE_ENGINE == "sqlite":
         }
     }
 else:
+    _pg_required = ("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_HOST", "POSTGRES_PORT")
+    _pg_missing = [v for v in _pg_required if not os.getenv(v)]
+    if _pg_missing:
+        raise ImproperlyConfigured(
+            "PostgreSQL configuration incomplete. Missing env vars: "
+            + ", ".join(_pg_missing)
+            + ". See .env.example."
+        )
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB", "smartline"),
-            "USER": os.getenv("POSTGRES_USER", "smartline"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "smartline"),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "NAME": os.getenv("POSTGRES_DB"),
+            "USER": os.getenv("POSTGRES_USER"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+            "HOST": os.getenv("POSTGRES_HOST"),
+            "PORT": os.getenv("POSTGRES_PORT"),
         }
     }
 
