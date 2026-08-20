@@ -102,6 +102,21 @@ class WebInterfaceTests(TestCase):
         for text in ["Ник", "Выплата, кк", "Дефал", "Фармил", "%"]:
             self.assertIn(text, content)
 
+    def test_cast_activity_flows_through_views_and_dashboard(self):
+        self._login()
+        self.activity.activity_type = Activity.ActivityType.CAST
+        self.activity.has_cast = True
+        self.activity.payment_kk = Decimal("75.00")
+        self.activity.save(update_fields=["activity_type", "has_cast", "payment_kk"])
+
+        response = self.client.get(reverse("activities"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("CAST", response.content.decode())
+
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("75", response.content.decode())
+
     def test_excel_export_returns_xlsx_after_login(self):
         self._login()
         response = self.client.get(reverse("export_excel"), {"period": "today"})

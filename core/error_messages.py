@@ -7,6 +7,9 @@ and logged for audit; this module only controls what the end user sees.
 ERROR_MESSAGES = {
     "invalid_amount": "Не удалось разобрать количество часов.",
     "invalid_activity_type": "Неизвестный тип активности.",
+    "unknown_activity_type": "Неизвестный тип события.",
+    "def_and_farm_conflict": "Тип активности не может быть одновременно деф и фарм.",
+    "duplicate_type": "Тип активности указан повторно.",
     "invalid_wave_time": "Время начала волны указано неверно.",
     "missing_field_separators": "Не найдены разделители между полями. Используйте «|» или «-»",
     "missing_activity_type": "Не указан тип активности.",

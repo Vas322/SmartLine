@@ -75,6 +75,28 @@ class ExportActivitiesExcelTests(TestCase):
         rows = self._read_rows(date_from, date_to)
         self.assertEqual(rows[1][5], "0")
 
+    def test_cast_paid_hours_are_counted(self):
+        self.activity.activity_type = Activity.ActivityType.CAST
+        self.activity.has_cast = True
+        self.activity.save(update_fields=["activity_type", "has_cast"])
+
+        date_from = timezone.now() - timedelta(days=1)
+        date_to = timezone.now() + timedelta(days=1)
+        rows = self._read_rows(date_from, date_to)
+        self.assertEqual(rows[1][2], "CAST")
+        self.assertEqual(rows[1][5], "1.5")
+
+    def test_farm_plus_cast_paid_hours_are_counted(self):
+        self.activity.activity_type = Activity.ActivityType.FARM
+        self.activity.has_cast = True
+        self.activity.save(update_fields=["activity_type", "has_cast"])
+
+        date_from = timezone.now() - timedelta(days=1)
+        date_to = timezone.now() + timedelta(days=1)
+        rows = self._read_rows(date_from, date_to)
+        self.assertEqual(rows[1][2], "FARM")
+        self.assertEqual(rows[1][5], "1.5")
+
     def test_export_respects_period(self):
         date_from = timezone.now() - timedelta(days=30)
         date_to = timezone.now() - timedelta(days=29)

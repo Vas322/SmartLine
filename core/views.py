@@ -68,11 +68,12 @@ def dashboard(request):
                 "amount",
                 filter=Q(activity_type=Activity.ActivityType.FARM),
             ),
+            cast_hours=Sum(
+                "amount",
+                filter=Q(activity_type=Activity.ActivityType.CAST),
+            ),
             payment=Coalesce(
-                Sum(
-                    "payment_kk",
-                    filter=Q(activity_type=Activity.ActivityType.DEF),
-                ),
+                Sum("payment_kk"),
                 Decimal("0"),
             ),
         )
@@ -83,6 +84,7 @@ def dashboard(request):
         totals_by_player[row["player_id"]] = {
             "def_hours": row["def_hours"] or Decimal("0"),
             "farm_hours": row["farm_hours"] or Decimal("0"),
+            "cast_hours": row["cast_hours"] or Decimal("0"),
             "payment": row["payment"] or Decimal("0"),
         }
 
@@ -92,7 +94,8 @@ def dashboard(request):
         totals = totals_by_player.get(player.pk, {})
         def_hours = totals.get("def_hours", Decimal("0"))
         farm_hours = totals.get("farm_hours", Decimal("0"))
-        total_hours = def_hours + farm_hours
+        cast_hours = totals.get("cast_hours", Decimal("0"))
+        total_hours = def_hours + farm_hours + cast_hours
         rows.append(
             {
                 "pk": player.pk,
@@ -135,17 +138,19 @@ def player_detail(request, pk: int):
             "amount",
             filter=Q(activity_type=Activity.ActivityType.FARM),
         ),
+        cast_hours=Sum(
+            "amount",
+            filter=Q(activity_type=Activity.ActivityType.CAST),
+        ),
         payment=Coalesce(
-            Sum(
-                "payment_kk",
-                filter=Q(activity_type=Activity.ActivityType.DEF),
-            ),
+            Sum("payment_kk"),
             Decimal("0"),
         ),
     )
     def_hours = totals["def_hours"] or Decimal("0")
     farm_hours = totals["farm_hours"] or Decimal("0")
-    total_hours = def_hours + farm_hours
+    cast_hours = totals["cast_hours"] or Decimal("0")
+    total_hours = def_hours + farm_hours + cast_hours
 
     summary = {
         "total_hours": total_hours,
