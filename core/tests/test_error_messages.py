@@ -37,11 +37,6 @@ class FriendlyErrorMessageTests(SimpleTestCase):
     def test_message_does_not_start_with_plus(self):
         self.assertIn("«+»", friendly_error_message("message_does_not_start_with_plus"))
 
-    def test_player_conflict_includes_nick(self):
-        msg = friendly_error_message("nickname_registered_to_other_telegram:Swettka")
-        self.assertIn("Swettka", msg)
-        self.assertIn("друг", msg)
-
     def test_unknown_reason_falls_back_with_code(self):
         msg = friendly_error_message("some_future_code")
         self.assertIn("some_future_code", msg)

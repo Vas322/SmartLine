@@ -49,28 +49,8 @@ def get_or_create_telegram_message(
     )
 
 
-class PlayerConflictError(Exception):
-    """Raised when a nickname is already bound to another Telegram user."""
-
-
-def _resolve_or_create_player(
-    nickname: str,
-    user_id: Optional[int],
-    username: str,
-    bind_to_sender: bool = True,
-) -> Tuple[Player, bool]:
+def _resolve_or_create_player(nickname: str) -> Tuple[Player, bool]:
     """Return a Player for the nickname, auto-creating it on first use.
-
-    Binding rules (when bind_to_sender is True):
-    - No player with this nickname (case-insensitive) yet: create one bound to
-      the sender, keeping the nickname spelling as provided.
-    - Player exists but is unbound: bind it to the current sender.
-    - Player exists and is bound to the current sender: reuse it.
-    - Player exists and is bound to another Telegram user: raise PlayerConflict.
-
-    When bind_to_sender is False (multi-nick messages) the player is looked up
-    or created only by nickname; no Telegram binding is set and no conflict is
-    raised.
 
     Nicknames are matched case-insensitively (POCOMAXA and pocomaxa are the
     same player), but the stored spelling is the one first seen.
@@ -79,30 +59,9 @@ def _resolve_or_create_player(
     """
     player = Player.objects.filter(nickname__iexact=nickname).order_by("id").first()
     if player is None:
-        player = Player.objects.create(
-            nickname=nickname,
-            telegram_user_id=user_id if bind_to_sender else None,
-            telegram_username=username if bind_to_sender else "",
-        )
-        logger.info(
-            "Player auto-created nickname=%s user_id=%s",
-            nickname,
-            user_id if bind_to_sender else None,
-        )
+        player = Player.objects.create(nickname=nickname)
+        logger.info("Player auto-created nickname=%s", nickname)
         return player, True
-
-    if bind_to_sender and player.telegram_user_id is None:
-        player.telegram_user_id = user_id
-        player.telegram_username = username
-        player.save(update_fields=["telegram_user_id", "telegram_username", "updated_at"])
-        logger.info("Player bound nickname=%s user_id=%s", nickname, user_id)
-        return player, False
-
-    if bind_to_sender and player.telegram_user_id != user_id:
-        raise PlayerConflictError(
-            f"nickname_registered_to_other_telegram:{nickname}"
-        )
-
     return player, False
 
 
@@ -168,25 +127,9 @@ def process_telegram_message(
             parsed.activity_type,
         )
 
-        multi = len(parsed.nicknames) > 1
-
         players = []
         for n in parsed.nicknames:
-            try:
-                player, _created = _resolve_or_create_player(
-                    n,
-                    user_id=user_id if not multi else None,
-                    username=username if not multi else "",
-                    bind_to_sender=not multi,
-                )
-            except PlayerConflictError as exc:
-                logger.warning(
-                    "Player nickname conflict chat_id=%s message_id=%s: %s",
-                    chat_id,
-                    message_id,
-                    exc,
-                )
-                return _create_processing_error(telegram_message, str(exc))
+            player, _created = _resolve_or_create_player(n)
             players.append(player)
 
         payment = (
@@ -283,21 +226,9 @@ def process_telegram_edit(
             tm.save(update_fields=["text", "message_date", "status"])
             return _create_processing_error(tm, str(exc))
 
-        multi = len(parsed.nicknames) > 1
         players = []
         for n in parsed.nicknames:
-            try:
-                player, _c = _resolve_or_create_player(
-                    n,
-                    user_id=user_id if not multi else None,
-                    username=username if not multi else "",
-                    bind_to_sender=not multi,
-                )
-            except PlayerConflictError as exc:
-                tm.text = stripped
-                tm.message_date = message_date
-                tm.save(update_fields=["text", "message_date"])
-                return _create_processing_error(tm, str(exc))
+            player, _c = _resolve_or_create_player(n)
             players.append(player)
 
         payment = (
