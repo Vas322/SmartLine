@@ -12,6 +12,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1 | деф | Swettka | 11.56 | Первая волна")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
+        self.assertFalse(parsed.has_cast)
         self.assertEqual(parsed.nicknames, ["Swettka"])
         self.assertEqual(parsed.description, "Первая волна")
         self.assertEqual(parsed.wave_start, time(11, 56))
@@ -57,11 +58,13 @@ class ParseActivityMessageTests(SimpleTestCase):
     def test_uppercase_type(self):
         parsed = parse_activity_message("+1 | ДЕФ | Swettka | 11.56 | Описание")
         self.assertEqual(parsed.activity_type, "DEF")
+        self.assertFalse(parsed.has_cast)
 
     def test_farm_type(self):
         parsed = parse_activity_message("+2 | фарм | Swettka | 11.56 | Две волны")
         self.assertEqual(parsed.amount, Decimal("2"))
         self.assertEqual(parsed.activity_type, "FARM")
+        self.assertFalse(parsed.has_cast)
 
     def test_leading_spaces(self):
         parsed = parse_activity_message("  +1 | деф | Swettka | 11.56 | описание")
@@ -99,12 +102,12 @@ class ParseActivityMessageTests(SimpleTestCase):
     def test_invalid_activity_type(self):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 | неизвестный_тип | Swettka | 11.56 | описание")
-        self.assertEqual(str(ctx.exception), "invalid_activity_type")
+        self.assertEqual(str(ctx.exception), "unknown_activity_type")
 
     def test_empty_activity_type(self):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 | | Swettka | 11.56 | описание")
-        self.assertEqual(str(ctx.exception), "invalid_activity_type")
+        self.assertEqual(str(ctx.exception), "unknown_activity_type")
 
     def test_empty_nickname(self):
         with self.assertRaises(ParserError) as ctx:
@@ -292,7 +295,7 @@ class ParseActivityMessageTests(SimpleTestCase):
     def test_wrong_order_type_in_nick_position(self):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+0,5 | Ostin | фарм | 11.56 | описание")
-        self.assertEqual(str(ctx.exception), "invalid_activity_type")
+        self.assertEqual(str(ctx.exception), "unknown_activity_type")
 
     def test_wave_time_flexible_description_after_time(self):
         parsed = parse_activity_message(
@@ -330,3 +333,98 @@ class ParseActivityMessageTests(SimpleTestCase):
     def test_wave_time_flexible_rejects_garbage(self):
         with self.assertRaisesRegex(ParserError, "invalid_wave_time"):
             parse_activity_message("+1 - farm - Pocomaxa - бессмыслица")
+
+    # --- compound activity types (каст / перекаст) ---
+
+    def test_def_plus_cast(self):
+        parsed = parse_activity_message("+1 | деф+каст | Swettka | 11.56 | Первая волна")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.wave_start, time(11, 56))
+
+    def test_standalone_cast(self):
+        parsed = parse_activity_message("+0,3 | каст | Swettka | 11.56 | Первая волна")
+        self.assertEqual(parsed.activity_type, "CAST")
+        self.assertTrue(parsed.has_cast)
+        self.assertEqual(parsed.amount, Decimal("0.3"))
+
+    def test_farm_plus_cast(self):
+        parsed = parse_activity_message("+1 | фарм+каст | presli | 11:56")
+        self.assertEqual(parsed.activity_type, "FARM")
+        self.assertTrue(parsed.has_cast)
+        self.assertEqual(parsed.amount, Decimal("1"))
+        self.assertEqual(parsed.wave_start, time(11, 56))
+
+    def test_english_tokens_lowercase(self):
+        parsed = parse_activity_message("+1 | def+cast | Swettka | 11.56 | описание")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+
+    def test_uppercase_compound(self):
+        parsed = parse_activity_message("+1 | ДЕФ+КАСТ | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+
+    def test_uppercase_cast(self):
+        parsed = parse_activity_message("+1 | КАСТ | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "CAST")
+        self.assertTrue(parsed.has_cast)
+
+    def test_recast_identical_to_cast(self):
+        parsed = parse_activity_message("+1 | деф+перекаст | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+
+    def test_recast_english_identical_to_cast(self):
+        parsed = parse_activity_message("+1 | recast | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "CAST")
+        self.assertTrue(parsed.has_cast)
+
+    def test_whitespace_and_plus_combined(self):
+        parsed = parse_activity_message("+1 | деф  +  каст | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+
+    def test_whitespace_separated_tokens(self):
+        parsed = parse_activity_message("+1 | фарм каст | Swettka | 11.56")
+        self.assertEqual(parsed.activity_type, "FARM")
+        self.assertTrue(parsed.has_cast)
+
+    def test_no_spaces_around_separators_compound(self):
+        parsed = parse_activity_message("+1|деф+каст|  Swettka |11.56")
+        self.assertEqual(parsed.activity_type, "DEF")
+        self.assertTrue(parsed.has_cast)
+        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.wave_start, time(11, 56))
+
+    def test_def_farm_conflict(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | деф+фарм | Swettka")
+        self.assertEqual(str(ctx.exception), "def_and_farm_conflict")
+
+    def test_unknown_type_token(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | блабла | Swettka")
+        self.assertEqual(str(ctx.exception), "unknown_activity_type")
+
+    def test_duplicate_same_token(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | каст+каст | Swettka")
+        self.assertEqual(str(ctx.exception), "duplicate_type")
+
+    def test_duplicate_def_tokens(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | деф+деф | Swettka | 11.56")
+        self.assertEqual(str(ctx.exception), "duplicate_type")
+
+    def test_duplicate_cast_recast(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | каст+recast | Swettka | 11.56")
+        self.assertEqual(str(ctx.exception), "duplicate_type")
+
+    def test_unknown_token_in_compound(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | деф+блабла | Swettka | 11.56")
+        self.assertEqual(str(ctx.exception), "unknown_activity_type")

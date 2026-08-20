@@ -9,12 +9,12 @@ from typing import Optional, Tuple
 from django.db import transaction
 
 from core.models import Activity, Player, ProcessingError, TelegramMessage
-from core.parsers import ParserError, parse_activity_message
+from core.parsers import ParsedActivity, ParserError, parse_activity_message
 from core.services.notification_service import (
     notify_group_reply,
     notify_processing_error,
 )
-from core.services.rates import payment_kk
+from core.services.rates import payment_cast_kk, payment_kk
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,21 @@ def _resolve_or_create_player(nickname: str) -> Tuple[Player, bool]:
         logger.info("Player auto-created nickname=%s", nickname)
         return player, True
     return player, False
+
+
+def _compute_payment(parsed: ParsedActivity) -> Decimal:
+    """Compute the payment_kk snapshot for a parsed activity.
+
+    Payment is the SUM of paid components: DEF pays from the DEF Rate table
+    and CAST pays from the CastRate table. FARM is never paid. There is no
+    multiplier anywhere.
+    """
+    payment = Decimal("0")
+    if parsed.activity_type == "DEF":
+        payment += payment_kk(parsed.wave_start, parsed.amount)
+    if parsed.has_cast:
+        payment += payment_cast_kk(parsed.wave_start, parsed.amount)
+    return payment
 
 
 def process_telegram_message(
@@ -132,11 +147,7 @@ def process_telegram_message(
             player, _created = _resolve_or_create_player(n)
             players.append(player)
 
-        payment = (
-            Decimal("0")
-            if parsed.activity_type == "FARM"
-            else payment_kk(parsed.wave_start, parsed.amount)
-        )
+        payment = _compute_payment(parsed)
 
         activities = []
         for player in players:
@@ -145,6 +156,7 @@ def process_telegram_message(
                 telegram_message=telegram_message,
                 amount=parsed.amount,
                 activity_type=parsed.activity_type,
+                has_cast=parsed.has_cast,
                 description=parsed.description,
                 wave_start_time=parsed.wave_start,
                 payment_kk=payment,
@@ -231,11 +243,7 @@ def process_telegram_edit(
             player, _c = _resolve_or_create_player(n)
             players.append(player)
 
-        payment = (
-            Decimal("0")
-            if parsed.activity_type == "FARM"
-            else payment_kk(parsed.wave_start, parsed.amount)
-        )
+        payment = _compute_payment(parsed)
 
         for player in players:
             Activity.objects.create(
@@ -243,6 +251,7 @@ def process_telegram_edit(
                 telegram_message=tm,
                 amount=parsed.amount,
                 activity_type=parsed.activity_type,
+                has_cast=parsed.has_cast,
                 description=parsed.description,
                 wave_start_time=parsed.wave_start,
                 payment_kk=payment,

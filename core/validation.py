@@ -2,7 +2,7 @@
 from core.models import Player
 from core.parsers import ParsedActivity
 
-VALID_ACTIVITY_TYPES = ("DEF", "FARM")
+VALID_ACTIVITY_TYPES = ("DEF", "FARM", "CAST")
 
 
 def validate_parsed(parsed: ParsedActivity) -> None:

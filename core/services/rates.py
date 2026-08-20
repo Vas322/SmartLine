@@ -1,9 +1,9 @@
-"""Rate-based payout calculations (KK) for DEF activity."""
+"""Rate-based payout calculations (KK) for DEF and CAST activity."""
 import logging
 from datetime import time
 from decimal import Decimal
 
-from core.models import Rate
+from core.models import CastRate, Rate
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,10 @@ def rate_at(t: time):
     return None
 
 
-def payment_kk(wave_start: time, duration_hours: Decimal) -> Decimal:
-    """Compute the prorated payout in KK for a DEF wave (inclusive intervals)."""
+def _payment_from_rates(rates, wave_start: time, duration_hours: Decimal) -> Decimal:
+    """Compute the prorated payout in KK over the given active rate rows."""
     pieces = []
-    for rate in Rate.objects.filter(active=True):
+    for rate in rates:
         start = Decimal(rate.start_time.hour * 60 + rate.start_time.minute)
         end = Decimal(rate.end_time.hour * 60 + rate.end_time.minute)
         if end <= start:
@@ -68,3 +68,25 @@ def payment_kk(wave_start: time, duration_hours: Decimal) -> Decimal:
         )
 
     return total_kk.quantize(Decimal("0.01"))
+
+
+def payment_kk(wave_start: time, duration_hours: Decimal) -> Decimal:
+    """Compute the prorated payout in KK for a DEF wave (inclusive intervals)."""
+    return _payment_from_rates(
+        Rate.objects.filter(active=True),
+        wave_start,
+        duration_hours,
+    )
+
+
+def payment_cast_kk(wave_start: time, duration_hours: Decimal) -> Decimal:
+    """Compute the prorated payout in KK for a CAST wave.
+
+    Reads strictly from CastRate; there is no fallback to the DEF Rate
+    table. The no-rate behavior mirrors :func:`payment_kk`.
+    """
+    return _payment_from_rates(
+        CastRate.objects.filter(active=True),
+        wave_start,
+        duration_hours,
+    )

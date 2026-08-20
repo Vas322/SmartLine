@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from core.models import Activity, Player, ProcessingError, TelegramMessage
+from core.models import Activity, CastRate, Player, ProcessingError, Rate, TelegramMessage
 from core.services.activity_service import (
     ProcessResultStatus,
     process_telegram_edit,
@@ -261,7 +261,7 @@ class ProcessTelegramEditTests(TestCase):
         self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
         self.assertEqual(Activity.objects.count(), 0)
         error = ProcessingError.objects.get()
-        self.assertEqual(error.reason, "invalid_activity_type")
+        self.assertEqual(error.reason, "unknown_activity_type")
         self.assertNotEqual(error.pk, old_error.pk)
         self.assertEqual(
             result.telegram_message.status,
@@ -306,6 +306,96 @@ class ProcessTelegramEditTests(TestCase):
         self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
         self.assertEqual(Activity.objects.count(), 2)
         self.assertEqual(ProcessingError.objects.count(), 0)
+
+
+@override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
+class CastPaymentTests(TestCase):
+    """CAST (каст/перекаст) is paid from CastRate; payment is the SUM of
+    paid components with no multiplier."""
+
+    def setUp(self):
+        Rate.objects.all().delete()
+        CastRate.objects.all().delete()
+        Rate.objects.create(
+            start_time=time(8, 1),
+            end_time=time(16, 0),
+            rate_kk=Decimal("75"),
+            order=2,
+        )
+        CastRate.objects.create(
+            start_time=time(8, 1),
+            end_time=time(16, 0),
+            rate_kk=Decimal("75"),
+            order=2,
+        )
+
+    def test_def_only_pays_def_rate(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertFalse(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("75.00"))
+
+    def test_def_plus_cast_payment_is_sum(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф+каст | Swettka | 11.56 | Первая волна")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("150.00"))
+
+    def test_standalone_cast_payment_from_cast_rate(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+0,3 | каст | Swettka | 11.56 | Первая волна")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "CAST")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("22.50"))
+
+    def test_farm_plus_cast_pays_only_cast(self):
+        Player.objects.create(nickname="presli")
+        _process("+1 | фарм+каст | presli | 11:56")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "FARM")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("75.00"))
+
+    def test_def_plus_cast_prorated_amount(self):
+        Player.objects.create(nickname="presli")
+        _process("+0,7 | деф+каст | presli | 11:56")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("105.00"))
+
+    def test_farm_only_is_not_paid(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | фарм | Swettka | 11:56")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "FARM")
+        self.assertFalse(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("0"))
+
+    def test_recast_is_paid_like_cast(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | перекаст | Swettka | 11.56")
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "CAST")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("75.00"))
+
+    def test_cast_via_edit_path_is_paid(self):
+        Player.objects.create(nickname="Swettka")
+        first = _process("+abc | деф | Swettka | 11.56 | описание")
+        self.assertEqual(first.status, ProcessResultStatus.PROCESSING_ERROR)
+
+        result = _process_edit("+1 | каст | Swettka | 11.56")
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "CAST")
+        self.assertTrue(activity.has_cast)
+        self.assertEqual(activity.payment_kk, Decimal("75.00"))
 
 
 class PlayerDeletionTests(TestCase):

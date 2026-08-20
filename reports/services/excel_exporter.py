@@ -11,6 +11,8 @@ from core.models import Activity
 def _paid_amount(activity: Activity) -> Decimal:
     if activity.activity_type == Activity.ActivityType.DEF:
         return activity.amount
+    if activity.has_cast:
+        return activity.amount
     return Decimal("0")
 
 

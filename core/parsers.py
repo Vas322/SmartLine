@@ -9,14 +9,24 @@ from datetime import time
 from decimal import Decimal, InvalidOperation
 from typing import List
 
-_ACTIVITY_TYPE_MAP = {
-    "деф": "DEF",
+_DEF_TOKENS = {"def", "деф"}
+_FARM_TOKENS = {"farm", "фарм"}
+_CAST_TOKENS = {"cast", "каст", "recast", "перекаст"}
+_RECOGNIZED_TOKENS = _DEF_TOKENS | _FARM_TOKENS | _CAST_TOKENS
+
+_TOKEN_CATEGORY = {
     "def": "DEF",
-    "фарм": "FARM",
+    "деф": "DEF",
     "farm": "FARM",
+    "фарм": "FARM",
+    "cast": "CAST",
+    "каст": "CAST",
+    "recast": "CAST",
+    "перекаст": "CAST",
 }
 
 _SEP_RE = re.compile(r'(?:\||-|–|—)')
+_TYPE_TOKEN_RE = re.compile(r'[+\s]+')
 _WAVE_TIME_RE = re.compile(r'^(\d{1,2})[.:](\d{2})$')
 _TIME_WITH_REST_RE = re.compile(r'^(\d{1,2})[.:](\d{2})(?:[.,;]?\s*(.*))?$')
 
@@ -28,7 +38,8 @@ class ParserError(ValueError):
 @dataclass
 class ParsedActivity:
     amount: Decimal
-    activity_type: str  # 'DEF' | 'FARM'
+    activity_type: str  # 'DEF' | 'FARM' | 'CAST'
+    has_cast: bool
     nicknames: List[str]
     wave_start: time
     description: str
@@ -47,12 +58,52 @@ def _parse_amount(raw: str) -> Decimal:
     return amount
 
 
-def _normalize_activity_type(raw: str) -> str:
-    key = raw.strip().lower()
-    activity_type = _ACTIVITY_TYPE_MAP.get(key)
-    if activity_type is None:
-        raise ParserError("invalid_activity_type")
-    return activity_type
+def _split_type_tokens(raw: str) -> list[str]:
+    """Split a TYPE field into lowercased tokens.
+
+    Tokens may be separated by "+" and/or whitespace: "деф+каст",
+    "деф  +  каст", "деф каст" are equivalent.
+    """
+    return [token for token in _TYPE_TOKEN_RE.split(raw.strip().lower()) if token]
+
+
+def _part_has_known_type(part: str) -> bool:
+    """Return True when any token in a field is a recognized type word."""
+    return any(token in _RECOGNIZED_TOKENS for token in _split_type_tokens(part))
+
+
+def _parse_activity_type(raw: str) -> tuple[str, bool]:
+    """Parse a (possibly compound) TYPE field.
+
+    Returns ``(activity_type, has_cast)``. Raises :class:`ParserError` for
+    unknown tokens, DEF+FARM conflicts and duplicate tokens of the same
+    category.
+    """
+    tokens = _split_type_tokens(raw)
+    categories = []
+    for token in tokens:
+        category = _TOKEN_CATEGORY.get(token)
+        if category is None:
+            raise ParserError("unknown_activity_type")
+        categories.append(category)
+
+    if "DEF" in categories and "FARM" in categories:
+        raise ParserError("def_and_farm_conflict")
+
+    if len(set(categories)) != len(categories):
+        raise ParserError("duplicate_type")
+
+    if "CAST" in categories:
+        if "DEF" in categories:
+            return "DEF", True
+        if "FARM" in categories:
+            return "FARM", True
+        return "CAST", True
+    if "DEF" in categories:
+        return "DEF", False
+    if "FARM" in categories:
+        return "FARM", False
+    raise ParserError("unknown_activity_type")
 
 
 def _parse_wave_time(raw: str) -> time:
@@ -108,8 +159,21 @@ def parse_activity_message(text: str) -> ParsedActivity:
         # time, inspect the available parts to name the actually missing
         # role (type / time / nickname).
         remaining = parts[1:]
-        has_type = any(p.strip().lower() in _ACTIVITY_TYPE_MAP for p in remaining)
+        has_type = any(_part_has_known_type(p) for p in remaining)
         has_time = any(_TIME_WITH_REST_RE.match(p) for p in remaining)
+        if _part_has_known_type(parts[1]):
+            # The type slot is filled with a compound type; validate it
+            # fully so conflict/duplicate/unknown errors surface instead of
+            # a generic missing-field message.
+            _parse_activity_type(parts[1])
+        elif (
+            not has_time
+            and parts[1].strip()
+            and not _TIME_WITH_REST_RE.match(parts[1])
+        ):
+            # The type slot is filled with an unrecognized word and there is
+            # no plausible time field, e.g. "+1 | блабла | Swettka".
+            raise ParserError("unknown_activity_type")
         if not has_type:
             raise ParserError("missing_activity_type")
         if not has_time:
@@ -120,7 +184,7 @@ def parse_activity_message(text: str) -> ParsedActivity:
     amount_part, type_part, nickname = parts[0], parts[1], parts[2]
     time_part = parts[3]
     amount = _parse_amount(amount_part)
-    activity_type = _normalize_activity_type(type_part)
+    activity_type, has_cast = _parse_activity_type(type_part)
     wave_start, time_extra = _parse_wave_time_flexible(time_part)
 
     if len(parts) > 4:
@@ -148,6 +212,7 @@ def parse_activity_message(text: str) -> ParsedActivity:
     return ParsedActivity(
         amount=amount,
         activity_type=activity_type,
+        has_cast=has_cast,
         nicknames=nicknames,
         wave_start=wave_start,
         description=description,
