@@ -7,7 +7,14 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Activity, Instruction, Player, Rate, TelegramMessage
+from core.models import (
+    Activity,
+    CastRate,
+    Instruction,
+    Player,
+    Rate,
+    TelegramMessage,
+)
 
 _XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -277,13 +284,16 @@ class WebInterfaceTests(TestCase):
         self._login()
         response = self.client.get(reverse("settings"))
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Тарифы по времени", response.content.decode())
+        content = response.content.decode()
+        self.assertIn("Тарифы за DEF", content)
+        self.assertIn("Тарифы за каст", content)
 
     def test_settings_add_rate(self):
         self._login()
         response = self.client.post(
             reverse("settings"),
             {
+                "add_rate": "1",
                 "start_time": "08:00",
                 "end_time": "16:00",
                 "rate_kk": "75.00",
@@ -326,6 +336,74 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(rate.end_time, time(17, 0))
         self.assertEqual(rate.rate_kk, Decimal("80"))
         self.assertEqual(Rate.objects.count(), 1)
+
+    def test_settings_add_cast_rate(self):
+        self._login()
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "add_cast_rate": "1",
+                "start_time": "08:00",
+                "end_time": "16:00",
+                "rate_kk": "75.00",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+        cast_rate = CastRate.objects.get(
+            start_time=time(8, 0), end_time=time(16, 0)
+        )
+        self.assertEqual(cast_rate.rate_kk, Decimal("75.00"))
+        self.assertTrue(cast_rate.active)
+        self.assertEqual(cast_rate.order, 0)
+
+    def test_settings_edit_cast_rate(self):
+        self._login()
+        # The 0018_seed_cast_rates_from_rate migration seeds CastRate rows;
+        # clear them so the count assertion below checks only this test's data.
+        CastRate.objects.all().delete()
+        cast_rate = CastRate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("100"),
+        )
+
+        response = self.client.get(reverse("settings") + f"?edit_cast={cast_rate.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="edit_cast_rate"', response.content.decode())
+
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "edit_cast_rate": str(cast_rate.pk),
+                "start_time": "09:00",
+                "end_time": "17:00",
+                "rate_kk": "80",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+
+        cast_rate.refresh_from_db()
+        self.assertEqual(cast_rate.start_time, time(9, 0))
+        self.assertEqual(cast_rate.end_time, time(17, 0))
+        self.assertEqual(cast_rate.rate_kk, Decimal("80"))
+        self.assertEqual(CastRate.objects.count(), 1)
+
+    def test_settings_delete_cast_rate(self):
+        self._login()
+        # The 0018_seed_cast_rates_from_rate migration seeds CastRate rows;
+        # clear them so the count assertion below checks only this test's data.
+        CastRate.objects.all().delete()
+        cast_rate = CastRate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("100"),
+        )
+        response = self.client.post(
+            reverse("settings"),
+            {"delete_cast_rate": str(cast_rate.pk)},
+        )
+        self.assertRedirects(response, reverse("settings"))
+        self.assertEqual(CastRate.objects.count(), 0)
 
     def test_instructions_list_table(self):
         self._login()
