@@ -31,6 +31,24 @@ class FriendlyErrorMessageTests(SimpleTestCase):
         self.assertIn("разделител", msg)
         self.assertIn("|", msg)
 
+    def test_unknown_activity_type(self):
+        self.assertEqual(
+            friendly_error_message("unknown_activity_type"),
+            "Неизвестный тип события.",
+        )
+
+    def test_def_and_farm_conflict(self):
+        self.assertEqual(
+            friendly_error_message("def_and_farm_conflict"),
+            "Тип активности не может быть одновременно деф и фарм.",
+        )
+
+    def test_duplicate_type(self):
+        self.assertEqual(
+            friendly_error_message("duplicate_type"),
+            "Тип активности указан повторно.",
+        )
+
     def test_empty_nickname(self):
         self.assertIn("ник", friendly_error_message("empty_nickname"))
 

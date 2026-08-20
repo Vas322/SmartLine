@@ -17,6 +17,7 @@ _TYPE_CHOICES = [
     ("", "Все"),
     ("DEF", "DEF"),
     ("FARM", "FARM"),
+    ("CAST", "CAST"),
 ]
 
 
