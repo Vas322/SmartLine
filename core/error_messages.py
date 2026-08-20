@@ -19,13 +19,9 @@ ERROR_MESSAGES = {
 def friendly_error_message(reason: str) -> str:
     """Return a Russian user-facing message for an internal error reason.
 
-    Dynamic reasons like 'nickname_registered_to_other_telegram:<nick>'
-    are detected by prefix. Unknown reasons fall back to a message that
-    still mentions the raw code so the clan leader can report it.
+    Unknown reasons fall back to a message that still mentions the raw code
+    so the clan leader can report it.
     """
-    if reason.startswith("nickname_registered_to_other_telegram:"):
-        nick = reason.split(":", 1)[1]
-        return f"Ник «{nick}» уже привязан к другому Telegram-аккаунту. Уточните у командира клана."
     return ERROR_MESSAGES.get(
         reason,
         f"Не удалось обработать сообщение (код: {reason}). Обратитесь к командиру клана.",

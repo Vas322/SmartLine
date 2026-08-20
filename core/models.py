@@ -5,8 +5,6 @@ from django.db import models
 
 class Player(models.Model):
     nickname = models.CharField(max_length=64, unique=True)
-    telegram_user_id = models.BigIntegerField(null=True, blank=True)
-    telegram_username = models.CharField(max_length=64, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

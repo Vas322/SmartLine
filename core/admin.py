@@ -8,13 +8,11 @@ from core.models import Activity, Player, ProcessingError, TelegramMessage
 class PlayerAdmin(admin.ModelAdmin):
     list_display = (
         "nickname",
-        "telegram_user_id",
-        "telegram_username",
         "is_active",
         "created_at",
         "updated_at",
     )
-    search_fields = ("nickname", "telegram_username")
+    search_fields = ("nickname",)
     list_filter = ("is_active",)
 
 
