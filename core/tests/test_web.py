@@ -124,6 +124,107 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("75", response.content.decode())
 
+    def test_activity_type_display(self):
+        """Test type_display property returns correct compound type strings."""
+        message = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=100,
+            text="+1 | деф | Test | тест",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        # DEF
+        act_def = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            has_cast=False,
+        )
+        self.assertEqual(act_def.type_display, "DEF")
+
+        # FARM
+        act_farm = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.FARM,
+            has_cast=False,
+        )
+        self.assertEqual(act_farm.type_display, "FARM")
+
+        # CAST
+        act_cast = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.CAST,
+            has_cast=True,
+        )
+        self.assertEqual(act_cast.type_display, "CAST")
+
+        # DEF+CAST
+        act_def_cast = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            has_cast=True,
+        )
+        self.assertEqual(act_def_cast.type_display, "DEF+CAST")
+
+        # FARM+CAST
+        act_farm_cast = Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.FARM,
+            has_cast=True,
+        )
+        self.assertEqual(act_farm_cast.type_display, "FARM+CAST")
+
+    def test_activities_view_shows_compound_type(self):
+        self._login()
+        message = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=200,
+            text="+1 | деф+каст | Swettka | деф+каст",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            has_cast=True,
+            description="деф+каст",
+        )
+        response = self.client.get(reverse("activities"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("DEF+CAST", response.content.decode())
+
+    def test_activity_filter_cast_includes_compound(self):
+        self._login()
+        message = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=201,
+            text="+1 | деф+каст | Swettka | деф+каст",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=self.player,
+            telegram_message=message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            has_cast=True,
+            description="деф+каст",
+        )
+        response = self.client.get(reverse("activities"), {"activity_type": "CAST"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("DEF+CAST", response.content.decode())
+
     def test_dashboard_counts_cast_activities(self):
         self._login()
         ostin = Player.objects.create(nickname="Ostin")

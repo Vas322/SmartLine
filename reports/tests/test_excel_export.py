@@ -94,8 +94,18 @@ class ExportActivitiesExcelTests(TestCase):
         date_from = timezone.now() - timedelta(days=1)
         date_to = timezone.now() + timedelta(days=1)
         rows = self._read_rows(date_from, date_to)
-        self.assertEqual(rows[1][2], "FARM")
+        self.assertEqual(rows[1][2], "FARM+CAST")
         self.assertEqual(rows[1][5], "1.5")
+
+    def test_def_plus_cast_export_type(self):
+        self.activity.activity_type = Activity.ActivityType.DEF
+        self.activity.has_cast = True
+        self.activity.save(update_fields=["activity_type", "has_cast"])
+
+        date_from = timezone.now() - timedelta(days=1)
+        date_to = timezone.now() + timedelta(days=1)
+        rows = self._read_rows(date_from, date_to)
+        self.assertEqual(rows[1][2], "DEF+CAST")
 
     def test_export_respects_period(self):
         date_from = timezone.now() - timedelta(days=30)

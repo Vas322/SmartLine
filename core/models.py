@@ -104,6 +104,14 @@ class Activity(models.Model):
     def __str__(self) -> str:
         return f"{self.player_id} {self.activity_type} {self.amount}"
 
+    @property
+    def type_display(self) -> str:
+        label = self.get_activity_type_display()
+        if self.has_cast and self.activity_type != self.ActivityType.CAST:
+            label = f"{label}+CAST"
+        return label
+    type_display.fget.short_description = "Тип"
+
 
 class ProcessingError(models.Model):
     class Status(models.TextChoices):
