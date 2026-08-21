@@ -710,9 +710,9 @@ Parser
 
 +1 | деф | Swettka | 11.56
 
-+0,5 | фарм | Ostin, Pocomaxa | 23.10
-
 Ошибки:
+
++0,5 | фарм | Ostin, Pocomaxa | 23.10 (invalid_nickname: несколько ников)
 
 +1 деф Swettka описание
 
