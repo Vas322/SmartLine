@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from datetime import time
 from decimal import Decimal, InvalidOperation
-from typing import List
 
 _DEF_TOKENS = {"def", "деф"}
 _FARM_TOKENS = {"farm", "фарм"}
@@ -40,7 +39,7 @@ class ParsedActivity:
     amount: Decimal
     activity_type: str  # 'DEF' | 'FARM' | 'CAST'
     has_cast: bool
-    nicknames: List[str]
+    nickname: str
     wave_start: time
     description: str
 
@@ -138,7 +137,7 @@ def parse_activity_message(text: str) -> ParsedActivity:
     """Parse a Telegram activity message into structured data.
 
     Expected format: ``+X | TYPE | NICK | TIME | DESCRIPTION``. Field order is
-    strict: amount, then type, then nicknames, then wave start time, then
+    strict: amount, then type, then nickname, then wave start time, then
     description. DESCRIPTION may be omitted; any additional ``|`` symbols
     inside DESCRIPTION are preserved.
     """
@@ -195,25 +194,14 @@ def parse_activity_message(text: str) -> ParsedActivity:
     if not nickname:
         raise ParserError("empty_nickname")
 
-    nick_parts = [n for n in re.split(r"[,\s]+", nickname.strip()) if n]
-    nicknames: list[str] = []
-    seen = set()
-    for n in nick_parts:
-        if not n:
-            continue
-        key = n.lower()
-        if key in seen:
-            continue  # тихий дедуп case-insensitive
-        seen.add(key)
-        nicknames.append(n)
-    if not nicknames:
-        raise ParserError("empty_nickname")
+    if not re.fullmatch(r"[A-Za-zА-Яа-яЁё0-9]+", nickname):
+        raise ParserError("invalid_nickname")
 
     return ParsedActivity(
         amount=amount,
         activity_type=activity_type,
         has_cast=has_cast,
-        nicknames=nicknames,
+        nickname=nickname,
         wave_start=wave_start,
         description=description,
     )
