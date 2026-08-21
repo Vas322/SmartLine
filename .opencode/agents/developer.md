@@ -1,7 +1,7 @@
 ---
 description: Реализует код по плану Architect и исправляет замечания Reviewer/QA. Следует PROJECT_RULES.md и существующей архитектуре проекта Smartline.
 mode: subagent
-model: 123/gonka/deepseek-ai/DeepSeek-V4-Flash-0731
+model: opencode/nemotron-3-ultra-free
 permission:
   read: allow
   write: allow

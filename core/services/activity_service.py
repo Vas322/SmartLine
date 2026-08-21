@@ -49,20 +49,49 @@ def get_or_create_telegram_message(
     )
 
 
-def _resolve_or_create_player(nickname: str) -> Tuple[Player, bool]:
-    """Return a Player for the nickname, auto-creating it on first use.
+def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str]]:
+    """Update player nickname if spelling differs (case-insensitive).
 
-    Nicknames are matched case-insensitively (POCOMAXA and pocomaxa are the
-    same player), but the stored spelling is the one first seen.
-
-    Returns (player, created).
+    Returns (player, nick_changed, old_nickname_or_none).
     """
-    player = Player.objects.filter(nickname__iexact=nickname).order_by("id").first()
-    if player is None:
-        player = Player.objects.create(nickname=nickname)
-        logger.info("Player auto-created nickname=%s", nickname)
-        return player, True
-    return player, False
+    if p.nickname.casefold() != nick.casefold():
+        old = p.nickname
+        p.nickname = nick
+        p.save(update_fields=["nickname"])
+        return p, True, old
+    return p, False, None
+
+
+def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Optional[str]]:
+    """Resolve a player by Telegram user_id first, then by nickname.
+
+    - If user_id is provided and a player has that telegram_user_id, use that
+      player (adopting the new nickname spelling if different).
+    - Else, look up by nickname case-insensitively.
+      - If found and user_id is provided but the player has a different
+        telegram_user_id, raise ParserError("nick_already_bound").
+      - If found and user_id is provided and the player has no telegram_user_id,
+        bind it.
+    - Else, create a new player with the nickname and user_id (if provided).
+
+    Returns (player, nick_changed, old_nickname_or_none).
+    """
+    if user_id is not None:
+        p = Player.objects.filter(telegram_user_id=user_id).first()
+        if p is not None:
+            return _adopt_nick(p, nick)
+
+    p = Player.objects.filter(nickname__iexact=nick).order_by("id").first()
+    if p is not None:
+        if user_id is not None:
+            if p.telegram_user_id is not None and p.telegram_user_id != user_id:
+                raise ParserError("nick_already_bound")
+            p.telegram_user_id = user_id
+            p.save(update_fields=["telegram_user_id"])
+        return _adopt_nick(p, nick)
+
+    p = Player.objects.create(nickname=nick, telegram_user_id=user_id)
+    return p, False, None
 
 
 def _compute_payment(parsed: ParsedActivity) -> Decimal:
@@ -142,26 +171,29 @@ def process_telegram_message(
             parsed.activity_type,
         )
 
-        players = []
-        for n in parsed.nicknames:
-            player, _created = _resolve_or_create_player(n)
-            players.append(player)
+        try:
+            player, nick_changed, old_nick = _resolve_player(parsed.nickname, user_id)
+        except ParserError as exc:
+            logger.warning(
+                "Player resolve error chat_id=%s message_id=%s: %s",
+                chat_id,
+                message_id,
+                exc,
+            )
+            return _create_processing_error(telegram_message, str(exc))
 
         payment = _compute_payment(parsed)
 
-        activities = []
-        for player in players:
-            activity = Activity.objects.create(
-                player=player,
-                telegram_message=telegram_message,
-                amount=parsed.amount,
-                activity_type=parsed.activity_type,
-                has_cast=parsed.has_cast,
-                description=parsed.description,
-                wave_start_time=parsed.wave_start,
-                payment_kk=payment,
-            )
-            activities.append(activity)
+        activity = Activity.objects.create(
+            player=player,
+            telegram_message=telegram_message,
+            amount=parsed.amount,
+            activity_type=parsed.activity_type,
+            has_cast=parsed.has_cast,
+            description=parsed.description,
+            wave_start_time=parsed.wave_start,
+            payment_kk=payment,
+        )
 
         telegram_message.status = TelegramMessage.Status.PROCESSED
         telegram_message.save(update_fields=["status"])
@@ -174,11 +206,15 @@ def process_telegram_message(
             parsed.amount,
             parsed.activity_type,
         )
-        return ProcessResult(
-            status=ProcessResultStatus.ACTIVITY_CREATED,
-            telegram_message=telegram_message,
-            activities=activities,
-        )
+
+    if nick_changed:
+        notify_group_reply(telegram_message, f"Ник изменён: {old_nick} → {player.nickname}")
+
+    return ProcessResult(
+        status=ProcessResultStatus.ACTIVITY_CREATED,
+        telegram_message=telegram_message,
+        activities=[activity],
+    )
 
 
 def process_telegram_edit(
@@ -238,35 +274,38 @@ def process_telegram_edit(
             tm.save(update_fields=["text", "message_date", "status"])
             return _create_processing_error(tm, str(exc))
 
-        players = []
-        for n in parsed.nicknames:
-            player, _c = _resolve_or_create_player(n)
-            players.append(player)
+        try:
+            player, nick_changed, old_nick = _resolve_player(parsed.nickname, user_id)
+        except ParserError as exc:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            return _create_processing_error(tm, str(exc))
 
         payment = _compute_payment(parsed)
 
-        for player in players:
-            Activity.objects.create(
-                player=player,
-                telegram_message=tm,
-                amount=parsed.amount,
-                activity_type=parsed.activity_type,
-                has_cast=parsed.has_cast,
-                description=parsed.description,
-                wave_start_time=parsed.wave_start,
-                payment_kk=payment,
-            )
+        Activity.objects.create(
+            player=player,
+            telegram_message=tm,
+            amount=parsed.amount,
+            activity_type=parsed.activity_type,
+            has_cast=parsed.has_cast,
+            description=parsed.description,
+            wave_start_time=parsed.wave_start,
+            payment_kk=payment,
+        )
         tm.status = TelegramMessage.Status.PROCESSED
         tm.save(update_fields=["status", "text", "message_date"])
-        return ProcessResult(
-            status=ProcessResultStatus.ACTIVITY_CREATED,
-            telegram_message=tm,
-            activities=(
-                players
-                and list(Activity.objects.filter(telegram_message=tm))
-                or None
-            ),
-        )
+
+    if nick_changed:
+        notify_group_reply(tm, f"Ник изменён: {old_nick} → {player.nickname}")
+
+    return ProcessResult(
+        status=ProcessResultStatus.ACTIVITY_CREATED,
+        telegram_message=tm,
+        activities=(
+            list(Activity.objects.filter(telegram_message=tm))
+        ),
+    )
 
 
 def _create_processing_error(

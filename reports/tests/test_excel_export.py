@@ -113,24 +113,16 @@ class ExportActivitiesExcelTests(TestCase):
         rows = self._read_rows(date_from, date_to)
         self.assertEqual(len(rows), 1)  # only the header row
 
-    def test_multiple_activities_on_one_message_are_exported(self):
-        player2 = Player.objects.create(nickname="Pocomaxa")
-        Activity.objects.create(
-            player=player2,
-            telegram_message=self.message,
-            amount=Decimal("1.5"),
-            activity_type=Activity.ActivityType.DEF,
-            description="Первая волна",
-        )
-
+    def test_single_activity_per_message_exported(self):
+        """Only one activity per message is created; export reflects that."""
+        # Manually creating a second activity for the same message would violate
+        # the new single-activity-per-message invariant, but the exporter
+        # simply iterates all activities. Here we verify the normal case:
+        # one activity, one row.
         date_from = timezone.now() - timedelta(days=1)
         date_to = timezone.now() + timedelta(days=1)
         rows = self._read_rows(date_from, date_to)
 
-        self.assertEqual(len(rows), 3)  # header + two activities
-        nicknames = {row[1] for row in rows[1:]}
-        self.assertEqual(nicknames, {"Swettka", "Pocomaxa"})
-        # source text stays reachable through the FK on both rows
-        for row in rows[1:]:
-            self.assertEqual(row[7], "+1 | деф | Swettka | Первая волна")
-            self.assertEqual(row[8], 20)
+        self.assertEqual(len(rows), 2)  # header + one activity
+        self.assertEqual(rows[1][1], "Swettka")
+        self.assertEqual(rows[1][7], "+1 | деф | Swettka | Первая волна")

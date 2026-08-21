@@ -13,7 +13,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
         self.assertFalse(parsed.has_cast)
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "Первая волна")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
@@ -21,7 +21,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+0,5 | деф | Swettka | 11.56 | Первая волна")
         self.assertEqual(parsed.amount, Decimal("0.5"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
     def test_dot_decimal_separator(self):
@@ -43,7 +43,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1|деф|Swettka|11.56|Описание")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "Описание")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
@@ -69,7 +69,7 @@ class ParseActivityMessageTests(SimpleTestCase):
     def test_leading_spaces(self):
         parsed = parse_activity_message("  +1 | деф | Swettka | 11.56 | описание")
         self.assertEqual(parsed.amount, Decimal("1"))
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
 
     def test_extra_separators_kept_in_description(self):
         parsed = parse_activity_message("+1 | деф | Swettka | 11.56 | описание | лишнее")
@@ -118,14 +118,14 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1 | деф | Swettka | 11.56 |")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "")
 
     def test_four_fields_no_description_parses(self):
         parsed = parse_activity_message("+1 - деф - presli - 13:00")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["presli"])
+        self.assertEqual(parsed.nickname, "presli")
         self.assertEqual(parsed.wave_start, time(13, 0))
         self.assertEqual(parsed.description, "")
 
@@ -183,7 +183,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1-деф-Swettka-11.56-Первая волна")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "Первая волна")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
@@ -191,96 +191,44 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+0,5—деф—Swettka—11.56—описание")
         self.assertEqual(parsed.amount, Decimal("0.5"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
 
     def test_en_dash_separator(self):
         parsed = parse_activity_message("+2–фарм–Swettka–11.56–две волны")
         self.assertEqual(parsed.amount, Decimal("2"))
         self.assertEqual(parsed.activity_type, "FARM")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
 
     def test_mixed_separators(self):
         parsed = parse_activity_message("+1|деф-Swettka|11.56|описание")
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "описание")
 
     def test_description_keeps_separator_chars(self):
         parsed = parse_activity_message("+1-деф-Swettka-11.56-описание с дефисом-тест")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.description, "описание с дефисом-тест")
 
     def test_hyphen_uppercase_type(self):
         parsed = parse_activity_message("+1—ДЕФ—Swettka—11.56—описание")
         self.assertEqual(parsed.activity_type, "DEF")
 
-    def test_multi_nickname_comma_separated(self):
-        parsed = parse_activity_message(
-            "+1 - деф - Swettka, Pocomaxa - 11.56 - Первая волна"
-        )
-        self.assertEqual(parsed.amount, Decimal("1"))
-        self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa"])
-        self.assertEqual(parsed.description, "Первая волна")
-
-    def test_multi_nickname_spaces_around_commas(self):
-        parsed = parse_activity_message("+1|деф|Swettka, Pocomaxa | 11.56 | волна")
-        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa"])
-        self.assertEqual(parsed.description, "волна")
-
-    def test_multi_nickname_no_spaces_around_commas(self):
-        parsed = parse_activity_message("+1|деф|Swettka,Pocomaxa|11.56|волна")
-        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa"])
-        self.assertEqual(parsed.description, "волна")
-
-    def test_multi_nickname_dedup_case_insensitive(self):
-        parsed = parse_activity_message("+1 - деф - Swettka, swettka - 11.56 - в")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
-
-    def test_nickname_space_separated(self):
-        parsed = parse_activity_message("+1 - деф - Аттакер Polako - 13.00")
-        self.assertEqual(parsed.amount, Decimal("1"))
-        self.assertEqual(parsed.activity_type, "DEF")
-        self.assertEqual(parsed.nicknames, ["Аттакер", "Polako"])
-        self.assertEqual(parsed.wave_start, time(13, 0))
-
-    def test_nickname_mixed_space_and_comma(self):
-        parsed = parse_activity_message(
-            "+1 - деф - Swettka Pocomaxa, Ostin - 11.56 - в"
-        )
-        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa", "Ostin"])
-
-    def test_nickname_multiple_spaces(self):
-        parsed = parse_activity_message(
-            "+1 | деф |  Swettka   Pocomaxa  | 11.56 | в"
-        )
-        self.assertEqual(parsed.nicknames, ["Swettka", "Pocomaxa"])
-
-    def test_single_nickname_unchanged(self):
-        parsed = parse_activity_message("+1 | деф | Swettka | 11.56 | описание")
-        self.assertEqual(parsed.nicknames, ["Swettka"])
-
-    def test_multi_nickname_keeps_first_spelling_on_dedup(self):
-        parsed = parse_activity_message("+1 - деф - swettka, Swettka - 11.56 - в")
-        self.assertEqual(parsed.nicknames, ["swettka"])
-
-    def test_empty_nicknames_after_split(self):
+    def test_invalid_nickname_with_space(self):
         with self.assertRaises(ParserError) as ctx:
-            parse_activity_message("+1 | деф | ,  | 11.56 | описание")
-        self.assertEqual(str(ctx.exception), "empty_nickname")
+            parse_activity_message("+1 | деф | Swett ka | 11.56 | описание")
+        self.assertEqual(str(ctx.exception), "invalid_nickname")
 
-    def test_empty_nickname_parameter_raises(self):
+    def test_invalid_nickname_with_symbol(self):
         with self.assertRaises(ParserError) as ctx:
-            parse_activity_message("+1 | деф | | 11.56 | описание")
-        self.assertEqual(str(ctx.exception), "empty_nickname")
+            parse_activity_message("+1 | деф | Swettka! | 11.56 | описание")
+        self.assertEqual(str(ctx.exception), "invalid_nickname")
 
-    def test_user_example_without_description(self):
-        parsed = parse_activity_message("+0,5 | фарм | Ostin, Pocomaxa | 11.56 |")
-        self.assertEqual(parsed.amount, Decimal("0.5"))
-        self.assertEqual(parsed.activity_type, "FARM")
-        self.assertEqual(parsed.nicknames, ["Ostin", "Pocomaxa"])
-        self.assertEqual(parsed.description, "")
+    def test_two_nicks_via_space_is_invalid(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_activity_message("+1 | деф | Swettka Pocomaxa | 11.56 | описание")
+        self.assertEqual(str(ctx.exception), "invalid_nickname")
 
     def test_wrong_order_type_first(self):
         with self.assertRaises(ParserError) as ctx:
@@ -303,7 +251,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         )
         self.assertEqual(parsed.amount, Decimal("1"))
         self.assertEqual(parsed.activity_type, "FARM")
-        self.assertEqual(parsed.nicknames, ["Pocomaxa"])
+        self.assertEqual(parsed.nickname, "Pocomaxa")
         self.assertEqual(parsed.wave_start, time(18, 0))
         self.assertEqual(parsed.description, "Тестовое сообщение")
 
@@ -341,7 +289,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         self.assertEqual(parsed.activity_type, "DEF")
         self.assertTrue(parsed.has_cast)
         self.assertEqual(parsed.amount, Decimal("1"))
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
     def test_standalone_cast(self):
@@ -396,7 +344,7 @@ class ParseActivityMessageTests(SimpleTestCase):
         parsed = parse_activity_message("+1|деф+каст|  Swettka |11.56")
         self.assertEqual(parsed.activity_type, "DEF")
         self.assertTrue(parsed.has_cast)
-        self.assertEqual(parsed.nicknames, ["Swettka"])
+        self.assertEqual(parsed.nickname, "Swettka")
         self.assertEqual(parsed.wave_start, time(11, 56))
 
     def test_def_farm_conflict(self):
