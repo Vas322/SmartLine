@@ -10,6 +10,10 @@ from core.error_messages import friendly_error_message
 
 logger = logging.getLogger(__name__)
 
+_ERROR_TEMPLATE_HINT = "+время на волне | тип | ники | время начала волны | описание"
+_ERROR_EXAMPLE_HINT = "+1 | деф+каст | Swettka | 11.56 | Деф и каст"
+_ERROR_CTA = "Просьба отредактировать свое сообщение по шаблону. Да прибудет с тобой сила, спартанец!"
+
 _TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
 
@@ -68,8 +72,9 @@ def notify_processing_error(error: ProcessingError) -> None:
         f"Причина: {friendly_error_message(error.reason)}\n"
         f"Текст: {message.text}\n"
         f"Username: {message.telegram_username or '-'}\n"
-        f"Дата: {message.message_date.isoformat()}\n"
-        f"Message ID: {message.telegram_message_id}"
+        f"Шаблон: {_ERROR_TEMPLATE_HINT}\n"
+        f"Пример: {_ERROR_EXAMPLE_HINT}\n"
+        f"{_ERROR_CTA}"
     )
     if notify_group_reply(message, text):
         error.status = ProcessingError.Status.NOTIFIED
