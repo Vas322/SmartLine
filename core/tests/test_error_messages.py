@@ -80,5 +80,11 @@ class NotifyProcessingErrorTests(TestCase):
             sent_text = mock_reply.call_args[0][1]
         self.assertIn("Не указано время начала волны", sent_text)
         self.assertNotIn("missing_wave_time", sent_text)
+        self.assertIn("Шаблон:", sent_text)
+        self.assertIn("деф+каст", sent_text)
+        self.assertIn("отредактировать свое сообщение по шаблону", sent_text)
+        self.assertIn("Да прибудет с тобой сила, спартанец!", sent_text)
+        self.assertNotIn("Дата:", sent_text)
+        self.assertNotIn("Message ID:", sent_text)
         err.refresh_from_db()
         self.assertEqual(err.status, ProcessingError.Status.NOTIFIED)
