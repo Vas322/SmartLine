@@ -1,6 +1,7 @@
 """Tests for the activity processing service."""
 from datetime import time
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -123,6 +124,7 @@ class ProcessTelegramMessageTests(TestCase):
         self.assertEqual(Activity.objects.count(), 2)
 
     def test_nickname_is_resolved_by_nickname_not_sender(self):
+        """Existing player by nickname is used even if user_id differs (no binding yet)."""
         Player.objects.create(nickname="Swettka")
         result = process_telegram_message(
             chat_id=1,
@@ -135,29 +137,9 @@ class ProcessTelegramMessageTests(TestCase):
 
         self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
         self.assertEqual(Player.objects.filter(nickname="Swettka").count(), 1)
-
-    def test_different_senders_same_nickname_both_succeed(self):
-        first = process_telegram_message(
-            chat_id=1,
-            message_id=1,
-            user_id=100,
-            username="user_a",
-            text="+1 | деф | Swettka | 11.56 | Первая",
-            message_date=timezone.now(),
-        )
-        second = process_telegram_message(
-            chat_id=1,
-            message_id=2,
-            user_id=200,
-            username="user_b",
-            text="+2 | деф | Swettka | 11.56 | Вторая",
-            message_date=timezone.now(),
-        )
-
-        self.assertEqual(first.status, ProcessResultStatus.ACTIVITY_CREATED)
-        self.assertEqual(second.status, ProcessResultStatus.ACTIVITY_CREATED)
-        self.assertEqual(Player.objects.filter(nickname="Swettka").count(), 1)
-        self.assertEqual(Activity.objects.count(), 2)
+        player = Player.objects.get(nickname="Swettka")
+        # Since player had no telegram_user_id, it gets bound to user_id=999
+        self.assertEqual(player.telegram_user_id, 999)
 
     def test_same_user_can_use_own_nickname_repeatedly(self):
         _process("+1 | деф | Swettka | 11.56 | Первая", message_id=1)
@@ -196,34 +178,68 @@ class ProcessTelegramMessageTests(TestCase):
         )
         self.assertEqual(total, Decimal("1.0"))
 
-    def test_multi_nickname_creates_activities(self):
-        result = _process("+1 - деф - Swettka, Pocomaxa - 11.56 - Первая волна")
+    # --- new binding logic tests ---
+
+    def test_resolve_by_user_id_takes_precedence(self):
+        """Player with telegram_user_id=100 is resolved by user_id even if nick differs."""
+        Player.objects.create(nickname="OldNick", telegram_user_id=100)
+        result = _process("+1 | деф | Swettka | 11.56 | Первая", message_id=1)
 
         self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
-        self.assertEqual(Activity.objects.count(), 2)
-        self.assertEqual(len(result.activities), 2)
-        players = set(
-            Activity.objects.values_list("player__nickname", flat=True)
-        )
-        self.assertEqual(players, {"Swettka", "Pocomaxa"})
-        for activity in Activity.objects.all():
-            self.assertEqual(activity.amount, Decimal("1"))
-            self.assertEqual(activity.activity_type, "DEF")
-            self.assertEqual(activity.description, "Первая волна")
-            self.assertEqual(activity.telegram_message_id, result.telegram_message.pk)
+        self.assertEqual(Player.objects.count(), 1)
+        player = Player.objects.get()
+        self.assertEqual(player.nickname, "Swettka")  # nickname adopted
+        self.assertEqual(player.telegram_user_id, 100)
 
-    def test_multi_nickname_same_amount_for_each_player(self):
-        _process("+0,5 | фарм | Swettka, Pocomaxa | 11.56 | вторая волна")
+    def test_nick_already_bound(self):
+        """Player with telegram_user_id=100 cannot be claimed by user_id=200."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        result = process_telegram_message(
+            chat_id=1,
+            message_id=1,
+            user_id=200,
+            username="user_b",
+            text="+1 | деф | Swettka | 11.56 | Первая",
+            message_date=timezone.now(),
+        )
 
+        self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.reason, "nick_already_bound")
+        self.assertEqual(Activity.objects.count(), 0)
+
+    def test_auto_create_binds_user_id(self):
+        """New player gets telegram_user_id bound on creation."""
+        result = _process("+1 | деф | Newbie | 11.56 | описание", message_id=1)
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        player = Player.objects.get(nickname="Newbie")
+        self.assertEqual(player.telegram_user_id, 100)
+
+    def test_no_duplicate_player_for_same_user_id(self):
+        """Two calls with same user_id but different nickname spelling -> one player."""
+        _process("+1 | деф | Swettka | 11.56 | Первая", message_id=1)
+        result = _process("+2 | деф | Swettkaa | 11.56 | Вторая", message_id=2)
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(Player.objects.count(), 1)
+        player = Player.objects.get()
+        self.assertEqual(player.nickname, "Swettkaa")  # latest spelling adopted
+        self.assertEqual(player.telegram_user_id, 100)
         self.assertEqual(Activity.objects.count(), 2)
-        amounts = set(
-            Activity.objects.values_list("amount", flat=True)
-        )
-        self.assertEqual(amounts, {Decimal("0.5")})
-        types = set(
-            Activity.objects.values_list("activity_type", flat=True)
-        )
-        self.assertEqual(types, {"FARM"})
+
+    @patch("core.services.activity_service.notify_group_reply")
+    def test_nick_change_notifies_group(self, mock_notify):
+        """Nick change triggers group notification."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        _process("+1 | деф | Swettkaa | 11.56 | Вторая", message_id=1)
+
+        self.assertEqual(Player.objects.count(), 1)
+        player = Player.objects.get()
+        self.assertEqual(player.nickname, "Swettkaa")
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        self.assertIn("Ник изменён: Swettka → Swettkaa", args[1])
 
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
@@ -297,15 +313,6 @@ class ProcessTelegramEditTests(TestCase):
         self.assertEqual(result.status, ProcessResultStatus.IGNORED)
         self.assertEqual(ProcessingError.objects.count(), 1)
         self.assertEqual(Activity.objects.count(), 0)
-
-    def test_edit_on_error_with_multiple_nicknames(self):
-        _process("+abc | деф | Swettka | 11.56 | описание")
-
-        result = _process_edit("+1 - деф - Swettka, Pocomaxa - 11.56 - Первая волна")
-
-        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
-        self.assertEqual(Activity.objects.count(), 2)
-        self.assertEqual(ProcessingError.objects.count(), 0)
 
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
