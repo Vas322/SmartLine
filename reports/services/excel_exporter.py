@@ -55,7 +55,7 @@ def export_activities_excel(date_from: datetime, date_to: datetime) -> io.BytesI
             [
                 activity.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 activity.player.nickname,
-                activity.activity_type,
+                activity.type_display,
                 _display_amount(activity.amount),
                 minutes,
                 _display_amount(_paid_amount(activity)),

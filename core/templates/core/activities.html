@@ -22,7 +22,7 @@
     <tr>
         <td>{{ activity.created_at|date:"d.m.Y H:i" }}</td>
         <td>{{ activity.player.nickname }}</td>
-        <td>{{ activity.activity_type }}</td>
+        <td>{{ activity.type_display }}</td>
         <td>{{ activity.amount }}</td>
         <td>{% if activity.wave_start_time %}{{ activity.wave_start_time|time:"H:i" }}{% else %}—{% endif %}</td>
         <td>{% if activity.payment_kk is not None %}{{ activity.payment_kk }}{% else %}—{% endif %}</td>

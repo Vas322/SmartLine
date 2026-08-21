@@ -24,7 +24,7 @@ class TelegramMessageAdmin(admin.ModelAdmin):
 
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
-    list_display = ("player", "activity_type", "amount", "created_at")
+    list_display = ("player", "type_display", "amount", "created_at")
     list_filter = ("activity_type",)
     search_fields = ("player__nickname",)
 

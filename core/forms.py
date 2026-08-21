@@ -2,6 +2,7 @@
 from datetime import datetime, time
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 
 from core.models import CastRate, Instruction, Player, Rate
@@ -70,7 +71,10 @@ class ActivityFilterForm(forms.Form):
         if player is not None:
             queryset = queryset.filter(player=player)
         if activity_type:
-            queryset = queryset.filter(activity_type=activity_type)
+            if activity_type == "CAST":
+                queryset = queryset.filter(Q(activity_type="CAST") | Q(has_cast=True))
+            else:
+                queryset = queryset.filter(activity_type=activity_type)
         if date_from:
             queryset = queryset.filter(created_at__date__gte=date_from)
         if date_to:
