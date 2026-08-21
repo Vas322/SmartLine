@@ -1,5 +1,6 @@
 """Update the activity instruction: add cast/recast activity type and combos."""
 from django.db import migrations
+from django.db.models import Q
 
 
 INSTRUCTION_CONTENT = """Сообщение обязательно начинается с +:
@@ -51,11 +52,13 @@ def update_instruction_content(apps, schema_editor):
     Instruction = apps.get_model("core", "Instruction")
     global previous_content
     previous_content = dict(
-        Instruction.objects.filter(slug="how-to-write-activity").values_list("pk", "content")
+        Instruction.objects.filter(
+            Q(slug="how-to-write-activity") | Q(title="Запись активности на форте")
+        ).values_list("pk", "content")
     )
-    Instruction.objects.filter(slug="how-to-write-activity").update(
-        content=INSTRUCTION_CONTENT
-    )
+    Instruction.objects.filter(
+        Q(slug="how-to-write-activity") | Q(title="Запись активности на форте")
+    ).update(content=INSTRUCTION_CONTENT)
 
 
 def revert_instruction_content(apps, schema_editor):
