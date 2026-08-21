@@ -1,4 +1,5 @@
 """Forms for the Smartline web interface."""
+import re
 from datetime import datetime, time
 
 from django import forms
@@ -35,6 +36,10 @@ class PlayerForm(forms.ModelForm):
         if Player.objects.filter(nickname__iexact=nickname).exists():
             raise forms.ValidationError(
                 f"Игрок с ником «{nickname}» уже существует (регистр не важен)."
+            )
+        if not re.fullmatch(r"^[A-Za-zА-Яа-яЁё0-9]+$", nickname):
+            raise forms.ValidationError(
+                "Ник может содержать только буквы русского/английского алфавита и цифры. Пожалуйста, исправьте игровой ник на корректный."
             )
         return nickname
 
