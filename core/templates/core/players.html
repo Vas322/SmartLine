@@ -20,6 +20,9 @@
         <td>{{ player.is_active|yesno:"Да,Нет" }}</td>
         <td>{{ player.created_at|date:"d.m.Y H:i" }}</td>
         <td>
+            {% if user.is_staff %}
+            <a href="{% url 'player_edit' player.pk %}" class="btn">Редактировать</a>
+            {% endif %}
             <form action="{% url 'player_toggle' player.pk %}" method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" class="btn">

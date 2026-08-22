@@ -49,20 +49,20 @@ def get_or_create_telegram_message(
     )
 
 
-def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str]]:
+def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str], bool]:
     """Update player nickname if spelling differs (case-insensitive).
 
-    Returns (player, nick_changed, old_nickname_or_none).
+    Returns (player, nick_changed, old_nickname_or_none, is_new_player).
     """
     if p.nickname.casefold() != nick.casefold():
         old = p.nickname
         p.nickname = nick
         p.save(update_fields=["nickname"])
-        return p, True, old
-    return p, False, None
+        return p, True, old, False
+    return p, False, None, False
 
 
-def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Optional[str]]:
+def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Optional[str], bool]:
     """Resolve a player by Telegram user_id first, then by nickname.
 
     - If user_id is provided and a player has that telegram_user_id, use that
@@ -74,7 +74,7 @@ def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Op
         bind it.
     - Else, create a new player with the nickname and user_id (if provided).
 
-    Returns (player, nick_changed, old_nickname_or_none).
+    Returns (player, nick_changed, old_nickname_or_none, is_new_player).
     """
     if user_id is not None:
         p = Player.objects.filter(telegram_user_id=user_id).first()
@@ -91,7 +91,7 @@ def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Op
         return _adopt_nick(p, nick)
 
     p = Player.objects.create(nickname=nick, telegram_user_id=user_id)
-    return p, False, None
+    return p, False, None, True
 
 
 def _compute_payment(parsed: ParsedActivity) -> Decimal:
@@ -172,7 +172,7 @@ def process_telegram_message(
         )
 
         try:
-            player, nick_changed, old_nick = _resolve_player(parsed.nickname, user_id)
+            player, nick_changed, old_nick, is_new_player = _resolve_player(parsed.nickname, user_id)
         except ParserError as exc:
             logger.warning(
                 "Player resolve error chat_id=%s message_id=%s: %s",
@@ -209,6 +209,11 @@ def process_telegram_message(
 
     if nick_changed:
         notify_group_reply(telegram_message, f"Ник изменён: {old_nick} → {player.nickname}")
+    elif is_new_player:
+        notify_group_reply(
+            telegram_message,
+            f"Зарегистрирован новый игрок! На {player.nickname} будет приходить оплата!",
+        )
 
     return ProcessResult(
         status=ProcessResultStatus.ACTIVITY_CREATED,
@@ -275,7 +280,7 @@ def process_telegram_edit(
             return _create_processing_error(tm, str(exc))
 
         try:
-            player, nick_changed, old_nick = _resolve_player(parsed.nickname, user_id)
+            player, nick_changed, old_nick, is_new_player = _resolve_player(parsed.nickname, user_id)
         except ParserError as exc:
             tm.status = TelegramMessage.Status.ERROR
             tm.save(update_fields=["text", "message_date", "status"])
@@ -298,6 +303,11 @@ def process_telegram_edit(
 
     if nick_changed:
         notify_group_reply(tm, f"Ник изменён: {old_nick} → {player.nickname}")
+    elif is_new_player:
+        notify_group_reply(
+            tm,
+            f"Зарегистрирован новый игрок! На {player.nickname} будет приходить оплата!",
+        )
 
     return ProcessResult(
         status=ProcessResultStatus.ACTIVITY_CREATED,
