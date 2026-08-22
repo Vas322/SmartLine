@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block title %}Редактирование игрока{% endblock %}
+{% block content %}
+<h1>Редактирование игрока: {{ player.nickname }}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn">Сохранить</button>
+    <a href="{% url 'players' %}" class="btn">Отмена</a>
+</form>
+{% endblock %}

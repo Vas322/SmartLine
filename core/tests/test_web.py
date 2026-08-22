@@ -381,6 +381,38 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
 
+    def test_player_edit_requires_staff(self):
+        self._login()
+        response = self.client.get(reverse("player_edit", args=[self.player.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("admin", response.url)
+
+    def test_player_edit_updates_nickname_and_user_id(self):
+        self.user.is_staff = True
+        self.user.save()
+        self._login()
+        response = self.client.post(
+            reverse("player_edit", args=[self.player.pk]),
+            {"nickname": "Ostin", "telegram_user_id": "999"},
+        )
+        self.assertRedirects(response, reverse("players"))
+        self.player.refresh_from_db()
+        self.assertEqual(self.player.nickname, "Ostin")
+        self.assertEqual(self.player.telegram_user_id, 999)
+
+    def test_player_edit_rejects_duplicate_nickname(self):
+        self.user.is_staff = True
+        self.user.save()
+        Player.objects.create(nickname="Ostin")
+        self._login()
+        response = self.client.post(
+            reverse("player_edit", args=[self.player.pk]),
+            {"nickname": "ostin", "telegram_user_id": ""},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.player.refresh_from_db()
+        self.assertEqual(self.player.nickname, "Swettka")
+
     def test_settings_shows_rates_section(self):
         self._login()
         response = self.client.get(reverse("settings"))
