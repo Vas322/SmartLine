@@ -17,6 +17,7 @@ urlpatterns = [
     path("player/<int:pk>/", views.player_detail, name="player_detail"),
     path("players/toggle/<int:pk>/", views.toggle_player, name="player_toggle"),
     path("players/delete/<int:pk>/", views.delete_player, name="player_delete"),
+    path("players/edit/<int:pk>/", views.player_edit, name="player_edit"),
     path("activities/", views.activities, name="activities"),
     path("telegram-messages/", views.telegram_messages, name="telegram_messages"),
     path("processing_errors/", views.processing_errors, name="processing_errors"),
