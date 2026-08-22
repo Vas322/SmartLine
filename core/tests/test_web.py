@@ -1,9 +1,10 @@
 """Tests for the Smartline web interface."""
 from datetime import time, timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -13,6 +14,7 @@ from core.models import (
     Instruction,
     Player,
     Rate,
+    ScheduleMirror,
     TelegramMessage,
 )
 
@@ -638,3 +640,120 @@ class WebInterfaceTests(TestCase):
             reverse("instruction_edit", args=[999999])
         )
         self.assertEqual(response.status_code, 404)
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN="12345:TESTTOKEN",
+    SCHEDULE_SOURCE_CHAT_ID=-5329088669,
+    ALLIANCE_BOT_USERNAME="x5_fort_bot",
+    CLAN_CHAT_ID=-1000000000,
+)
+class ScheduleMirrorViewTests(TestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username="kl", password="test-password-123", is_staff=True
+        )
+        self.non_staff_user = User.objects.create_user(
+            username="player", password="test-password-123", is_staff=False
+        )
+
+    def _login_staff(self):
+        self.client.login(username="kl", password="test-password-123")
+
+    def _login_non_staff(self):
+        self.client.login(username="player", password="test-password-123")
+
+    def test_schedule_mirror_requires_staff(self):
+        """Non-staff users should be redirected (302 to admin/login)."""
+        self._login_non_staff()
+        response = self.client.get(reverse("schedule_mirror"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("admin", response.url)
+
+    def test_schedule_mirror_get_shows_form(self):
+        """Staff user sees the form on GET."""
+        self._login_staff()
+        response = self.client.get(reverse("schedule_mirror"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Добавить / обновить расписание", response.content.decode())
+        self.assertIn("ID исходного чата", response.content.decode())
+        self.assertIn("ID сообщения с расписанием", response.content.decode())
+
+    def test_schedule_mirror_post_creates_mirror(self):
+        """POST with valid data creates ScheduleMirror via service."""
+        self._login_staff()
+        with mock.patch("core.views.schedule_mirror_service.setup_mirror") as mock_setup:
+            mock_mirror = mock.Mock()
+            mock_setup.return_value = mock_mirror
+
+            response = self.client.post(
+                reverse("schedule_mirror"),
+                {
+                    "source_chat_id": "-5329088669",
+                    "alliance_bot_username": "x5_fort_bot",
+                    "target_chat_id": "-1000000000",
+                    "message_id": "123",
+                    "label": "Test",
+                },
+            )
+
+            self.assertRedirects(response, reverse("schedule_mirror"))
+            mock_setup.assert_called_once()
+            call_kwargs = mock_setup.call_args.kwargs
+            self.assertEqual(call_kwargs["source_chat_id"], -5329088669)
+            self.assertEqual(call_kwargs["source_message_id"], 123)
+            self.assertEqual(call_kwargs["target_chat_id"], -1000000000)
+            self.assertEqual(call_kwargs["alliance_bot_username"], "x5_fort_bot")
+            self.assertEqual(call_kwargs["label"], "Test")
+            self.assertEqual(call_kwargs["user"], self.staff_user)
+
+    def test_schedule_mirror_post_shows_error_on_valueerror(self):
+        """POST shows form error when setup_mirror raises ValueError."""
+        self._login_staff()
+        with mock.patch("core.views.schedule_mirror_service.setup_mirror") as mock_setup:
+            mock_setup.side_effect = ValueError("Не удалось получить сообщение")
+
+            response = self.client.post(
+                reverse("schedule_mirror"),
+                {
+                    "source_chat_id": "-5329088669",
+                    "alliance_bot_username": "x5_fort_bot",
+                    "target_chat_id": "-1000000000",
+                    "message_id": "123",
+                    "label": "Test",
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode()
+            self.assertIn("Не удалось получить сообщение", content)
+
+    def test_schedule_mirror_reconcile_action(self):
+        """POST with action=reconcile calls reconcile_all and redirects."""
+        self._login_staff()
+        with mock.patch("core.views.schedule_mirror_service.reconcile_all") as mock_reconcile:
+            response = self.client.post(
+                reverse("schedule_mirror"),
+                {"action": "reconcile"},
+            )
+
+            self.assertRedirects(response, reverse("schedule_mirror"))
+            mock_reconcile.assert_called_once()
+
+    def test_schedule_mirror_shows_current_active_mirror(self):
+        """GET shows current active mirror text."""
+        self._login_staff()
+        ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=999,
+            last_text="Текущее расписание",
+            is_active=True,
+        )
+        response = self.client.get(reverse("schedule_mirror"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Текущее расписание", content)
+        self.assertIn("chat_id=-5329088669", content)
+        self.assertIn("message_id=100", content)
