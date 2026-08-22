@@ -40,7 +40,10 @@ def _apply_to_target(
     if target_chat_id is None:
         target_chat_id = _default_target_chat_id()
         if target_chat_id is None:
-            raise ValueError("Target chat ID is not configured and no messages exist to infer it.")
+            raise ValueError(
+                "Не удалось определить целевую группу: задайте CLAN_CHAT_ID в настройках "
+                "или убедитесь, что в системе есть обработанные Telegram-сообщения."
+            )
 
     bot = _bot()
 
@@ -161,6 +164,11 @@ def handle_source_message(
         )
     except Exception as exc:
         logger.exception("Failed to mirror schedule message: %s", exc)
+        try:
+            from core.services.notification_service import notify_kl
+            notify_kl("Smartline: ошибка при обработке сообщения с расписанием (см. логи бота).")
+        except Exception:
+            pass
         return None
 
 
@@ -171,7 +179,7 @@ def reconcile_all() -> None:
         try:
             msg_data = bot.get_message(mirror.source_chat_id, mirror.source_message_id)
         except TelegramAPIError as exc:
-            logger.warning("Reconcile failed for mirror %s: %s", mirror, exc)
+            logger.error("Reconcile failed for mirror %s: %s", mirror, exc)
             continue
 
         text = msg_data.get("result", {}).get("text", "")
@@ -183,7 +191,7 @@ def reconcile_all() -> None:
                     text=text,
                 )
             except TelegramAPIError as exc:
-                logger.warning("Reconcile edit failed for mirror %s: %s", mirror, exc)
+                logger.error("Reconcile edit failed for mirror %s: %s", mirror, exc)
                 continue
             mirror.last_text = text
             mirror.last_synced_at = timezone.now()
