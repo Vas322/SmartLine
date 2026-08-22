@@ -136,3 +136,110 @@ class TelegramBot:
                 f"Telegram API error in setMessageReaction: {data.get('description', 'unknown')}"
             )
         return data
+
+    def copy_message(
+        self, chat_id: int, from_chat_id: int, from_message_id: int
+    ) -> dict:
+        url = f"https://api.telegram.org/bot{self.token}/copyMessage"
+        data = {
+            "chat_id": chat_id,
+            "from_chat_id": from_chat_id,
+            "from_message_id": from_message_id,
+        }
+        try:
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+                try:
+                    body = response.json()
+                except Exception:
+                    body = None
+                desc = body.get("description") if isinstance(body, dict) else None
+                if desc:
+                    detail += f": {desc}"
+            raise TelegramAPIError(
+                f"Telegram copyMessage failed: {detail}"
+            ) from exc
+        data = response.json()
+        if not data.get("ok"):
+            raise TelegramAPIError(
+                f"Telegram API error in copyMessage: {data.get('description', 'unknown')}"
+            )
+        return data
+
+    def edit_message_text(
+        self, chat_id: int, message_id: int, text: str
+    ) -> dict:
+        url = f"https://api.telegram.org/bot{self.token}/editMessageText"
+        data = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+        }
+        try:
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+                try:
+                    body = response.json()
+                except Exception:
+                    body = None
+                desc = body.get("description") if isinstance(body, dict) else None
+                if desc:
+                    detail += f": {desc}"
+            raise TelegramAPIError(
+                f"Telegram editMessageText failed: {detail}"
+            ) from exc
+        data = response.json()
+        if not data.get("ok"):
+            raise TelegramAPIError(
+                f"Telegram API error in editMessageText: {data.get('description', 'unknown')}"
+            )
+        return data
+
+    def get_message(
+        self, chat_id: int, message_id: int
+    ) -> dict:
+        url = f"https://api.telegram.org/bot{self.token}/getMessage"
+        data = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+        }
+        try:
+            response = requests.post(url, data=data, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            response = getattr(exc, "response", None)
+            detail = type(exc).__name__
+            if response is not None:
+                status = getattr(response, "status_code", None)
+                if status is not None:
+                    detail += f" (HTTP {status})"
+                try:
+                    body = response.json()
+                except Exception:
+                    body = None
+                desc = body.get("description") if isinstance(body, dict) else None
+                if desc:
+                    detail += f": {desc}"
+            raise TelegramAPIError(
+                f"Telegram getMessage failed: {detail}"
+            ) from exc
+        data = response.json()
+        if not data.get("ok"):
+            raise TelegramAPIError(
+                f"Telegram API error in getMessage: {data.get('description', 'unknown')}"
+            )
+        return data

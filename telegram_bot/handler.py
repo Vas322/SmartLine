@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime
 from django.utils import timezone
+from django.conf import settings
 
 from core.services.activity_service import (
     process_telegram_edit,
@@ -9,6 +10,7 @@ from core.services.activity_service import (
     ProcessResultStatus,
 )
 from core.services.notification_service import notify_activity_reaction
+from core.services import schedule_mirror_service
 
 logger = logging.getLogger(__name__)
 MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный пояс Москвы
@@ -43,6 +45,23 @@ def handle_update(update: dict) -> None:
     username = user_info.get("username", "") or ""
     date = message.get("edit_date") if is_edit else message.get("date")
     message_date = datetime.fromtimestamp(date, tz=MSK)
+
+    # Schedule mirror: intercept messages from alliance bot in source chat
+    if (
+        chat_id == settings.SCHEDULE_SOURCE_CHAT_ID
+        and username == settings.ALLIANCE_BOT_USERNAME
+    ):
+        try:
+            schedule_mirror_service.handle_source_message(
+                source_chat_id=chat_id,
+                source_message_id=message_id,
+                text=text or "",
+                alliance_bot_username=username or "",
+                is_edit=is_edit,
+            )
+        except Exception:  # never break main flow
+            logger.exception("Failed to mirror schedule message")
+        return
 
     logger.info(
         "Received telegram update chat_id=%s message_id=%s is_edit=%s",

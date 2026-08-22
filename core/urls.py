@@ -33,4 +33,5 @@ urlpatterns = [
         name="instruction_edit",
     ),
     path("settings/", views.settings_view, name="settings"),
+    path("schedule/", views.schedule_mirror, name="schedule_mirror"),
 ]
