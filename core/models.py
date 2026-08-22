@@ -162,3 +162,36 @@ class Instruction(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ScheduleMirror(models.Model):
+    source_chat_id = models.BigIntegerField()
+    source_message_id = models.BigIntegerField()
+    target_chat_id = models.BigIntegerField()
+    target_message_id = models.BigIntegerField()
+    alliance_bot_username = models.CharField(max_length=64, blank=True, default="")
+    label = models.CharField(max_length=255, blank=True, default="")
+    last_text = models.TextField(default="")
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_schedule_mirrors",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_chat_id", "source_message_id"],
+                name="uniq_schedule_mirror_source",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"ScheduleMirror(src={self.source_chat_id}:{self.source_message_id}, active={self.is_active})"

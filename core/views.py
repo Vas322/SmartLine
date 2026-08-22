@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
@@ -20,6 +21,7 @@ from core.forms import (
     PlayerEditForm,
     PlayerForm,
     RateForm,
+    ScheduleMirrorForm,
 )
 from core.models import (
     Activity,
@@ -28,8 +30,10 @@ from core.models import (
     Player,
     ProcessingError,
     Rate,
+    ScheduleMirror,
     TelegramMessage,
 )
+from core.services import schedule_mirror_service
 
 
 def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
@@ -420,3 +424,43 @@ def instruction_edit(request, pk: int):
         "core/instruction_edit.html",
         {"form": form, "instruction": instr},
     )
+
+
+@staff_member_required
+def schedule_mirror(request):
+    """Manage schedule mirroring from alliance bot to clan group."""
+    current_mirror = ScheduleMirror.objects.filter(is_active=True).first()
+    current_text = schedule_mirror_service.get_current_text()
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "reconcile":
+            schedule_mirror_service.reconcile_all()
+            messages.success(request, "Синхронизация выполнена.")
+            return redirect("schedule_mirror")
+
+        form = ScheduleMirrorForm(request.POST)
+        if form.is_valid():
+            try:
+                schedule_mirror_service.setup_mirror(
+                    source_chat_id=form.cleaned_data["source_chat_id"],
+                    source_message_id=form.cleaned_data["message_id"],
+                    target_chat_id=form.cleaned_data["target_chat_id"],
+                    alliance_bot_username=form.cleaned_data["alliance_bot_username"],
+                    label=form.cleaned_data["label"],
+                    user=request.user,
+                    text=form.cleaned_data.get("schedule_text") or "",
+                )
+                messages.success(request, "Расписание успешно добавлено/обновлено.")
+                return redirect("schedule_mirror")
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+    else:
+        form = ScheduleMirrorForm()
+
+    context = {
+        "form": form,
+        "current_mirror": current_mirror,
+        "current_text": current_text,
+    }
+    return render(request, "core/schedule_mirror.html", context)
