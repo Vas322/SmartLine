@@ -98,3 +98,67 @@ class TestPollErrorLogging(unittest.TestCase):
             self.assertTrue(
                 any("HTTP 401: Unauthorized" in line for line in cm.output)
             )
+
+
+class TestCopyMessage(unittest.TestCase):
+    def _bot(self, token="12345:SECRETTKN"):
+        return TelegramBot(token=token)
+
+    def test_copy_message_success_returns_message_id(self):
+        resp = FakeResponse(200, {"ok": True, "result": {"message_id": 999}})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
+            result = self._bot().copy_message(chat_id=-100, from_chat_id=-200, from_message_id=42)
+        self.assertEqual(result["result"]["message_id"], 999)
+
+    def test_copy_message_http_error_raises_without_token(self):
+        resp = FakeResponse(403, {"ok": False, "description": "Forbidden: bot was blocked"})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
+            with self.assertRaises(TelegramAPIError) as ctx:
+                self._bot().copy_message(chat_id=-100, from_chat_id=-200, from_message_id=42)
+        msg = str(ctx.exception)
+        self.assertIn("403", msg)
+        self.assertIn("Forbidden", msg)
+        self.assertNotIn("SECRETTKN", msg)
+
+    def test_copy_message_ok_false_raises_without_token(self):
+        resp = FakeResponse(200, {"ok": False, "description": "copy failed"})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
+            with self.assertRaises(TelegramAPIError) as ctx:
+                self._bot().copy_message(chat_id=-100, from_chat_id=-200, from_message_id=42)
+        msg = str(ctx.exception)
+        self.assertIn("copy failed", msg)
+        self.assertNotIn("SECRETTKN", msg)
+
+    def test_copy_message_connection_error(self):
+        with mock.patch(
+            "telegram_bot.bot.requests.post",
+            side_effect=requests.ConnectionError("failed to connect"),
+        ):
+            with self.assertRaises(TelegramAPIError) as ctx:
+                self._bot().copy_message(chat_id=-100, from_chat_id=-200, from_message_id=42)
+        msg = str(ctx.exception)
+        self.assertIn("ConnectionError", msg)
+        self.assertNotIn("SECRETTKN", msg)
+
+
+class TestEditMessageText(unittest.TestCase):
+    def _bot(self, token="12345:SECRETTKN"):
+        return TelegramBot(token=token)
+
+    def test_edit_message_text_success(self):
+        resp = FakeResponse(200, {"ok": True, "result": True})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
+            result = self._bot().edit_message_text(chat_id=-100, message_id=42, text="new text")
+        self.assertTrue(result["ok"])
+
+    def test_edit_message_text_http_error_raises_without_token(self):
+        resp = FakeResponse(400, {"ok": False, "description": "Bad Request: message not found"})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
+            with self.assertRaises(TelegramAPIError) as ctx:
+                self._bot().edit_message_text(chat_id=-100, message_id=42, text="new text")
+        msg = str(ctx.exception)
+        self.assertIn("400", msg)
+        self.assertIn("Bad Request", msg)
+        self.assertNotIn("SECRETTKN", msg)
+
+
