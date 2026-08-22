@@ -61,6 +61,11 @@ def handle_update(update: dict) -> None:
             )
         except Exception:  # never break main flow
             logger.exception("Failed to mirror schedule message")
+            try:
+                from core.services.notification_service import notify_kl
+                notify_kl("Smartline: не удалось зеркалировать расписание из мостовой группы (см. логи бота).")
+            except Exception:
+                pass
         return
 
     logger.info(

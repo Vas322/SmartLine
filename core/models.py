@@ -186,6 +186,12 @@ class ScheduleMirror(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_chat_id", "source_message_id"],
+                name="uniq_schedule_mirror_source",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"ScheduleMirror(src={self.source_chat_id}:{self.source_message_id}, active={self.is_active})"

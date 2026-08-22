@@ -321,7 +321,8 @@ class ScheduleMirrorForm(forms.Form):
             default_id = _default_target_chat_id()
             if default_id is None:
                 raise forms.ValidationError(
-                    "Целевой чат не определён. Укажите CLAN_CHAT_ID в настройках или добавьте хотя бы одно обычное сообщение."
+                    "Не удалось определить целевую группу: задайте CLAN_CHAT_ID в настройках "
+                    "или убедитесь, что в системе есть обработанные Telegram-сообщения."
                 )
             cleaned["target_chat_id"] = default_id
         return cleaned
