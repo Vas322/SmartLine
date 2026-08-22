@@ -162,21 +162,3 @@ class TestEditMessageText(unittest.TestCase):
         self.assertNotIn("SECRETTKN", msg)
 
 
-class TestGetMessage(unittest.TestCase):
-    def _bot(self, token="12345:SECRETTKN"):
-        return TelegramBot(token=token)
-
-    def test_get_message_success_returns_text(self):
-        resp = FakeResponse(200, {"ok": True, "result": {"text": "schedule text"}})
-        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
-            result = self._bot().get_message(chat_id=-100, message_id=42)
-        self.assertEqual(result["result"]["text"], "schedule text")
-
-    def test_get_message_http_error_raises_without_token(self):
-        resp = FakeResponse(400, {"ok": False, "description": "Bad Request: message not found"})
-        with mock.patch("telegram_bot.bot.requests.post", return_value=resp):
-            with self.assertRaises(TelegramAPIError) as ctx:
-                self._bot().get_message(chat_id=-100, message_id=42)
-        msg = str(ctx.exception)
-        self.assertIn("400", msg)
-        self.assertNotIn("SECRETTKN", msg)

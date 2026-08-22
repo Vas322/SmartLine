@@ -29,14 +29,13 @@ class ScheduleMirrorServiceTests(TestCase):
         bot = mock.Mock(spec=schedule_mirror_service.TelegramBot)
         bot.copy_message = mock.Mock()
         bot.edit_message_text = mock.Mock()
-        bot.get_message = mock.Mock()
         return bot
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_apply_to_target_creates_new_mirror(self, mock_bot_factory):
         """First message creates a new ScheduleMirror."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"result": {"message_id": 999}}
+        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 999}}
         mock_bot_factory.return_value = mock_bot
 
         mirror = schedule_mirror_service._apply_to_target(
@@ -134,7 +133,7 @@ class ScheduleMirrorServiceTests(TestCase):
     def test_apply_to_target_new_message_id_deactivates_old(self, mock_bot_factory):
         """New source_message_id for same source_chat deactivates old mirrors."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"result": {"message_id": 888}}
+        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 888}}
         mock_bot_factory.return_value = mock_bot
 
         # Create old active mirror
@@ -167,10 +166,10 @@ class ScheduleMirrorServiceTests(TestCase):
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_setup_mirror_fetches_text_and_applies(self, mock_bot_factory):
-        """setup_mirror fetches message text via get_message then applies."""
+        """setup_mirror accepts text from admin and applies; copy_message returns only message_id."""
         mock_bot = self._mock_bot()
-        mock_bot.get_message.return_value = {"result": {"text": "Полученный текст"}}
-        mock_bot.copy_message.return_value = {"result": {"message_id": 777}}
+        # copy_message returns only message_id, NO text field
+        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 777}}
         mock_bot_factory.return_value = mock_bot
 
         mirror = schedule_mirror_service.setup_mirror(
@@ -180,16 +179,21 @@ class ScheduleMirrorServiceTests(TestCase):
             alliance_bot_username="x5_fort_bot",
             label="Manual",
             user=self.user,
+            text="ВСТАВЛЕННЫЙ ТЕКСТ",
         )
 
-        self.assertEqual(mirror.last_text, "Полученный текст")
-        mock_bot.get_message.assert_called_once_with(-5329088669, 300)
+        self.assertEqual(mirror.last_text, "ВСТАВЛЕННЫЙ ТЕКСТ")
+        mock_bot.copy_message.assert_called_once_with(
+            chat_id=-1000000000,
+            from_chat_id=-5329088669,
+            from_message_id=300,
+        )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
-    def test_setup_mirror_raises_on_get_message_failure(self, mock_bot_factory):
-        """setup_mirror raises ValueError if get_message fails."""
+    def test_setup_mirror_raises_on_copy_failure(self, mock_bot_factory):
+        """setup_mirror raises ValueError if copy_message fails."""
         mock_bot = self._mock_bot()
-        mock_bot.get_message.side_effect = TelegramAPIError("Failed")
+        mock_bot.copy_message.side_effect = TelegramAPIError("Failed to copy")
         mock_bot_factory.return_value = mock_bot
 
         with self.assertRaises(ValueError) as ctx:
@@ -200,14 +204,15 @@ class ScheduleMirrorServiceTests(TestCase):
                 alliance_bot_username="x5_fort_bot",
                 label="",
                 user=self.user,
+                text="Some text",
             )
-        self.assertIn("Не удалось получить сообщение", str(ctx.exception))
+        self.assertIn("Не удалось скопировать сообщение в группу клана", str(ctx.exception))
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_handle_source_message_uses_default_target(self, mock_bot_factory):
         """handle_source_message uses default target when None provided."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"result": {"message_id": 555}}
+        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 555}}
         mock_bot_factory.return_value = mock_bot
 
         result = schedule_mirror_service.handle_source_message(
@@ -223,9 +228,8 @@ class ScheduleMirrorServiceTests(TestCase):
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_reconcile_all_updates_changed_text(self, mock_bot_factory):
-        """reconcile_all edits target messages when source text changed."""
+        """reconcile_all edits target messages using stored last_text (no get_message)."""
         mock_bot = self._mock_bot()
-        mock_bot.get_message.return_value = {"result": {"text": "Updated text"}}
         mock_bot_factory.return_value = mock_bot
 
         ScheduleMirror.objects.create(
@@ -238,20 +242,20 @@ class ScheduleMirrorServiceTests(TestCase):
             is_active=True,
         )
 
-        schedule_mirror_service.reconcile_all()
+        result = schedule_mirror_service.reconcile_all()
 
-        mock_bot.get_message.assert_called_once_with(-5329088669, 100)
         mock_bot.edit_message_text.assert_called_once_with(
             chat_id=-1000000000,
             message_id=999,
-            text="Updated text",
+            text="Old text",
         )
+        self.assertEqual(result, {"updated": 1, "errors": 0})
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_reconcile_all_ignores_api_errors(self, mock_bot_factory):
         """reconcile_all continues on TelegramAPIError."""
         mock_bot = self._mock_bot()
-        mock_bot.get_message.side_effect = TelegramAPIError("Failed")
+        mock_bot.edit_message_text.side_effect = TelegramAPIError("Failed")
         mock_bot_factory.return_value = mock_bot
 
         ScheduleMirror.objects.create(
@@ -265,7 +269,8 @@ class ScheduleMirrorServiceTests(TestCase):
         )
 
         # Should not raise
-        schedule_mirror_service.reconcile_all()
+        result = schedule_mirror_service.reconcile_all()
+        self.assertEqual(result, {"updated": 0, "errors": 1})
 
     def test_get_current_text_returns_empty_when_no_active(self):
         """get_current_text returns empty string when no active mirror."""

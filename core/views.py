@@ -449,6 +449,7 @@ def schedule_mirror(request):
                     alliance_bot_username=form.cleaned_data["alliance_bot_username"],
                     label=form.cleaned_data["label"],
                     user=request.user,
+                    text=form.cleaned_data.get("schedule_text") or "",
                 )
                 messages.success(request, "Расписание успешно добавлено/обновлено.")
                 return redirect("schedule_mirror")
