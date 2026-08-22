@@ -18,6 +18,33 @@ MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный по
 
 def handle_update(update: dict) -> None:
     """Handle a single Telegram update dict."""
+    # [BRIDGE-DBG] Debug log for all incoming updates (before any routing)
+    msg = (
+        update.get("message")
+        or update.get("edited_message")
+        or update.get("channel_post")
+        or update.get("edited_channel_post")
+    )
+    if isinstance(msg, dict):
+        chat = msg.get("chat") or {}
+        chat_id = chat.get("id")
+        msg_id = msg.get("message_id")
+        from_user = msg.get("from") or {}
+        from_id = from_user.get("id")
+        from_username = from_user.get("username", "") or ""
+        forward_from = msg.get("forward_from") or {}
+        fwd_username = forward_from.get("username", "") or ""
+        text = msg.get("text") or msg.get("caption") or ""
+        logger.info(
+            "[BRIDGE-DBG] chat_id=%s msg_id=%s from_id=%s from_username=%s fwd_username=%s text=%r",
+            chat_id,
+            msg_id,
+            from_id,
+            from_username,
+            fwd_username,
+            text[:80],
+        )
+
     message = update.get("message")
     is_edit = False
     if not isinstance(message, dict):
