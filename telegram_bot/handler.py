@@ -1,6 +1,7 @@
 """Adapter between raw Telegram updates and the activity service."""
 import logging
 from datetime import datetime
+from django.utils import timezone
 
 from core.services.activity_service import (
     process_telegram_edit,
@@ -10,6 +11,7 @@ from core.services.activity_service import (
 from core.services.notification_service import notify_activity_reaction
 
 logger = logging.getLogger(__name__)
+MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный пояс Москвы
 
 
 def handle_update(update: dict) -> None:
@@ -40,7 +42,7 @@ def handle_update(update: dict) -> None:
     user_id = user_info.get("id")
     username = user_info.get("username", "") or ""
     date = message.get("edit_date") if is_edit else message.get("date")
-    message_date = datetime.fromtimestamp(date)
+    message_date = datetime.fromtimestamp(date, tz=MSK)
 
     logger.info(
         "Received telegram update chat_id=%s message_id=%s is_edit=%s",
