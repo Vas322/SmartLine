@@ -241,6 +241,21 @@ class ProcessTelegramMessageTests(TestCase):
         args, _ = mock_notify.call_args
         self.assertIn("Ник изменён: Swettka → Swettkaa", args[1])
 
+    @patch("core.services.activity_service.notify_group_reply")
+    def test_new_player_created_notifies_group(self, mock_notify):
+        """Auto-created player triggers group notification."""
+        result = _process("+1 | деф | Pocomaxa | 11.56 | Первая", message_id=1)
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        player = Player.objects.get()
+        self.assertEqual(player.nickname, "Pocomaxa")
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        self.assertIn(
+            "Зарегистрирован новый игрок! На Pocomaxa будет приходить оплата!",
+            args[1],
+        )
+
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
 class ProcessTelegramEditTests(TestCase):

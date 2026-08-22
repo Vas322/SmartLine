@@ -2,6 +2,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
@@ -16,6 +17,7 @@ from core.forms import (
     CastRateForm,
     InstructionForm,
     PeriodForm,
+    PlayerEditForm,
     PlayerForm,
     RateForm,
 )
@@ -207,6 +209,19 @@ def players(request):
     else:
         form = PlayerForm()
     return render(request, "core/players.html", {"players": players_qs, "form": form})
+
+
+@staff_member_required
+def player_edit(request, pk: int):
+    player = get_object_or_404(Player, pk=pk)
+    if request.method == "POST":
+        form = PlayerEditForm(request.POST, instance=player)
+        if form.is_valid():
+            form.save()
+            return redirect("players")
+    else:
+        form = PlayerEditForm(instance=player)
+    return render(request, "core/player_edit.html", {"form": form, "player": player})
 
 
 @login_required
