@@ -36,7 +36,12 @@ def _apply_to_target(
     label: str,
     user,
 ) -> ScheduleMirror:
-    """Core logic to create or update a mirrored schedule message."""
+    """Core logic to create or update a mirrored schedule message.
+
+    Text is NOT fetched from history. For new mirrors, text comes from
+    the admin-provided parameter (for setup_mirror) or live edit (for handle_source_message).
+    copyMessage only returns message_id, not text.
+    """
     if target_chat_id is None:
         target_chat_id = _default_target_chat_id()
         if target_chat_id is None:
@@ -55,7 +60,7 @@ def _apply_to_target(
     ).first()
 
     if mirror:
-        # Existing mirror for this exact message
+        # Existing mirror for this exact message: live edit comes with text in the update
         if mirror.last_text != text:
             try:
                 bot.edit_message_text(
@@ -71,28 +76,31 @@ def _apply_to_target(
                 mirror.save(update_fields=["last_text", "last_synced_at", "updated_at"])
         return mirror
 
-    # No exact match: deactivate all active mirrors for this source chat (switch to new schedule)
-    ScheduleMirror.objects.filter(
-        source_chat_id=source_chat_id,
-        is_active=True,
-    ).update(is_active=False)
-
-    # Copy message to target chat
+    # No exact match: copy the message to target chat (this is the main operation)
     try:
-        copy_result = bot.copy_message(
+        copy = bot.copy_message(
             chat_id=target_chat_id,
             from_chat_id=source_chat_id,
             from_message_id=source_message_id,
         )
     except TelegramAPIError as exc:
-        logger.exception("Failed to copy schedule message: %s", exc)
-        raise ValueError("Не удалось скопировать сообщение. Проверьте ID и что бот состоит в группах.") from exc
+        logger.exception("Failed to copy message: %s", exc)
+        raise ValueError(
+            "Не удалось скопировать сообщение в группу клана. Проверьте, что бот добавлен в целевую группу "
+            "и указан корректный ID сообщения."
+        )
 
-    target_message_id = copy_result.get("result", {}).get("message_id")
+    target_message_id = (copy.get("result") or {}).get("message_id")
     if target_message_id is None:
         raise ValueError("Telegram API не вернул message_id скопированного сообщения.")
 
-    # Create new active mirror
+    # ONLY AFTER successful copy_message: deactivate other active mirrors for this source chat
+    ScheduleMirror.objects.filter(
+        source_chat_id=source_chat_id,
+        is_active=True,
+    ).update(is_active=False)
+
+    # Create new active mirror with provided text (copyMessage doesn't return text)
     mirror = ScheduleMirror.objects.create(
         source_chat_id=source_chat_id,
         source_message_id=source_message_id,
@@ -116,19 +124,11 @@ def setup_mirror(
     alliance_bot_username: str,
     label: str,
     user,
+    text: str = "",
 ) -> ScheduleMirror:
-    """Setup mirror via web form: fetch message text first, then apply."""
-    bot = _bot()
-    try:
-        msg_data = bot.get_message(source_chat_id, source_message_id)
-    except TelegramAPIError as exc:
-        logger.exception("Failed to get source message: %s", exc)
-        raise ValueError("Не удалось получить сообщение по указанному ID. Проверьте ID и что бот состоит в группе.") from exc
-
-    text = msg_data.get("result", {}).get("text", "")
-    if not text:
-        raise ValueError("Сообщение не содержит текста.")
-
+    """Setup mirror via web form: text is provided by admin (schedule_text field).
+    copyMessage only returns message_id, not text.
+    """
     return _apply_to_target(
         source_chat_id=source_chat_id,
         source_message_id=source_message_id,
@@ -148,7 +148,11 @@ def handle_source_message(
     alliance_bot_username: str,
     is_edit: bool,
 ) -> Optional[ScheduleMirror]:
-    """Handle live message/edit from alliance bot in source chat."""
+    """Handle live message/edit from alliance bot in source chat.
+
+    For new messages (no exact mirror): copy_message creates mirror, text from live update.
+    For edits (exact mirror exists): edit_message_text with live text.
+    """
     if not text:
         logger.warning("Empty text for schedule mirror source message")
         return None
@@ -172,30 +176,33 @@ def handle_source_message(
         return None
 
 
-def reconcile_all() -> None:
-    """Reconcile all active mirrors with source messages."""
-    bot = _bot()
-    for mirror in ScheduleMirror.objects.filter(is_active=True):
-        try:
-            msg_data = bot.get_message(mirror.source_chat_id, mirror.source_message_id)
-        except TelegramAPIError as exc:
-            logger.error("Reconcile failed for mirror %s: %s", mirror, exc)
-            continue
+def reconcile_all() -> dict:
+    """Reconcile all active mirrors with source messages.
 
-        text = msg_data.get("result", {}).get("text", "")
-        if text and mirror.last_text != text:
-            try:
-                bot.edit_message_text(
-                    chat_id=mirror.target_chat_id,
-                    message_id=mirror.target_message_id,
-                    text=text,
-                )
-            except TelegramAPIError as exc:
-                logger.error("Reconcile edit failed for mirror %s: %s", mirror, exc)
-                continue
-            mirror.last_text = text
-            mirror.last_synced_at = timezone.now()
-            mirror.save(update_fields=["last_text", "last_synced_at", "updated_at"])
+    Does NOT fetch from history (bot cannot read other's messages by ID).
+    Best-effort: for each active mirror with non-empty last_text,
+    try to edit target message to restore last known text.
+    Live edits are synchronized via edited_message updates.
+    Returns {"updated": int, "errors": int}.
+    """
+    bot = _bot()
+    updated = 0
+    errors = 0
+    for mirror in ScheduleMirror.objects.filter(is_active=True):
+        if not mirror.last_text:
+            continue
+        try:
+            bot.edit_message_text(
+                chat_id=mirror.target_chat_id,
+                message_id=mirror.target_message_id,
+                text=mirror.last_text,
+            )
+        except TelegramAPIError as exc:
+            logger.error("Reconcile edit failed for mirror %s: %s", mirror, exc)
+            errors += 1
+        else:
+            updated += 1
+    return {"updated": updated, "errors": errors}
 
 
 def get_current_text() -> str:
