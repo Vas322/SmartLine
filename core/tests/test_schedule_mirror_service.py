@@ -27,7 +27,7 @@ class ScheduleMirrorServiceTests(TestCase):
     def _mock_bot(self):
         """Create a mock bot with all needed methods."""
         bot = mock.Mock(spec=schedule_mirror_service.TelegramBot)
-        bot.copy_message = mock.Mock()
+        bot.send_message = mock.Mock()
         bot.edit_message_text = mock.Mock()
         return bot
 
@@ -35,7 +35,7 @@ class ScheduleMirrorServiceTests(TestCase):
     def test_apply_to_target_creates_new_mirror(self, mock_bot_factory):
         """First message creates a new ScheduleMirror."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 999}}
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 999}}
         mock_bot_factory.return_value = mock_bot
 
         mirror = schedule_mirror_service._apply_to_target(
@@ -59,10 +59,8 @@ class ScheduleMirrorServiceTests(TestCase):
         self.assertTrue(mirror.is_active)
         self.assertEqual(mirror.created_by, self.user)
 
-        mock_bot.copy_message.assert_called_once_with(
-            chat_id=-1000000000,
-            from_chat_id=-5329088669,
-            from_message_id=100,
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="Расписание на неделю"
         )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
@@ -133,7 +131,7 @@ class ScheduleMirrorServiceTests(TestCase):
     def test_apply_to_target_new_message_id_deactivates_old(self, mock_bot_factory):
         """New source_message_id for same source_chat deactivates old mirrors."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 888}}
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 888}}
         mock_bot_factory.return_value = mock_bot
 
         # Create old active mirror
@@ -163,13 +161,16 @@ class ScheduleMirrorServiceTests(TestCase):
         self.assertEqual(result.source_message_id, 200)
         self.assertEqual(result.target_message_id, 888)
         self.assertTrue(result.is_active)
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="Новое расписание"
+        )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_setup_mirror_fetches_text_and_applies(self, mock_bot_factory):
-        """setup_mirror accepts text from admin and applies; copy_message returns only message_id."""
+        """setup_mirror accepts text from admin and applies; send_message returns only message_id."""
         mock_bot = self._mock_bot()
-        # copy_message returns only message_id, NO text field
-        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 777}}
+        # send_message returns only message_id, NO text field
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 777}}
         mock_bot_factory.return_value = mock_bot
 
         mirror = schedule_mirror_service.setup_mirror(
@@ -183,17 +184,15 @@ class ScheduleMirrorServiceTests(TestCase):
         )
 
         self.assertEqual(mirror.last_text, "ВСТАВЛЕННЫЙ ТЕКСТ")
-        mock_bot.copy_message.assert_called_once_with(
-            chat_id=-1000000000,
-            from_chat_id=-5329088669,
-            from_message_id=300,
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="ВСТАВЛЕННЫЙ ТЕКСТ"
         )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
-    def test_setup_mirror_raises_on_copy_failure(self, mock_bot_factory):
-        """setup_mirror raises ValueError if copy_message fails."""
+    def test_setup_mirror_raises_on_send_failure(self, mock_bot_factory):
+        """setup_mirror raises ValueError if send_message fails."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.side_effect = TelegramAPIError("Failed to copy")
+        mock_bot.send_message.side_effect = TelegramAPIError("Failed to send")
         mock_bot_factory.return_value = mock_bot
 
         with self.assertRaises(ValueError) as ctx:
@@ -206,13 +205,13 @@ class ScheduleMirrorServiceTests(TestCase):
                 user=self.user,
                 text="Some text",
             )
-        self.assertIn("Не удалось скопировать сообщение в группу клана", str(ctx.exception))
+        self.assertIn("Не удалось отправить сообщение в группу клана", str(ctx.exception))
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_handle_source_message_uses_default_target(self, mock_bot_factory):
         """handle_source_message uses default target when None provided."""
         mock_bot = self._mock_bot()
-        mock_bot.copy_message.return_value = {"ok": True, "result": {"message_id": 555}}
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 555}}
         mock_bot_factory.return_value = mock_bot
 
         result = schedule_mirror_service.handle_source_message(

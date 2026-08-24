@@ -40,7 +40,7 @@ def _apply_to_target(
 
     Text is NOT fetched from history. For new mirrors, text comes from
     the admin-provided parameter (for setup_mirror) or live edit (for handle_source_message).
-    copyMessage only returns message_id, not text.
+    send_message returns message_id, not text.
     """
     if target_chat_id is None:
         target_chat_id = _default_target_chat_id()
@@ -76,31 +76,30 @@ def _apply_to_target(
                 mirror.save(update_fields=["last_text", "last_synced_at", "updated_at"])
         return mirror
 
-    # No exact match: copy the message to target chat (this is the main operation)
+    # No exact match: repost the schedule text to target chat.
+    # We do NOT use copy_message because Telegram blocks copying from a channel
+    # (even for admins) when the channel has "Restrict saving content" enabled.
+    # The text is already known from the source channel_post / admin form.
     try:
-        copy = bot.copy_message(
-            chat_id=target_chat_id,
-            from_chat_id=source_chat_id,
-            from_message_id=source_message_id,
-        )
+        sent = bot.send_message(chat_id=target_chat_id, text=text)
     except TelegramAPIError as exc:
-        logger.exception("Failed to copy message: %s", exc)
+        logger.exception("Failed to send mirror message: %s", exc)
         raise ValueError(
-            "Не удалось скопировать сообщение в группу клана. Проверьте, что бот добавлен в целевую группу "
-            "и указан корректный ID сообщения."
+            "Не удалось отправить сообщение в группу клана. Проверьте, что бот добавлен в целевую группу "
+            "и имеет право отправлять сообщения."
         )
 
-    target_message_id = (copy.get("result") or {}).get("message_id")
+    target_message_id = (sent.get("result") or {}).get("message_id")
     if target_message_id is None:
-        raise ValueError("Telegram API не вернул message_id скопированного сообщения.")
+        raise ValueError("Telegram API не вернул message_id отправленного сообщения.")
 
-    # ONLY AFTER successful copy_message: deactivate other active mirrors for this source chat
+    # ONLY AFTER successful send_message: deactivate other active mirrors for this source chat
     ScheduleMirror.objects.filter(
         source_chat_id=source_chat_id,
         is_active=True,
     ).update(is_active=False)
 
-    # Create new active mirror with provided text (copyMessage doesn't return text)
+    # Create new active mirror with provided text (send_message returns message_id, not text)
     mirror = ScheduleMirror.objects.create(
         source_chat_id=source_chat_id,
         source_message_id=source_message_id,
@@ -127,7 +126,7 @@ def setup_mirror(
     text: str = "",
 ) -> ScheduleMirror:
     """Setup mirror via web form: text is provided by admin (schedule_text field).
-    copyMessage only returns message_id, not text.
+    send_message returns message_id, not text.
     """
     return _apply_to_target(
         source_chat_id=source_chat_id,
@@ -150,7 +149,7 @@ def handle_source_message(
 ) -> Optional[ScheduleMirror]:
     """Handle live message/edit from alliance bot in source chat.
 
-    For new messages (no exact mirror): copy_message creates mirror, text from live update.
+    For new messages (no exact mirror): send_message creates mirror, text from live update.
     For edits (exact mirror exists): edit_message_text with live text.
     """
     if not text:
