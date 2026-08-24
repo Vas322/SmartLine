@@ -140,6 +140,12 @@ SCHEDULE_MIRROR_IGNORE_PREFIXES = [
     if p.strip()
 ]
 
+# ID темы (forum topic / message_thread_id) в целевой группе, куда зеркалировать расписание.
+# Если не задан — публикация в общую тему (по умолчанию).
+SCHEDULE_MIRROR_TARGET_THREAD_ID = os.getenv("SCHEDULE_MIRROR_TARGET_THREAD_ID")
+if SCHEDULE_MIRROR_TARGET_THREAD_ID:
+    SCHEDULE_MIRROR_TARGET_THREAD_ID = int(SCHEDULE_MIRROR_TARGET_THREAD_ID)
+
 CSRF_TRUSTED_ORIGINS = [
     host.strip()
     for host in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")

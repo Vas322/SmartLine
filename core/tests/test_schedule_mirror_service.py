@@ -17,6 +17,7 @@ from telegram_bot.bot import TelegramAPIError
     SCHEDULE_SOURCE_CHAT_ID=-5329088669,
     ALLIANCE_BOT_USERNAME="x5_fort_bot",
     CLAN_CHAT_ID=-1000000000,
+    SCHEDULE_MIRROR_TARGET_THREAD_ID=5734,
 )
 class ScheduleMirrorServiceTests(TestCase):
     def setUp(self):
@@ -60,7 +61,7 @@ class ScheduleMirrorServiceTests(TestCase):
         self.assertEqual(mirror.created_by, self.user)
 
         mock_bot.send_message.assert_called_once_with(
-            chat_id=-1000000000, text="Расписание на неделю"
+            chat_id=-1000000000, text="Расписание на неделю", message_thread_id=5734
         )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
@@ -95,6 +96,7 @@ class ScheduleMirrorServiceTests(TestCase):
             chat_id=-1000000000,
             message_id=999,
             text="Новое расписание",
+            message_thread_id=5734,
         )
         mirror.refresh_from_db()
         self.assertEqual(mirror.last_text, "Новое расписание")
@@ -162,7 +164,7 @@ class ScheduleMirrorServiceTests(TestCase):
         self.assertEqual(result.target_message_id, 888)
         self.assertTrue(result.is_active)
         mock_bot.send_message.assert_called_once_with(
-            chat_id=-1000000000, text="Новое расписание"
+            chat_id=-1000000000, text="Новое расписание", message_thread_id=5734
         )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
@@ -185,7 +187,7 @@ class ScheduleMirrorServiceTests(TestCase):
 
         self.assertEqual(mirror.last_text, "ВСТАВЛЕННЫЙ ТЕКСТ")
         mock_bot.send_message.assert_called_once_with(
-            chat_id=-1000000000, text="ВСТАВЛЕННЫЙ ТЕКСТ"
+            chat_id=-1000000000, text="ВСТАВЛЕННЫЙ ТЕКСТ", message_thread_id=5734
         )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
@@ -224,6 +226,9 @@ class ScheduleMirrorServiceTests(TestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result.target_chat_id, -1000000000)
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="Live message", message_thread_id=5734
+        )
 
     @mock.patch("core.services.schedule_mirror_service._bot")
     def test_reconcile_all_updates_changed_text(self, mock_bot_factory):
@@ -247,6 +252,7 @@ class ScheduleMirrorServiceTests(TestCase):
             chat_id=-1000000000,
             message_id=999,
             text="Old text",
+            message_thread_id=5734,
         )
         self.assertEqual(result, {"updated": 1, "errors": 0})
 

@@ -75,6 +75,24 @@ class TestSendMessageErrorReporting(unittest.TestCase):
         self.assertIn("Forbidden", msg)
         self.assertNotIn("SECRETTKN", msg)
 
+    def test_send_message_includes_message_thread_id_when_provided(self):
+        """send_message includes message_thread_id in request data when provided."""
+        resp = FakeResponse(200, {"ok": True, "result": {"message_id": 1}})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp) as mock_post:
+            TelegramBot(token="12345:SECRETTKN").send_message(1, "hi", message_thread_id=5734)
+        args, kwargs = mock_post.call_args
+        sent_data = kwargs.get("data", {})
+        self.assertEqual(sent_data.get("message_thread_id"), 5734)
+
+    def test_send_message_excludes_message_thread_id_when_none(self):
+        """send_message does not include message_thread_id in request data when None."""
+        resp = FakeResponse(200, {"ok": True, "result": {"message_id": 1}})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp) as mock_post:
+            TelegramBot(token="12345:SECRETTKN").send_message(1, "hi", message_thread_id=None)
+        args, kwargs = mock_post.call_args
+        sent_data = kwargs.get("data", {})
+        self.assertNotIn("message_thread_id", sent_data)
+
 
 class TestPollErrorLogging(unittest.TestCase):
     def test_polling_error_logs_message_not_just_class(self):
@@ -160,5 +178,23 @@ class TestEditMessageText(unittest.TestCase):
         self.assertIn("400", msg)
         self.assertIn("Bad Request", msg)
         self.assertNotIn("SECRETTKN", msg)
+
+    def test_edit_message_text_includes_message_thread_id_when_provided(self):
+        """edit_message_text includes message_thread_id in request data when provided."""
+        resp = FakeResponse(200, {"ok": True, "result": True})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp) as mock_post:
+            self._bot().edit_message_text(chat_id=-100, message_id=42, text="new text", message_thread_id=5734)
+        args, kwargs = mock_post.call_args
+        sent_data = kwargs.get("data", {})
+        self.assertEqual(sent_data.get("message_thread_id"), 5734)
+
+    def test_edit_message_text_excludes_message_thread_id_when_none(self):
+        """edit_message_text does not include message_thread_id in request data when None."""
+        resp = FakeResponse(200, {"ok": True, "result": True})
+        with mock.patch("telegram_bot.bot.requests.post", return_value=resp) as mock_post:
+            self._bot().edit_message_text(chat_id=-100, message_id=42, text="new text", message_thread_id=None)
+        args, kwargs = mock_post.call_args
+        sent_data = kwargs.get("data", {})
+        self.assertNotIn("message_thread_id", sent_data)
 
 
