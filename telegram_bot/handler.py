@@ -16,8 +16,84 @@ logger = logging.getLogger(__name__)
 MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный пояс Москвы
 
 
+def _is_denylisted(text: str) -> bool:
+    """Return True if text should be skipped for schedule mirroring."""
+    if not text:
+        return True
+    stripped = text.lstrip()
+    if stripped.startswith("/"):
+        return True
+    lowered = stripped.lower()
+    for prefix in settings.SCHEDULE_MIRROR_IGNORE_PREFIXES:
+        if lowered.startswith(prefix.lower()):
+            return True
+    return False
+
+
 def handle_update(update: dict) -> None:
     """Handle a single Telegram update dict."""
+    # [BRIDGE-DBG] Debug log for all incoming updates (before any routing)
+    msg = (
+        update.get("message")
+        or update.get("edited_message")
+        or update.get("channel_post")
+        or update.get("edited_channel_post")
+    )
+    if isinstance(msg, dict):
+        chat = msg.get("chat") or {}
+        chat_id = chat.get("id")
+        msg_id = msg.get("message_id")
+        from_user = msg.get("from") or {}
+        from_id = from_user.get("id")
+        from_username = from_user.get("username", "") or ""
+        forward_from = msg.get("forward_from") or {}
+        fwd_username = forward_from.get("username", "") or ""
+        text = msg.get("text") or msg.get("caption") or ""
+        logger.info(
+            "[BRIDGE-DBG] chat_id=%s msg_id=%s from_id=%s from_username=%s fwd_username=%s text=%r",
+            chat_id,
+            msg_id,
+            from_id,
+            from_username,
+            fwd_username,
+            text[:80],
+        )
+
+    # Handle channel_post / edited_channel_post (schedule source channel)
+    channel_post = update.get("channel_post")
+    edited_channel_post = update.get("edited_channel_post")
+    if isinstance(channel_post, dict) or isinstance(edited_channel_post, dict):
+        is_edit = isinstance(edited_channel_post, dict)
+        message = edited_channel_post if is_edit else channel_post
+        chat_id = message["chat"]["id"]
+        message_id = message["message_id"]
+        text = message.get("text") or message.get("caption") or ""
+
+        if chat_id == settings.SCHEDULE_SOURCE_CHAT_ID:
+            if _is_denylisted(text):
+                logger.info(
+                    "Skipping schedule mirror for denylisted/empty channel post: chat_id=%s msg_id=%s",
+                    chat_id,
+                    message_id,
+                )
+                return
+            try:
+                schedule_mirror_service.handle_source_message(
+                    source_chat_id=chat_id,
+                    source_message_id=message_id,
+                    text=text,
+                    alliance_bot_username=settings.ALLIANCE_BOT_USERNAME,
+                    is_edit=is_edit,
+                )
+            except Exception:  # never break main flow
+                logger.exception("Failed to mirror schedule message from channel")
+                try:
+                    from core.services.notification_service import notify_kl
+                    notify_kl("Smartline: не удалось зеркалировать расписание из канала (см. логи бота).")
+                except Exception:
+                    pass
+            return
+
     message = update.get("message")
     is_edit = False
     if not isinstance(message, dict):
@@ -45,28 +121,6 @@ def handle_update(update: dict) -> None:
     username = user_info.get("username", "") or ""
     date = message.get("edit_date") if is_edit else message.get("date")
     message_date = datetime.fromtimestamp(date, tz=MSK)
-
-    # Schedule mirror: intercept messages from alliance bot in source chat
-    if (
-        chat_id == settings.SCHEDULE_SOURCE_CHAT_ID
-        and username == settings.ALLIANCE_BOT_USERNAME
-    ):
-        try:
-            schedule_mirror_service.handle_source_message(
-                source_chat_id=chat_id,
-                source_message_id=message_id,
-                text=text or "",
-                alliance_bot_username=username or "",
-                is_edit=is_edit,
-            )
-        except Exception:  # never break main flow
-            logger.exception("Failed to mirror schedule message")
-            try:
-                from core.services.notification_service import notify_kl
-                notify_kl("Smartline: не удалось зеркалировать расписание из мостовой группы (см. логи бота).")
-            except Exception:
-                pass
-        return
 
     logger.info(
         "Received telegram update chat_id=%s message_id=%s is_edit=%s",
