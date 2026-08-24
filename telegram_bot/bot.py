@@ -59,11 +59,14 @@ class TelegramBot:
         chat_id: int,
         text: str,
         reply_to_message_id: Optional[int] = None,
+        message_thread_id: Optional[int] = None,
     ) -> dict:
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         data = {"chat_id": chat_id, "text": text}
         if reply_to_message_id is not None:
             data["reply_to_message_id"] = reply_to_message_id
+        if message_thread_id is not None:
+            data["message_thread_id"] = message_thread_id
         try:
             response = requests.post(
                 url,
@@ -174,7 +177,7 @@ class TelegramBot:
         return data
 
     def edit_message_text(
-        self, chat_id: int, message_id: int, text: str
+        self, chat_id: int, message_id: int, text: str, message_thread_id: Optional[int] = None
     ) -> dict:
         url = f"https://api.telegram.org/bot{self.token}/editMessageText"
         data = {
@@ -182,6 +185,8 @@ class TelegramBot:
             "message_id": message_id,
             "text": text,
         }
+        if message_thread_id is not None:
+            data["message_thread_id"] = message_thread_id
         try:
             response = requests.post(url, data=data, timeout=10)
             response.raise_for_status()

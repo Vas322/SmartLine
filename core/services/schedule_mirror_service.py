@@ -52,6 +52,8 @@ def _apply_to_target(
 
     bot = _bot()
 
+    target_thread_id = settings.SCHEDULE_MIRROR_TARGET_THREAD_ID
+
     # Try to find active mirror for exact source message
     mirror = ScheduleMirror.objects.filter(
         source_chat_id=source_chat_id,
@@ -67,6 +69,7 @@ def _apply_to_target(
                     chat_id=mirror.target_chat_id,
                     message_id=mirror.target_message_id,
                     text=text,
+                    message_thread_id=target_thread_id,
                 )
             except TelegramAPIError as exc:
                 logger.exception("Failed to edit mirrored message: %s", exc)
@@ -81,7 +84,7 @@ def _apply_to_target(
     # (even for admins) when the channel has "Restrict saving content" enabled.
     # The text is already known from the source channel_post / admin form.
     try:
-        sent = bot.send_message(chat_id=target_chat_id, text=text)
+        sent = bot.send_message(chat_id=target_chat_id, text=text, message_thread_id=target_thread_id)
     except TelegramAPIError as exc:
         logger.exception("Failed to send mirror message: %s", exc)
         raise ValueError(
@@ -185,6 +188,7 @@ def reconcile_all() -> dict:
     Returns {"updated": int, "errors": int}.
     """
     bot = _bot()
+    target_thread_id = settings.SCHEDULE_MIRROR_TARGET_THREAD_ID
     updated = 0
     errors = 0
     for mirror in ScheduleMirror.objects.filter(is_active=True):
@@ -195,6 +199,7 @@ def reconcile_all() -> dict:
                 chat_id=mirror.target_chat_id,
                 message_id=mirror.target_message_id,
                 text=mirror.last_text,
+                message_thread_id=target_thread_id,
             )
         except TelegramAPIError as exc:
             logger.error("Reconcile edit failed for mirror %s: %s", mirror, exc)
