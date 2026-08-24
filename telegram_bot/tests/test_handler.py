@@ -7,6 +7,27 @@ from django.test import SimpleTestCase, override_settings
 from telegram_bot.handler import handle_update
 
 
+def _make_channel_post_update(
+    *,
+    update_id=1,
+    message_id=10,
+    chat_id=-1001234567890,
+    text="Расписание на неделю",
+    is_edit=False,
+):
+    """Create a channel_post or edited_channel_post update."""
+    message = {
+        "message_id": message_id,
+        "chat": {"id": chat_id},
+        "date": 1750000000,
+        "text": text,
+    }
+    if is_edit:
+        message["edit_date"] = 1750000001
+        return {"update_id": update_id, "edited_channel_post": message}
+    return {"update_id": update_id, "channel_post": message}
+
+
 def _make_update(
     *,
     update_id=1,
@@ -180,94 +201,69 @@ class HandleUpdateTests(SimpleTestCase):
 class ScheduleMirrorRoutingTests(SimpleTestCase):
     """Tests that schedule mirror messages are routed correctly."""
 
-    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-5329088669, ALLIANCE_BOT_USERNAME="x5_fort_bot")
+    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-1001234567890, ALLIANCE_BOT_USERNAME="x5_fort_bot")
     @mock.patch("telegram_bot.handler.schedule_mirror_service.handle_source_message")
     @mock.patch("telegram_bot.handler.process_telegram_message")
-    def test_alliance_bot_message_in_source_chat_routes_to_mirror_service(
+    def test_channel_post_from_source_chat_routes_to_mirror_service(
         self, mock_process, mock_mirror
     ):
-        """Message from alliance bot in source chat should go to mirror service, not activity service."""
-        update = _make_update(
-            chat_id=-5329088669,
+        """channel_post from SCHEDULE_SOURCE_CHAT_ID should go to mirror service, not activity service."""
+        update = _make_channel_post_update(
+            chat_id=-1001234567890,
             message_id=123,
             text="Расписание фортов на неделю...",
-            has_from=True,
         )
-        update["message"]["from"] = {"id": 999999, "username": "x5_fort_bot"}
 
         handle_update(update)
 
         mock_mirror.assert_called_once()
         mock_process.assert_not_called()
         kwargs = mock_mirror.call_args.kwargs
-        self.assertEqual(kwargs["source_chat_id"], -5329088669)
+        self.assertEqual(kwargs["source_chat_id"], -1001234567890)
         self.assertEqual(kwargs["source_message_id"], 123)
         self.assertEqual(kwargs["text"], "Расписание фортов на неделю...")
         self.assertEqual(kwargs["alliance_bot_username"], "x5_fort_bot")
         self.assertFalse(kwargs["is_edit"])
 
-    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-5329088669, ALLIANCE_BOT_USERNAME="x5_fort_bot")
+    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-1001234567890, ALLIANCE_BOT_USERNAME="x5_fort_bot")
     @mock.patch("telegram_bot.handler.schedule_mirror_service.handle_source_message")
     @mock.patch("telegram_bot.handler.process_telegram_edit")
-    def test_alliance_bot_edit_in_source_chat_routes_to_mirror_service(
+    def test_edited_channel_post_from_source_chat_routes_to_mirror_service(
         self, mock_edit, mock_mirror
     ):
-        """Edited message from alliance bot in source chat should go to mirror service."""
-        update = _make_edit_update(
-            chat_id=-5329088669,
+        """edited_channel_post from SCHEDULE_SOURCE_CHAT_ID should go to mirror service."""
+        update = _make_channel_post_update(
+            chat_id=-1001234567890,
             message_id=123,
             text="Обновлённое расписание фортов...",
-            has_from=True,
+            is_edit=True,
         )
-        update["edited_message"]["from"] = {"id": 999999, "username": "x5_fort_bot"}
 
         handle_update(update)
 
         mock_mirror.assert_called_once()
         mock_edit.assert_not_called()
         kwargs = mock_mirror.call_args.kwargs
-        self.assertEqual(kwargs["source_chat_id"], -5329088669)
+        self.assertEqual(kwargs["source_chat_id"], -1001234567890)
         self.assertEqual(kwargs["source_message_id"], 123)
         self.assertEqual(kwargs["text"], "Обновлённое расписание фортов...")
         self.assertEqual(kwargs["alliance_bot_username"], "x5_fort_bot")
         self.assertTrue(kwargs["is_edit"])
 
-    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-5329088669, ALLIANCE_BOT_USERNAME="x5_fort_bot")
+    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-1001234567890, ALLIANCE_BOT_USERNAME="x5_fort_bot")
     @mock.patch("telegram_bot.handler.schedule_mirror_service.handle_source_message")
     @mock.patch("telegram_bot.handler.process_telegram_message")
-    def test_other_bot_in_source_chat_not_routed_to_mirror(
+    def test_channel_post_from_different_chat_not_mirrored(
         self, mock_process, mock_mirror
     ):
-        """Message from different bot in source chat should go to activity service."""
-        update = _make_update(
-            chat_id=-5329088669,
-            message_id=123,
-            text="+1 | деф | Swettka | Первая волна",
-            has_from=True,
-        )
-        update["message"]["from"] = {"id": 500, "username": "other_bot"}
-
-        handle_update(update)
-
-        mock_mirror.assert_not_called()
-        mock_process.assert_called_once()
-
-    @override_settings(SCHEDULE_SOURCE_CHAT_ID=-5329088669, ALLIANCE_BOT_USERNAME="x5_fort_bot")
-    @mock.patch("telegram_bot.handler.schedule_mirror_service.handle_source_message")
-    @mock.patch("telegram_bot.handler.process_telegram_message")
-    def test_alliance_bot_in_different_chat_not_routed_to_mirror(
-        self, mock_process, mock_mirror
-    ):
-        """Message from alliance bot in different chat should go to activity service."""
-        update = _make_update(
-            chat_id=-1000000000,
+        """channel_post from a different chat_id should not be mirrored."""
+        update = _make_channel_post_update(
+            chat_id=-999999999999,
             message_id=123,
             text="Расписание фортов на неделю...",
-            has_from=True,
         )
-        update["message"]["from"] = {"id": 999999, "username": "x5_fort_bot"}
 
         handle_update(update)
 
         mock_mirror.assert_not_called()
-        mock_process.assert_called_once()
+        mock_process.assert_not_called()

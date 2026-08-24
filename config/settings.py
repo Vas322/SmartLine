@@ -127,11 +127,18 @@ LOGOUT_REDIRECT_URL = "/login/"
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 ADMIN_TELEGRAM_CHAT_IDS = os.getenv("ADMIN_TELEGRAM_CHAT_IDS", "")
+# ID канала-источника расписания (где x5_fort_bot публикует расписание)
 SCHEDULE_SOURCE_CHAT_ID = int(os.getenv("SCHEDULE_SOURCE_CHAT_ID", "0"))
 ALLIANCE_BOT_USERNAME = os.getenv("ALLIANCE_BOT_USERNAME", "")
 CLAN_CHAT_ID = os.getenv("CLAN_CHAT_ID")
 if CLAN_CHAT_ID:
     CLAN_CHAT_ID = int(CLAN_CHAT_ID)
+# Prefixes to ignore when mirroring from schedule source channel (case-insensitive)
+SCHEDULE_MIRROR_IGNORE_PREFIXES = [
+    p.strip()
+    for p in os.getenv("SCHEDULE_MIRROR_IGNORE_PREFIXES", "test,тест,/refresh,/fix").split(",")
+    if p.strip()
+]
 
 CSRF_TRUSTED_ORIGINS = [
     host.strip()
