@@ -107,9 +107,13 @@ def dashboard(request):
         .values("player_id")
         .annotate(
             reg_payment=Coalesce(Sum("payment_kk"), Decimal("0")),
+            reg_clans=Coalesce(Sum("clans_count"), 0),
         )
     )
-    reg_by_player = {row["player_id"]: row["reg_payment"] for row in reg_aggregates}
+    reg_by_player = {
+        row["player_id"]: {"payment": row["reg_payment"], "clans": row["reg_clans"]}
+        for row in reg_aggregates
+    }
 
     rows = []
     active_players = Player.objects.filter(is_active=True)
@@ -119,7 +123,9 @@ def dashboard(request):
         farm_hours = totals.get("farm_hours", Decimal("0"))
         cast_hours = totals.get("cast_hours", Decimal("0"))
         total_hours = def_hours + farm_hours + cast_hours
-        reg_payment = reg_by_player.get(player.pk, Decimal("0"))
+        reg_data = reg_by_player.get(player.pk, {"payment": Decimal("0"), "clans": 0})
+        reg_payment = reg_data["payment"]
+        reg_clans = reg_data["clans"]
         rows.append(
             {
                 "pk": player.pk,
@@ -129,7 +135,7 @@ def dashboard(request):
                 "farm_hours": farm_hours,
                 "cast_count": totals.get("cast_count", 0),
                 "adena": (totals.get("payment") or Decimal("0")) + reg_payment,
-                "registration": reg_payment,
+                "registration": reg_clans,
                 "percent": _percent(total_hours, days_in_period),
             }
         )
@@ -140,7 +146,9 @@ def dashboard(request):
     total_activity_payment = sum(
         (row["payment"] for row in totals_by_player.values()), Decimal("0")
     )
-    total_registration_payment = sum(reg_by_player.values(), Decimal("0"))
+    total_registration_payment = sum(
+        (row["payment"] for row in reg_by_player.values()), Decimal("0")
+    )
     total_payout = total_activity_payment + total_registration_payment
 
     context = {

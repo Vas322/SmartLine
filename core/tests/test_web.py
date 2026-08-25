@@ -838,10 +838,10 @@ class RegistrationDashboardTests(TestCase):
         rows = {row["nickname"]: row for row in response.context["rows"]}
         # Adena = activity payment (75) + registration payment (20) = 95
         self.assertEqual(rows["Swettka"]["adena"], Decimal("95.00"))
-        # Registration column shows 20
-        self.assertEqual(rows["Swettka"]["registration"], Decimal("20.00"))
+        # Registration column shows number of clans (2), not money
+        self.assertEqual(rows["Swettka"]["registration"], 2)
         # Ostin has no registration
-        self.assertEqual(rows["Ostin"]["registration"], Decimal("0"))
+        self.assertEqual(rows["Ostin"]["registration"], 0)
 
     def test_dashboard_percent_unchanged_by_registrations(self):
         """Attendance percent is based on hours, not registration money."""
@@ -873,7 +873,7 @@ class RegistrationDashboardTests(TestCase):
         # The exact value depends on days_in_period, but it should NOT include registration money
         self.assertEqual(rows["Swettka"]["total_hours"], Decimal("1"))
         # Registration money is in adena but not in percent calculation
-        self.assertEqual(rows["Swettka"]["registration"], Decimal("50.00"))
+        self.assertEqual(rows["Swettka"]["registration"], 5)
 
 
 class RegistrationSettingsTests(TestCase):
