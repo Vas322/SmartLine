@@ -155,7 +155,8 @@ class ProcessRegistrationMessageTests(TestCase):
         self.assertEqual(error.reason, "registration_missing_keyword")
 
     @patch("core.services.activity_service.notify_group_reply")
-    def test_notification_sent_on_no_photo(self, mock_notify):
+    @patch("core.services.activity_service.notify_processing_error")
+    def test_notification_sent_on_no_photo(self, mock_notify_processing, mock_notify):
         Player.objects.create(nickname="Swettka", telegram_user_id=100)
         self._process(has_photo=False, photo_file_id=None, message_thread_id=42)
 
@@ -163,18 +164,30 @@ class ProcessRegistrationMessageTests(TestCase):
         args, kwargs = mock_notify.call_args
         self.assertEqual(kwargs.get("message_thread_id"), 42)
         self.assertIn("скриншот", args[1])
+        # notify_processing_error should NOT be called for registration errors
+        mock_notify_processing.assert_not_called()
+        # Check ProcessingError status is NOTIFIED
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.status, ProcessingError.Status.NOTIFIED)
 
     @patch("core.services.activity_service.notify_group_reply")
-    def test_notification_sent_on_unregistered_sender(self, mock_notify):
+    @patch("core.services.activity_service.notify_processing_error")
+    def test_notification_sent_on_unregistered_sender(self, mock_notify_processing, mock_notify):
         self._process(user_id=999, message_thread_id=42)
 
         mock_notify.assert_called_once()
         args, kwargs = mock_notify.call_args
         self.assertEqual(kwargs.get("message_thread_id"), 42)
         self.assertIn("не зарегистрированы", args[1])
+        # notify_processing_error should NOT be called for registration errors
+        mock_notify_processing.assert_not_called()
+        # Check ProcessingError status is NOTIFIED
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.status, ProcessingError.Status.NOTIFIED)
 
     @patch("core.services.activity_service.notify_group_reply")
-    def test_notification_sent_on_parse_error(self, mock_notify):
+    @patch("core.services.activity_service.notify_processing_error")
+    def test_notification_sent_on_parse_error(self, mock_notify_processing, mock_notify):
         Player.objects.create(nickname="Swettka", telegram_user_id=100)
         self._process(text="рега", message_thread_id=42)
 
@@ -182,6 +195,11 @@ class ProcessRegistrationMessageTests(TestCase):
         args, kwargs = mock_notify.call_args
         self.assertEqual(kwargs.get("message_thread_id"), 42)
         self.assertIn("кланов", args[1])
+        # notify_processing_error should NOT be called for registration errors
+        mock_notify_processing.assert_not_called()
+        # Check ProcessingError status is NOTIFIED
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.status, ProcessingError.Status.NOTIFIED)
 
     def test_registration_links_to_telegram_message(self):
         Player.objects.create(nickname="Swettka", telegram_user_id=100)
@@ -313,7 +331,8 @@ class ProcessRegistrationEditTests(TestCase):
         self.assertEqual(error.reason, "registration_invalid_clans_count")
         self.assertNotEqual(error.pk, old_error.pk)
 
-    def test_edit_requires_photo(self):
+    @patch("core.services.activity_service.notify_group_reply", return_value=True)
+    def test_edit_requires_photo(self, mock_notify):
         Player.objects.create(nickname="Swettka", telegram_user_id=100)
         self._make_existing_message(status=TelegramMessage.Status.ERROR)
 
@@ -321,14 +340,21 @@ class ProcessRegistrationEditTests(TestCase):
 
         self.assertEqual(result.status, ProcessResultStatus.VALIDATION_ERROR)
         self.assertEqual(Registration.objects.count(), 0)
+        # Check ProcessingError status is NOTIFIED
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.status, ProcessingError.Status.NOTIFIED)
 
-    def test_edit_requires_registered_user(self):
+    @patch("core.services.activity_service.notify_group_reply", return_value=True)
+    def test_edit_requires_registered_user(self, mock_notify):
         self._make_existing_message(user_id=999, status=TelegramMessage.Status.ERROR)
 
         result = self._process_edit(user_id=999)
 
         self.assertEqual(result.status, ProcessResultStatus.VALIDATION_ERROR)
         self.assertEqual(Registration.objects.count(), 0)
+        # Check ProcessingError status is NOTIFIED
+        error = ProcessingError.objects.get()
+        self.assertEqual(error.status, ProcessingError.Status.NOTIFIED)
 
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")

@@ -428,15 +428,17 @@ def _create_registration_error(
         reason=reason,
         status=ProcessingError.Status.NEW,
     )
-    notify_processing_error(error)
 
     # Send user-friendly message to group
     from core.error_messages import friendly_error_message
-    notify_group_reply(
+    sent = notify_group_reply(
         telegram_message,
         friendly_error_message(reason),
         message_thread_id=message_thread_id,
     )
+    if sent:
+        error.status = ProcessingError.Status.NOTIFIED
+        error.save(update_fields=["status"])
 
     return ProcessResult(
         status=ProcessResultStatus.VALIDATION_ERROR if reason in ("registration_no_screenshot", "registration_unregistered_sender") else ProcessResultStatus.PROCESSING_ERROR,
