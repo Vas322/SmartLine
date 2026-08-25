@@ -1,6 +1,6 @@
 """Notification to the clan leader via Telegram."""
 import logging
-from typing import List
+from typing import List, Optional
 
 import requests
 from django.conf import settings
@@ -81,7 +81,7 @@ def notify_processing_error(error: ProcessingError) -> None:
         error.save(update_fields=["status"])
 
 
-def notify_group_reply(telegram_message, text: str) -> bool:
+def notify_group_reply(telegram_message, text: str, message_thread_id: Optional[int] = None) -> bool:
     """Reply to the original message in the same group.
 
     Returns True if the reply was sent successfully. Never raises:
@@ -99,6 +99,7 @@ def notify_group_reply(telegram_message, text: str) -> bool:
             chat_id=telegram_message.telegram_chat_id,
             text=text,
             reply_to_message_id=telegram_message.telegram_message_id,
+            message_thread_id=message_thread_id,
         )
     except Exception as exc:  # никогда не ломает обработку сообщения
         logger.warning(

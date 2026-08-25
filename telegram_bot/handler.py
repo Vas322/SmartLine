@@ -121,6 +121,7 @@ def handle_update(update: dict) -> None:
     username = user_info.get("username", "") or ""
     date = message.get("edit_date") if is_edit else message.get("date")
     message_date = datetime.fromtimestamp(date, tz=MSK)
+    message_thread_id = message.get("message_thread_id")
 
     logger.info(
         "Received telegram update chat_id=%s message_id=%s is_edit=%s",
@@ -128,29 +129,39 @@ def handle_update(update: dict) -> None:
         message_id,
         is_edit,
     )
-    if is_edit:
-        result = process_telegram_edit(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            message_date=message_date,
-            user_id=user_id,
-            username=username,
+    try:
+        if is_edit:
+            result = process_telegram_edit(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                message_date=message_date,
+                user_id=user_id,
+                username=username,
+                message_thread_id=message_thread_id,
+            )
+        else:
+            result = process_telegram_message(
+                chat_id=chat_id,
+                message_id=message_id,
+                user_id=user_id,
+                username=username,
+                text=text,
+                message_date=message_date,
+                message_thread_id=message_thread_id,
+            )
+        if result.status == ProcessResultStatus.ACTIVITY_CREATED:
+            notify_activity_reaction(result.telegram_message, "🎉")
+        logger.info(
+            "Processed message chat_id=%s message_id=%s status=%s",
+            chat_id,
+            message_id,
+            result.status.value,
         )
-    else:
-        result = process_telegram_message(
-            chat_id=chat_id,
-            message_id=message_id,
-            user_id=user_id,
-            username=username,
-            text=text,
-            message_date=message_date,
-        )
-    if result.status == ProcessResultStatus.ACTIVITY_CREATED:
-        notify_activity_reaction(result.telegram_message, "🎉")
-    logger.info(
-        "Processed message chat_id=%s message_id=%s status=%s",
-        chat_id,
-        message_id,
-        result.status.value,
-    )
+    except Exception:
+        logger.exception("Failed to process telegram message")
+        try:
+            from core.services.notification_service import notify_kl
+            notify_kl("Smartline: ошибка обработки сообщения (см. логи бота).")
+        except Exception:
+            pass

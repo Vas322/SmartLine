@@ -1,6 +1,7 @@
 """Tests for the activity processing service."""
 from datetime import time
 from decimal import Decimal
+from typing import Optional
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -15,7 +16,7 @@ from core.services.activity_service import (
 )
 
 
-def _process(text: str, chat_id: int = 1, message_id: int = 1):
+def _process(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None):
     return process_telegram_message(
         chat_id=chat_id,
         message_id=message_id,
@@ -23,10 +24,11 @@ def _process(text: str, chat_id: int = 1, message_id: int = 1):
         username="test_user",
         text=text,
         message_date=timezone.now(),
+        message_thread_id=message_thread_id,
     )
 
 
-def _process_edit(text: str, chat_id: int = 1, message_id: int = 1):
+def _process_edit(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None):
     return process_telegram_edit(
         chat_id=chat_id,
         message_id=message_id,
@@ -34,6 +36,7 @@ def _process_edit(text: str, chat_id: int = 1, message_id: int = 1):
         username="test_user",
         text=text,
         message_date=timezone.now(),
+        message_thread_id=message_thread_id,
     )
 
 
@@ -181,15 +184,24 @@ class ProcessTelegramMessageTests(TestCase):
     # --- new binding logic tests ---
 
     def test_resolve_by_user_id_takes_precedence(self):
-        """Player with telegram_user_id=100 is resolved by user_id even if nick differs."""
+        """Player with telegram_user_id=100 is resolved by user_id even if nick differs.
+        
+        Now: mismatch -> NICK_MISMATCH, nick NOT changed, no activity created.
+        """
         Player.objects.create(nickname="OldNick", telegram_user_id=100)
         result = _process("+1 | деф | Swettka | 11.56 | Первая", message_id=1)
 
-        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(result.status, ProcessResultStatus.NICK_MISMATCH)
         self.assertEqual(Player.objects.count(), 1)
         player = Player.objects.get()
-        self.assertEqual(player.nickname, "Swettka")  # nickname adopted
+        self.assertEqual(player.nickname, "OldNick")
         self.assertEqual(player.telegram_user_id, 100)
+        self.assertEqual(Activity.objects.count(), 0)
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.ERROR,
+        )
+        self.assertEqual(ProcessingError.objects.count(), 0)
 
     def test_nick_already_bound(self):
         """Player with telegram_user_id=100 cannot be claimed by user_id=200."""
@@ -217,29 +229,36 @@ class ProcessTelegramMessageTests(TestCase):
         self.assertEqual(player.telegram_user_id, 100)
 
     def test_no_duplicate_player_for_same_user_id(self):
-        """Two calls with same user_id but different nickname spelling -> one player."""
+        """Two calls with same user_id but different nickname spelling -> NICK_MISMATCH on second."""
         _process("+1 | деф | Swettka | 11.56 | Первая", message_id=1)
         result = _process("+2 | деф | Swettkaa | 11.56 | Вторая", message_id=2)
 
-        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(result.status, ProcessResultStatus.NICK_MISMATCH)
         self.assertEqual(Player.objects.count(), 1)
         player = Player.objects.get()
-        self.assertEqual(player.nickname, "Swettkaa")  # latest spelling adopted
+        self.assertEqual(player.nickname, "Swettka")
         self.assertEqual(player.telegram_user_id, 100)
-        self.assertEqual(Activity.objects.count(), 2)
+        self.assertEqual(Activity.objects.count(), 1)
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.ERROR,
+        )
+        self.assertEqual(ProcessingError.objects.count(), 0)
 
     @patch("core.services.activity_service.notify_group_reply")
     def test_nick_change_notifies_group(self, mock_notify):
-        """Nick change triggers group notification."""
+        """Nick mismatch triggers group notification (no rename)."""
         Player.objects.create(nickname="Swettka", telegram_user_id=100)
-        _process("+1 | деф | Swettkaa | 11.56 | Вторая", message_id=1)
+        result = _process("+1 | деф | Swettkaa | 11.56 | Вторая", message_id=1)
 
+        self.assertEqual(result.status, ProcessResultStatus.NICK_MISMATCH)
         self.assertEqual(Player.objects.count(), 1)
         player = Player.objects.get()
-        self.assertEqual(player.nickname, "Swettkaa")
+        self.assertEqual(player.nickname, "Swettka")
         mock_notify.assert_called_once()
         args, _ = mock_notify.call_args
-        self.assertIn("Ник изменён: Swettka → Swettkaa", args[1])
+        self.assertIn("Возможно вы ошиблись ником", args[1])
+        self.assertIn("Swettka", args[1])
 
     @patch("core.services.activity_service.notify_group_reply")
     def test_new_player_created_notifies_group(self, mock_notify):
@@ -255,6 +274,63 @@ class ProcessTelegramMessageTests(TestCase):
             "Зарегистрирован новый игрок! На Pocomaxa будет приходить оплата!",
             args[1],
         )
+
+    def test_mismatch_returns_nick_mismatch_status(self):
+        """Mismatch returns NICK_MISMATCH, no activity, TelegramMessage ERROR, no ProcessingError."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        result = _process("+1 | деф | Swettkaa | 11.56 | Первая", message_id=1)
+
+        self.assertEqual(result.status, ProcessResultStatus.NICK_MISMATCH)
+        self.assertEqual(Activity.objects.count(), 0)
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.ERROR,
+        )
+        self.assertEqual(ProcessingError.objects.count(), 0)
+
+    @patch("core.services.activity_service.notify_group_reply")
+    def test_mismatch_warning_contains_username_and_correct_nick(self, mock_notify):
+        """Warning text contains @username and correct registered nick."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        _process("+1 | деф | Swettkaa | 11.56 | Первая", message_id=1)
+
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        warning_text = args[1]
+        self.assertIn("@test_user", warning_text)
+        self.assertIn("Swettka", warning_text)
+        self.assertIn("Исправь ник в сообщении", warning_text)
+
+    @patch("core.services.activity_service.notify_group_reply")
+    def test_mismatch_warning_without_username_uses_vami(self, mock_notify):
+        """When username is empty, warning uses 'за вами зарегистрирован'."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        # Call without username
+        process_telegram_message(
+            chat_id=1,
+            message_id=2,
+            user_id=100,
+            username="",
+            text="+1 | деф | Swettkaa | 11.56 | Первая",
+            message_date=timezone.now(),
+        )
+
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        warning_text = args[1]
+        self.assertIn("за вами зарегистрирован", warning_text)
+        self.assertIn("Swettka", warning_text)
+        self.assertNotIn("@", warning_text)
+
+    def test_race_safe_get_or_create_new_player(self):
+        """Two sequential _resolve_player calls with new nick and SAME user_id -> same player, no IntegrityError."""
+        from core.services.activity_service import _resolve_player
+
+        p1, _, _, _, _ = _resolve_player("NewPlayer1", 100)
+        p2, _, _, _, _ = _resolve_player("NewPlayer1", 100)
+
+        self.assertEqual(p1.pk, p2.pk)
+        self.assertEqual(Player.objects.filter(nickname="NewPlayer1").count(), 1)
 
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
@@ -328,6 +404,28 @@ class ProcessTelegramEditTests(TestCase):
         self.assertEqual(result.status, ProcessResultStatus.IGNORED)
         self.assertEqual(ProcessingError.objects.count(), 1)
         self.assertEqual(Activity.objects.count(), 0)
+
+    def test_edit_after_mismatch_creates_activity(self):
+        """Edit message after NICK_MISMATCH with correct nick -> ACTIVITY_CREATED."""
+        # First message with mismatch
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        first = _process("+1 | деф | Swettkaa | 11.56 | Первая", message_id=1)
+        self.assertEqual(first.status, ProcessResultStatus.NICK_MISMATCH)
+        self.assertEqual(Activity.objects.count(), 0)
+
+        # Edit with correct nick
+        result = _process_edit("+1 | деф | Swettka | 11.56 | Первая волна", message_id=1)
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        self.assertEqual(Activity.objects.count(), 1)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.player.nickname, "Swettka")
+        self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(ProcessingError.objects.count(), 0)
+        self.assertEqual(
+            result.telegram_message.status,
+            TelegramMessage.Status.PROCESSED,
+        )
 
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")

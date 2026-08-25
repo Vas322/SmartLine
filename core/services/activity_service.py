@@ -25,6 +25,7 @@ class ProcessResultStatus(str, Enum):
     DUPLICATE = "DUPLICATE"
     PROCESSING_ERROR = "PROCESSING_ERROR"
     EDIT_IGNORED = "EDIT_IGNORED"
+    NICK_MISMATCH = "NICK_MISMATCH"
 
 
 @dataclass
@@ -49,37 +50,40 @@ def get_or_create_telegram_message(
     )
 
 
-def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str], bool]:
+def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str], bool, bool]:
     """Update player nickname if spelling differs (case-insensitive).
 
-    Returns (player, nick_changed, old_nickname_or_none, is_new_player).
+    Returns (player, nick_changed, old_nickname_or_none, is_new_player, mismatch).
     """
     if p.nickname.casefold() != nick.casefold():
         old = p.nickname
         p.nickname = nick
         p.save(update_fields=["nickname"])
-        return p, True, old, False
-    return p, False, None, False
+        return p, True, old, False, False
+    return p, False, None, False, False
 
 
-def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Optional[str], bool]:
+def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Optional[str], bool, bool]:
     """Resolve a player by Telegram user_id first, then by nickname.
 
     - If user_id is provided and a player has that telegram_user_id, use that
-      player (adopting the new nickname spelling if different).
+      player. If the written nick differs from the registered one (typo),
+      mismatch=True is returned; the nick is NOT changed.
     - Else, look up by nickname case-insensitively.
       - If found and user_id is provided but the player has a different
         telegram_user_id, raise ParserError("nick_already_bound").
       - If found and user_id is provided and the player has no telegram_user_id,
-        bind it.
-    - Else, create a new player with the nickname and user_id (if provided).
+        bind it and return via _adopt_nick (5-tuple).
+    - Else, create a new player with the nickname and user_id (if provided)
+      using get_or_create to avoid IntegrityError on race conditions.
 
-    Returns (player, nick_changed, old_nickname_or_none, is_new_player).
+    Returns (player, nick_changed, old_nickname_or_none, is_new_player, mismatch).
     """
     if user_id is not None:
         p = Player.objects.filter(telegram_user_id=user_id).first()
         if p is not None:
-            return _adopt_nick(p, nick)
+            mismatch = p.nickname.casefold() != nick.casefold()
+            return p, False, None, False, mismatch
 
     p = Player.objects.filter(nickname__iexact=nick).order_by("id").first()
     if p is not None:
@@ -90,8 +94,25 @@ def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Op
             p.save(update_fields=["telegram_user_id"])
         return _adopt_nick(p, nick)
 
-    p = Player.objects.create(nickname=nick, telegram_user_id=user_id)
-    return p, False, None, True
+    # Use get_or_create to avoid IntegrityError on unique nickname constraint
+    p, created = Player.objects.get_or_create(
+        nickname=nick,
+        defaults={"telegram_user_id": user_id},
+    )
+    return p, False, None, created, False
+
+
+def _nick_mismatch_text(username: str, correct_nick: str) -> str:
+    """Generate warning text for nickname mismatch."""
+    if username:
+        return (
+            f"Возможно вы ошиблись ником, за пользователем @{username} "
+            f"зарегистрирован {correct_nick}. Исправь ник в сообщении."
+        )
+    return (
+        f"Возможно вы ошиблись ником, за вами зарегистрирован {correct_nick}. "
+        f"Исправь ник в сообщении."
+    )
 
 
 def _compute_payment(parsed: ParsedActivity) -> Decimal:
@@ -117,6 +138,7 @@ def process_telegram_message(
     username: str = "",
     text: str,
     message_date: datetime,
+    message_thread_id: Optional[int] = None,
 ) -> ProcessResult:
     """Process a single Telegram message into an Activity or an error record."""
     stripped = text.strip()
@@ -172,7 +194,7 @@ def process_telegram_message(
         )
 
         try:
-            player, nick_changed, old_nick, is_new_player = _resolve_player(parsed.nickname, user_id)
+            player, nick_changed, old_nick, is_new_player, mismatch = _resolve_player(parsed.nickname, user_id)
         except ParserError as exc:
             logger.warning(
                 "Player resolve error chat_id=%s message_id=%s: %s",
@@ -181,6 +203,19 @@ def process_telegram_message(
                 exc,
             )
             return _create_processing_error(telegram_message, str(exc))
+
+        if mismatch:
+            telegram_message.status = TelegramMessage.Status.ERROR
+            telegram_message.save(update_fields=["status"])
+            notify_group_reply(
+                telegram_message,
+                _nick_mismatch_text(username, player.nickname),
+                message_thread_id=message_thread_id,
+            )
+            return ProcessResult(
+                status=ProcessResultStatus.NICK_MISMATCH,
+                telegram_message=telegram_message,
+            )
 
         payment = _compute_payment(parsed)
 
@@ -230,6 +265,7 @@ def process_telegram_edit(
     username: str = "",
     text: str,
     message_date: datetime,
+    message_thread_id: Optional[int] = None,
 ) -> ProcessResult:
     """Re-process an edited Telegram message without double counting.
 
@@ -257,6 +293,7 @@ def process_telegram_edit(
             username=username,
             text=text,
             message_date=message_date,
+            message_thread_id=message_thread_id,
         )
 
     # уже засчитано -> не пересчитывать
@@ -280,11 +317,24 @@ def process_telegram_edit(
             return _create_processing_error(tm, str(exc))
 
         try:
-            player, nick_changed, old_nick, is_new_player = _resolve_player(parsed.nickname, user_id)
+            player, nick_changed, old_nick, is_new_player, mismatch = _resolve_player(parsed.nickname, user_id)
         except ParserError as exc:
             tm.status = TelegramMessage.Status.ERROR
             tm.save(update_fields=["text", "message_date", "status"])
             return _create_processing_error(tm, str(exc))
+
+        if mismatch:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            notify_group_reply(
+                tm,
+                _nick_mismatch_text(username, player.nickname),
+                message_thread_id=message_thread_id,
+            )
+            return ProcessResult(
+                status=ProcessResultStatus.NICK_MISMATCH,
+                telegram_message=tm,
+            )
 
         payment = _compute_payment(parsed)
 
