@@ -21,6 +21,7 @@ from core.forms import (
     PlayerEditForm,
     PlayerForm,
     RateForm,
+    RegistrationRateForm,
     ScheduleMirrorForm,
 )
 from core.models import (
@@ -30,6 +31,8 @@ from core.models import (
     Player,
     ProcessingError,
     Rate,
+    Registration,
+    RegistrationRate,
     ScheduleMirror,
     TelegramMessage,
 )
@@ -98,6 +101,16 @@ def dashboard(request):
             "payment": row["payment"] or Decimal("0"),
         }
 
+    # Registrations aggregation (registered_at__range for the period)
+    reg_aggregates = (
+        Registration.objects.filter(registered_at__range=(date_from, date_to))
+        .values("player_id")
+        .annotate(
+            reg_payment=Coalesce(Sum("payment_kk"), Decimal("0")),
+        )
+    )
+    reg_by_player = {row["player_id"]: row["reg_payment"] for row in reg_aggregates}
+
     rows = []
     active_players = Player.objects.filter(is_active=True)
     for player in active_players:
@@ -106,6 +119,7 @@ def dashboard(request):
         farm_hours = totals.get("farm_hours", Decimal("0"))
         cast_hours = totals.get("cast_hours", Decimal("0"))
         total_hours = def_hours + farm_hours + cast_hours
+        reg_payment = reg_by_player.get(player.pk, Decimal("0"))
         rows.append(
             {
                 "pk": player.pk,
@@ -114,12 +128,20 @@ def dashboard(request):
                 "def_hours": def_hours,
                 "farm_hours": farm_hours,
                 "cast_count": totals.get("cast_count", 0),
-                "adena": totals.get("payment") or Decimal("0"),
+                "adena": (totals.get("payment") or Decimal("0")) + reg_payment,
+                "registration": reg_payment,
                 "percent": _percent(total_hours, days_in_period),
             }
         )
 
     rows.sort(key=lambda row: row["percent"], reverse=True)
+
+    # Total payout for the period (activities + registrations)
+    total_activity_payment = sum(
+        (row["payment"] for row in totals_by_player.values()), Decimal("0")
+    )
+    total_registration_payment = sum(reg_by_player.values(), Decimal("0"))
+    total_payout = total_activity_payment + total_registration_payment
 
     context = {
         "form": form,
@@ -127,6 +149,7 @@ def dashboard(request):
         "date_to": date_to,
         "days_in_period": days_in_period,
         "rows": rows,
+        "total_payout": total_payout,
     }
     return render(request, "core/dashboard.html", context)
 
@@ -283,12 +306,15 @@ def processing_errors(request):
 def settings_view(request):
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
     edit_cast_rate_pk = request.GET.get("edit_cast") or request.POST.get("edit_cast_rate")
+    edit_reg_rate_pk = request.GET.get("edit_reg") or request.POST.get("edit_reg_rate")
 
     def_add_open = False
     cast_add_open = False
+    reg_add_open = False
 
     rate_form = None
     cast_rate_form = None
+    reg_rate_form = None
 
     if request.method == "POST":
         rate_pk = request.POST.get("delete_rate")
@@ -303,6 +329,14 @@ def settings_view(request):
         if cast_rate_pk:
             try:
                 CastRate.objects.filter(pk=cast_rate_pk).delete()
+            except (TypeError, ValueError):
+                pass
+            return redirect("settings")
+
+        reg_rate_pk = request.POST.get("delete_reg_rate")
+        if reg_rate_pk:
+            try:
+                RegistrationRate.objects.filter(pk=reg_rate_pk).delete()
             except (TypeError, ValueError):
                 pass
             return redirect("settings")
@@ -339,6 +373,22 @@ def settings_view(request):
                 if cast_rate_form.is_valid():
                     cast_rate_form.save()
                     return redirect("settings")
+        elif request.POST.get("add_reg_rate") or request.POST.get("edit_reg_rate"):
+            reg_add_open = True
+            if request.POST.get("edit_reg_rate"):
+                reg_rate = RegistrationRate.objects.filter(pk=request.POST["edit_reg_rate"]).first()
+                if reg_rate:
+                    reg_rate_form = RegistrationRateForm(request.POST, instance=reg_rate)
+                    if reg_rate_form.is_valid():
+                        reg_rate_form.save()
+                        return redirect("settings")
+                else:
+                    reg_rate_form = RegistrationRateForm()
+            else:
+                reg_rate_form = RegistrationRateForm(request.POST)
+                if reg_rate_form.is_valid():
+                    reg_rate_form.save()
+                    return redirect("settings")
 
     if rate_form is None:
         rate = Rate.objects.filter(pk=edit_rate_pk).first() if edit_rate_pk else None
@@ -350,9 +400,17 @@ def settings_view(request):
             else None
         )
         cast_rate_form = CastRateForm(instance=cast_rate) if cast_rate else CastRateForm()
+    if reg_rate_form is None:
+        reg_rate = (
+            RegistrationRate.objects.filter(pk=edit_reg_rate_pk).first()
+            if edit_reg_rate_pk
+            else None
+        )
+        reg_rate_form = RegistrationRateForm(instance=reg_rate) if reg_rate else RegistrationRateForm()
 
     rates = Rate.objects.all()
     cast_rates = CastRate.objects.all()
+    reg_rates = RegistrationRate.objects.all()
     return render(
         request,
         "core/settings.html",
@@ -365,6 +423,10 @@ def settings_view(request):
             "cast_rates": cast_rates,
             "edit_cast_rate_pk": edit_cast_rate_pk,
             "cast_add_open": cast_add_open,
+            "reg_rate_form": reg_rate_form,
+            "reg_rates": reg_rates,
+            "edit_reg_rate_pk": edit_reg_rate_pk,
+            "reg_add_open": reg_add_open,
         },
     )
 
