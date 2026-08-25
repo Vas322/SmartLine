@@ -8,13 +8,19 @@ from typing import Optional, Tuple
 
 from django.db import transaction
 
-from core.models import Activity, Player, ProcessingError, TelegramMessage
-from core.parsers import ParsedActivity, ParserError, parse_activity_message
+from core.models import Activity, Player, ProcessingError, Registration, TelegramMessage
+from core.parsers import (
+    ParsedActivity,
+    ParsedRegistration,
+    ParserError,
+    parse_activity_message,
+    parse_registration_message,
+)
 from core.services.notification_service import (
     notify_group_reply,
     notify_processing_error,
 )
-from core.services.rates import payment_cast_kk, payment_kk
+from core.services.rates import payment_cast_kk, payment_kk, registration_payment_kk
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,8 @@ class ProcessResultStatus(str, Enum):
     PROCESSING_ERROR = "PROCESSING_ERROR"
     EDIT_IGNORED = "EDIT_IGNORED"
     NICK_MISMATCH = "NICK_MISMATCH"
+    REGISTRATION_CREATED = "REGISTRATION_CREATED"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
 
 
 @dataclass
@@ -385,4 +393,293 @@ def _create_processing_error(
         status=ProcessResultStatus.PROCESSING_ERROR,
         telegram_message=telegram_message,
         processing_error=error,
+    )
+
+
+def _resolve_registration_player(user_id: Optional[int]) -> Tuple[Player, bool, Optional[str], bool, bool]:
+    """Resolve a player for registration by Telegram user_id only.
+
+    Registration messages don't contain a nickname, so we only match by user_id.
+    Returns (player, nick_changed, old_nickname_or_none, is_new_player, mismatch).
+    For registration, mismatch is always False (we don't create players automatically).
+    """
+    if user_id is None:
+        return None, False, None, False, False  # type: ignore[return-value]
+
+    p = Player.objects.filter(telegram_user_id=user_id).first()
+    if p is not None:
+        return p, False, None, False, False
+
+    # No player with this user_id - registration not allowed
+    return None, False, None, False, False  # type: ignore[return-value]
+
+
+def _create_registration_error(
+    telegram_message: TelegramMessage,
+    reason: str,
+    message_thread_id: Optional[int] = None,
+) -> ProcessResult:
+    """Create a processing error for registration and send group reply."""
+    telegram_message.status = TelegramMessage.Status.ERROR
+    telegram_message.save(update_fields=["status"])
+
+    error = ProcessingError.objects.create(
+        telegram_message=telegram_message,
+        reason=reason,
+        status=ProcessingError.Status.NEW,
+    )
+
+    # Send user-friendly message to group
+    from core.error_messages import friendly_error_message
+    sent = notify_group_reply(
+        telegram_message,
+        friendly_error_message(reason),
+        message_thread_id=message_thread_id,
+    )
+    if sent:
+        error.status = ProcessingError.Status.NOTIFIED
+        error.save(update_fields=["status"])
+
+    return ProcessResult(
+        status=ProcessResultStatus.VALIDATION_ERROR if reason in ("registration_no_screenshot", "registration_unregistered_sender") else ProcessResultStatus.PROCESSING_ERROR,
+        telegram_message=telegram_message,
+        processing_error=error,
+    )
+
+
+def process_registration_message(
+    *,
+    chat_id: int,
+    message_id: int,
+    user_id: Optional[int] = None,
+    username: str = "",
+    text: str,
+    message_date: datetime,
+    has_photo: bool,
+    photo_file_id: Optional[str] = None,
+    message_thread_id: Optional[int] = None,
+) -> ProcessResult:
+    """Process a Telegram message as a clan fort registration."""
+    stripped = text.strip()
+
+    defaults = {
+        "telegram_user_id": user_id,
+        "telegram_username": username,
+        "text": stripped,
+        "message_date": message_date,
+    }
+
+    with transaction.atomic():
+        telegram_message, created = get_or_create_telegram_message(
+            chat_id=chat_id,
+            message_id=message_id,
+            defaults=defaults,
+        )
+        if not created:
+            logger.info(
+                "Duplicate telegram message chat_id=%s message_id=%s",
+                chat_id,
+                message_id,
+            )
+            return ProcessResult(
+                status=ProcessResultStatus.EDIT_IGNORED,
+                telegram_message=telegram_message,
+            )
+
+        # Parse registration message
+        try:
+            parsed = parse_registration_message(stripped)
+        except ParserError as exc:
+            logger.warning(
+                "Registration parser error chat_id=%s message_id=%s: %s",
+                chat_id,
+                message_id,
+                exc,
+            )
+            return _create_registration_error(telegram_message, str(exc), message_thread_id)
+
+        logger.info(
+            "Parsed registration chat_id=%s message_id=%s clans_count=%s",
+            chat_id,
+            message_id,
+            parsed.clans_count,
+        )
+
+        # Check for photo
+        if not has_photo:
+            logger.warning(
+                "Registration without photo chat_id=%s message_id=%s",
+                chat_id,
+                message_id,
+            )
+            return _create_registration_error(
+                telegram_message,
+                "registration_no_screenshot",
+                message_thread_id,
+            )
+
+        # Resolve player by user_id only
+        player, _, _, _, _ = _resolve_registration_player(user_id)
+        if player is None:
+            logger.warning(
+                "Unregistered sender for registration chat_id=%s message_id=%s user_id=%s",
+                chat_id,
+                message_id,
+                user_id,
+            )
+            return _create_registration_error(
+                telegram_message,
+                "registration_unregistered_sender",
+                message_thread_id,
+            )
+
+        # Calculate payment
+        payment_kk = registration_payment_kk(message_date.time(), parsed.clans_count)
+
+        # Create registration
+        registration = Registration.objects.create(
+            player=player,
+            telegram_message=telegram_message,
+            clans_count=parsed.clans_count,
+            payment_kk=payment_kk,
+            description=parsed.description,
+            photo_file_id=photo_file_id,
+            registered_at=message_date,
+        )
+
+        telegram_message.status = TelegramMessage.Status.PROCESSED
+        telegram_message.save(update_fields=["status"])
+
+        logger.info(
+            "Registration created chat_id=%s message_id=%s player=%s clans=%s payment=%s",
+            chat_id,
+            message_id,
+            player.nickname,
+            parsed.clans_count,
+            payment_kk,
+        )
+
+    return ProcessResult(
+        status=ProcessResultStatus.REGISTRATION_CREATED,
+        telegram_message=telegram_message,
+        activities=[registration],
+    )
+
+
+def process_registration_edit(
+    *,
+    chat_id: int,
+    message_id: int,
+    user_id: Optional[int] = None,
+    username: str = "",
+    text: str,
+    message_date: datetime,
+    has_photo: bool,
+    photo_file_id: Optional[str] = None,
+    message_thread_id: Optional[int] = None,
+) -> ProcessResult:
+    """Re-process an edited Telegram registration message without double counting."""
+    stripped = text.strip()
+
+    tm = TelegramMessage.objects.filter(
+        telegram_chat_id=chat_id,
+        telegram_message_id=message_id,
+    ).first()
+
+    if tm is None:
+        return process_registration_message(
+            chat_id=chat_id,
+            message_id=message_id,
+            user_id=user_id,
+            username=username,
+            text=text,
+            message_date=message_date,
+            has_photo=has_photo,
+            photo_file_id=photo_file_id,
+            message_thread_id=message_thread_id,
+        )
+
+    # уже засчитано -> не пересчитывать
+    if tm.status == TelegramMessage.Status.PROCESSED:
+        # Check if it was a registration
+        if hasattr(tm, "registration") and tm.registration is not None:
+            notify_group_reply(tm, "Регистрация уже учтена — правка игнорируется.")
+        else:
+            notify_group_reply(tm, "Сообщение уже учтено — правка игнорируется.")
+        return ProcessResult(
+            status=ProcessResultStatus.EDIT_IGNORED,
+            telegram_message=tm,
+        )
+
+    # было ERROR -> переобработать
+    with transaction.atomic():
+        ProcessingError.objects.filter(telegram_message=tm).delete()
+        tm.text = stripped
+        tm.message_date = message_date
+
+        # Parse registration message
+        try:
+            parsed = parse_registration_message(stripped)
+        except ParserError as exc:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            logger.warning(
+                "Registration edit parser error chat_id=%s message_id=%s: %s",
+                chat_id,
+                message_id,
+                exc,
+            )
+            return _create_registration_error(tm, str(exc), message_thread_id)
+
+        # Check for photo
+        if not has_photo:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            return _create_registration_error(
+                tm,
+                "registration_no_screenshot",
+                message_thread_id,
+            )
+
+        # Resolve player by user_id only
+        player, _, _, _, _ = _resolve_registration_player(user_id)
+        if player is None:
+            tm.status = TelegramMessage.Status.ERROR
+            tm.save(update_fields=["text", "message_date", "status"])
+            return _create_registration_error(
+                tm,
+                "registration_unregistered_sender",
+                message_thread_id,
+            )
+
+        # Calculate payment
+        payment_kk = registration_payment_kk(message_date.time(), parsed.clans_count)
+
+        # Create registration
+        Registration.objects.create(
+            player=player,
+            telegram_message=tm,
+            clans_count=parsed.clans_count,
+            payment_kk=payment_kk,
+            description=parsed.description,
+            photo_file_id=photo_file_id,
+            registered_at=message_date,
+        )
+
+        tm.status = TelegramMessage.Status.PROCESSED
+        tm.save(update_fields=["status", "text", "message_date"])
+
+        logger.info(
+            "Registration created (edit) chat_id=%s message_id=%s player=%s clans=%s payment=%s",
+            chat_id,
+            message_id,
+            player.nickname,
+            parsed.clans_count,
+            payment_kk,
+        )
+
+    return ProcessResult(
+        status=ProcessResultStatus.REGISTRATION_CREATED,
+        telegram_message=tm,
+        activities=list(Registration.objects.filter(telegram_message=tm)),
     )

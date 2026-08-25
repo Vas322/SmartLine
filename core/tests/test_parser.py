@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.test import SimpleTestCase
 
-from core.parsers import ParserError, parse_activity_message
+from core.parsers import ParserError, parse_activity_message, parse_registration_message
 
 
 class ParseActivityMessageTests(SimpleTestCase):
@@ -376,3 +376,77 @@ class ParseActivityMessageTests(SimpleTestCase):
         with self.assertRaises(ParserError) as ctx:
             parse_activity_message("+1 | деф+блабла | Swettka | 11.56")
         self.assertEqual(str(ctx.exception), "unknown_activity_type")
+
+
+class ParseRegistrationMessageTests(SimpleTestCase):
+    """Tests for the registration message parser."""
+
+    def test_basic_registration_lowercase(self):
+        parsed = parse_registration_message("рега 2 кланами атака форта")
+        self.assertEqual(parsed.clans_count, 2)
+        self.assertEqual(parsed.description, "атака форта")
+
+    def test_basic_registration_uppercase(self):
+        parsed = parse_registration_message("РЕГА 3 кланов")
+        self.assertEqual(parsed.clans_count, 3)
+        self.assertEqual(parsed.description, "")
+
+    def test_registration_full_word(self):
+        parsed = parse_registration_message("регистрация 1 клан описание")
+        self.assertEqual(parsed.clans_count, 1)
+        self.assertEqual(parsed.description, "описание")
+
+    def test_registration_mixed_case(self):
+        parsed = parse_registration_message("РеГа 5 кланов тест")
+        self.assertEqual(parsed.clans_count, 5)
+        self.assertEqual(parsed.description, "тест")
+
+    def test_registration_extra_spaces(self):
+        parsed = parse_registration_message("  рега   2   клана   описание  ")
+        self.assertEqual(parsed.clans_count, 2)
+        self.assertEqual(parsed.description, "описание")
+
+    def test_registration_no_description(self):
+        parsed = parse_registration_message("регистрация 4 клана")
+        self.assertEqual(parsed.clans_count, 4)
+        self.assertEqual(parsed.description, "")
+
+    def test_registration_missing_keyword_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("2 клана атака")
+        self.assertEqual(str(ctx.exception), "registration_missing_keyword")
+
+    def test_registration_missing_clans_count_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("рега")
+        self.assertEqual(str(ctx.exception), "registration_missing_clans_count")
+
+    def test_registration_invalid_clans_count_zero_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("рега 0 кланов")
+        self.assertEqual(str(ctx.exception), "registration_invalid_clans_count")
+
+    def test_registration_invalid_clans_count_negative_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("рега -1 кланов")
+        self.assertEqual(str(ctx.exception), "registration_invalid_clans_count")
+
+    def test_registration_invalid_clans_count_non_number_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("рега много кланов")
+        self.assertEqual(str(ctx.exception), "registration_invalid_clans_count")
+
+    def test_registration_empty_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("")
+        self.assertEqual(str(ctx.exception), "registration_empty")
+
+    def test_registration_keyword_not_at_start_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("привет рега 2 клана")
+        self.assertEqual(str(ctx.exception), "registration_missing_keyword")
+
+    def test_registration_keyword_as_substring_raises(self):
+        with self.assertRaises(ParserError) as ctx:
+            parse_registration_message("регалия 2 клана")
+        self.assertEqual(str(ctx.exception), "registration_missing_keyword")

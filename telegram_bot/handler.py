@@ -7,6 +7,8 @@ from django.conf import settings
 from core.services.activity_service import (
     process_telegram_edit,
     process_telegram_message,
+    process_registration_edit,
+    process_registration_message,
     ProcessResultStatus,
 )
 from core.services.notification_service import notify_activity_reaction
@@ -14,6 +16,9 @@ from core.services import schedule_mirror_service
 
 logger = logging.getLogger(__name__)
 MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный пояс Москвы
+
+# Keywords for registration messages (case-insensitive, word boundary)
+_REG_KEYWORDS = {"рега", "регистрация"}
 
 
 def _is_denylisted(text: str) -> bool:
@@ -27,6 +32,20 @@ def _is_denylisted(text: str) -> bool:
     for prefix in settings.SCHEDULE_MIRROR_IGNORE_PREFIXES:
         if lowered.startswith(prefix.lower()):
             return True
+    return False
+
+
+def _is_registration_message(text: str) -> bool:
+    """Check if text is a registration message (starts with 'рега' or 'регистрация')."""
+    if not text:
+        return False
+    stripped = text.lstrip()
+    lowered = stripped.lower()
+    for kw in _REG_KEYWORDS:
+        if lowered.startswith(kw):
+            # Ensure word boundary: next char is space or end of string
+            if len(stripped) == len(kw) or stripped[len(kw)].isspace():
+                return True
     return False
 
 
@@ -123,6 +142,11 @@ def handle_update(update: dict) -> None:
     message_date = datetime.fromtimestamp(date, tz=MSK)
     message_thread_id = message.get("message_thread_id")
 
+    # Extract photo info
+    photo = message.get("photo")
+    has_photo = bool(photo)
+    photo_file_id = photo[0].get("file_id") if photo else None
+
     logger.info(
         "Received telegram update chat_id=%s message_id=%s is_edit=%s",
         chat_id,
@@ -130,27 +154,56 @@ def handle_update(update: dict) -> None:
         is_edit,
     )
     try:
-        if is_edit:
-            result = process_telegram_edit(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=text,
-                message_date=message_date,
-                user_id=user_id,
-                username=username,
-                message_thread_id=message_thread_id,
-            )
+        # Route: registration messages first (BEFORE activity "+" check)
+        if _is_registration_message(text):
+            if is_edit:
+                result = process_registration_edit(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    user_id=user_id,
+                    username=username,
+                    text=text,
+                    message_date=message_date,
+                    has_photo=has_photo,
+                    photo_file_id=photo_file_id,
+                    message_thread_id=message_thread_id,
+                )
+            else:
+                result = process_registration_message(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    user_id=user_id,
+                    username=username,
+                    text=text,
+                    message_date=message_date,
+                    has_photo=has_photo,
+                    photo_file_id=photo_file_id,
+                    message_thread_id=message_thread_id,
+                )
         else:
-            result = process_telegram_message(
-                chat_id=chat_id,
-                message_id=message_id,
-                user_id=user_id,
-                username=username,
-                text=text,
-                message_date=message_date,
-                message_thread_id=message_thread_id,
-            )
-        if result.status == ProcessResultStatus.ACTIVITY_CREATED:
+            # Activity messages and other messages (service handles "+" check and returns IGNORED)
+            if is_edit:
+                result = process_telegram_edit(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=text,
+                    message_date=message_date,
+                    user_id=user_id,
+                    username=username,
+                    message_thread_id=message_thread_id,
+                )
+            else:
+                result = process_telegram_message(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    user_id=user_id,
+                    username=username,
+                    text=text,
+                    message_date=message_date,
+                    message_thread_id=message_thread_id,
+                )
+
+        if result.status in (ProcessResultStatus.ACTIVITY_CREATED, ProcessResultStatus.REGISTRATION_CREATED):
             notify_activity_reaction(result.telegram_message, "🎉")
         logger.info(
             "Processed message chat_id=%s message_id=%s status=%s",

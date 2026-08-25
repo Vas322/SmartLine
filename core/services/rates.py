@@ -3,7 +3,7 @@ import logging
 from datetime import time
 from decimal import Decimal
 
-from core.models import CastRate, Rate
+from core.models import CastRate, Rate, RegistrationRate
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,36 @@ def rate_at(t: time):
         elif start <= minute <= end:
             return rate.rate_kk
     return None
+
+
+def registration_rate_at(t: time) -> Decimal:
+    """Return the KK rate for clan registration active at time t.
+
+    A rate interval [start_time, end_time] is INCLUSIVE of end_time and wraps
+    past midnight when end_time <= start_time.
+
+    Returns Decimal("0") if no active rate covers the time (with warning log).
+    """
+    minute = Decimal(t.hour * 60 + t.minute)
+    for rate in RegistrationRate.objects.filter(active=True):
+        start = Decimal(rate.start_time.hour * 60 + rate.start_time.minute)
+        end = Decimal(rate.end_time.hour * 60 + rate.end_time.minute)
+        if end <= start:
+            if minute >= start or minute <= end:
+                return rate.rate_kk
+        elif start <= minute <= end:
+            return rate.rate_kk
+    logger.warning("No active RegistrationRate for time %s, returning 0", t)
+    return Decimal("0")
+
+
+def registration_payment_kk(t: time, clans_count: int) -> Decimal:
+    """Compute the registration payout in KK.
+
+    Formula: clans_count * registration_rate_at(t)
+    """
+    rate = registration_rate_at(t)
+    return (Decimal(str(clans_count)) * rate).quantize(Decimal("0.01"))
 
 
 def _payment_from_rates(rates, wave_start: time, duration_hours: Decimal) -> Decimal:

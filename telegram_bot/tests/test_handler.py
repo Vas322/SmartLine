@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 
+from core.services.activity_service import ProcessResult, ProcessResultStatus
 from telegram_bot.handler import handle_update
 
 
@@ -267,3 +268,101 @@ class ScheduleMirrorRoutingTests(SimpleTestCase):
 
         mock_mirror.assert_not_called()
         mock_process.assert_not_called()
+
+
+class RegistrationRoutingTests(SimpleTestCase):
+    """Tests that registration messages are routed correctly."""
+
+    def _make_registration_update(
+        self,
+        *,
+        update_id=1,
+        message_id=10,
+        chat_id=1000,
+        text="рега 2 кланами атака форта",
+        has_photo=False,
+    ):
+        """Create a registration message update."""
+        message = {
+            "message_id": message_id,
+            "chat": {"id": chat_id},
+            "date": 1750000000,
+            "text": text,
+            "from": {"id": 500, "username": "swettka"},
+        }
+        if has_photo:
+            message["photo"] = [{"file_id": "x", "width": 1, "height": 1}]
+        return {"update_id": update_id, "message": message}
+
+    @mock.patch("telegram_bot.handler.process_registration_message")
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_registration_message_with_photo_routes_to_registration_service(
+        self, mock_process_activity, mock_process_registration
+    ):
+        """Group message with text 'рега 2 кланами' and photo should route to registration service."""
+        mock_process_registration.return_value = ProcessResult(
+            status=ProcessResultStatus.REGISTRATION_CREATED,
+            telegram_message=None,
+        )
+
+        update = self._make_registration_update(
+            text="рега 2 кланами атака форта",
+            has_photo=True,
+        )
+
+        handle_update(update)
+
+        mock_process_registration.assert_called_once()
+        mock_process_activity.assert_not_called()
+        kwargs = mock_process_registration.call_args.kwargs
+        self.assertEqual(kwargs["chat_id"], 1000)
+        self.assertEqual(kwargs["message_id"], 10)
+        self.assertEqual(kwargs["user_id"], 500)
+        self.assertEqual(kwargs["username"], "swettka")
+        self.assertEqual(kwargs["text"], "рега 2 кланами атака форта")
+        self.assertTrue(kwargs["has_photo"])
+        self.assertEqual(kwargs["photo_file_id"], "x")
+        self.assertIsInstance(kwargs["message_date"], datetime)
+
+    @mock.patch("telegram_bot.handler.process_registration_message")
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_regular_activity_message_not_routed_as_registration(
+        self, mock_process_activity, mock_process_registration
+    ):
+        """Regular activity message '+1 | деф | Ник | опис' should NOT be routed as registration."""
+        mock_process_activity.return_value = ProcessResult(
+            status=ProcessResultStatus.ACTIVITY_CREATED,
+            telegram_message=None,
+        )
+
+        update = self._make_registration_update(
+            text="+1 | деф | Swettka | Первая волна",
+            has_photo=False,
+        )
+
+        handle_update(update)
+
+        mock_process_activity.assert_called_once()
+        mock_process_registration.assert_not_called()
+
+    @mock.patch("telegram_bot.handler.process_registration_message")
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_regalia_not_routed_as_registration(
+        self, mock_process_activity, mock_process_registration
+    ):
+        """Message 'регалия 2' should NOT be routed as registration (not a keyword)."""
+        mock_process_activity.return_value = ProcessResult(
+            status=ProcessResultStatus.IGNORED,
+            telegram_message=None,
+        )
+
+        update = self._make_registration_update(
+            text="регалия 2",
+            has_photo=False,
+        )
+
+        handle_update(update)
+
+        # Should go to activity service but be IGNORED (not a valid activity)
+        mock_process_activity.assert_called_once()
+        mock_process_registration.assert_not_called()

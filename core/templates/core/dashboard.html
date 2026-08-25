@@ -12,11 +12,13 @@
 </form>
 <p>Период: {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}</p>
 <p>Дней в периоде: {{ days_in_period }}</p>
+<p>Итого за период: {{ total_payout }} кк</p>
 <table>
     <tr>
         <th>Ник</th>
         <th>Всего посещений</th>
         <th>Выплата, кк</th>
+        <th>Регистрировал</th>
         <th>Дефал</th>
         <th>Фармил</th>
         <th>Каст</th>
@@ -27,6 +29,7 @@
         <td><a href="{% url 'player_detail' row.pk %}">{{ row.nickname }}</a></td>
         <td>{{ row.total_hours }}</td>
         <td>{{ row.adena }}</td>
+        <td>{{ row.registration }}</td>
         <td>{{ row.def_hours }}</td>
         <td>{{ row.farm_hours }}</td>
         <td>{{ row.cast_count }}</td>
@@ -38,7 +41,7 @@
         </td>
     </tr>
     {% empty %}
-    <tr><td colspan="7" class="muted">Игроков пока нет.</td></tr>
+    <tr><td colspan="8" class="muted">Игроков пока нет.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}

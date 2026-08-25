@@ -18,6 +18,13 @@ ERROR_MESSAGES = {
     "message_does_not_start_with_plus": "Сообщение должно начинаться с «+».",
     "invalid_nickname": "Ник может содержать только буквы русского/английского алфавита и цифры. Пожалуйста, исправьте игровой ник на корректный.",
     "nick_already_bound": "Этот ник уже привязан к другому пользователю.",
+    # Registration errors
+    "registration_empty": "Пустое сообщение регистрации.",
+    "registration_missing_keyword": "Сообщение должно начинаться со слова «рега» или «регистрация».",
+    "registration_missing_clans_count": "Укажите количество кланов после слова «рега»/«регистрация».",
+    "registration_invalid_clans_count": "Количество кланов должно быть целым положительным числом.",
+    "registration_no_screenshot": "Регистрация клана без скриншота не принимается к оплате.",
+    "registration_unregistered_sender": "Вы не зарегистрированы в системе. Обратитесь к КЛ.",
 }
 
 

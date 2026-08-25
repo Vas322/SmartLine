@@ -1,7 +1,7 @@
 """Django admin registration for the core models."""
 from django.contrib import admin
 
-from core.models import Activity, CastRate, Player, ProcessingError, TelegramMessage
+from core.models import Activity, CastRate, Player, ProcessingError, Registration, RegistrationRate, TelegramMessage
 
 
 @admin.register(Player)
@@ -33,6 +33,19 @@ class ActivityAdmin(admin.ModelAdmin):
 class CastRateAdmin(admin.ModelAdmin):
     list_display = ("start_time", "end_time", "rate_kk", "active", "order")
     list_filter = ("active",)
+
+
+@admin.register(RegistrationRate)
+class RegistrationRateAdmin(admin.ModelAdmin):
+    list_display = ("start_time", "end_time", "rate_kk", "active", "order")
+    list_filter = ("active",)
+
+
+@admin.register(Registration)
+class RegistrationAdmin(admin.ModelAdmin):
+    list_display = ("player", "clans_count", "payment_kk", "registered_at")
+    list_filter = ("player",)
+    search_fields = ("player__nickname",)
 
 
 @admin.register(ProcessingError)

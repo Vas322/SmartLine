@@ -14,6 +14,8 @@ from core.models import (
     Instruction,
     Player,
     Rate,
+    Registration,
+    RegistrationRate,
     ScheduleMirror,
     TelegramMessage,
 )
@@ -757,3 +759,213 @@ class ScheduleMirrorViewTests(TestCase):
         self.assertIn("Текущее расписание", content)
         self.assertIn("chat_id=-5329088669", content)
         self.assertIn("message_id=100", content)
+
+
+class RegistrationDashboardTests(TestCase):
+    """Tests for registration display on dashboard."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="kl",
+            password="test-password-123",
+        )
+        self.player = Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        self.player2 = Player.objects.create(nickname="Ostin", telegram_user_id=200)
+        self.message = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=20,
+            telegram_user_id=100,
+            telegram_username="swettka",
+            text="+1 | деф | Swettka | Первая волна",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        # Activity payment for 1 hour DEF at 11:56 = 75 kk (from default rates)
+        self.activity = Activity.objects.create(
+            player=self.player,
+            telegram_message=self.message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            description="Первая волна",
+            payment_kk=Decimal("75.00"),
+        )
+
+    def _login(self):
+        self.client.login(username="kl", password="test-password-123")
+
+    def test_dashboard_shows_registration_column(self):
+        """Dashboard table includes 'Регистрировал' column."""
+        self._login()
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Регистрировал", content)
+
+    def test_dashboard_shows_total_payout_line(self):
+        """Dashboard shows 'Итого за период' line with total."""
+        self._login()
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Итого за период", content)
+        self.assertIn("кк</p>", content)  # Total payout line
+
+    def test_dashboard_includes_registration_in_adena(self):
+        """Registration payments are included in 'Выплата, кк' (adena)."""
+        self._login()
+        # Create a registration for Swettka
+        reg_msg = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=21,
+            telegram_user_id=100,
+            telegram_username="swettka",
+            text="рега 2 кланами атака форта",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Registration.objects.create(
+            player=self.player,
+            telegram_message=reg_msg,
+            clans_count=2,
+            payment_kk=Decimal("20.00"),
+            description="атака форта",
+            photo_file_id="photo123",
+            registered_at=timezone.now(),
+        )
+
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        rows = {row["nickname"]: row for row in response.context["rows"]}
+        # Adena = activity payment (75) + registration payment (20) = 95
+        self.assertEqual(rows["Swettka"]["adena"], Decimal("95.00"))
+        # Registration column shows number of clans (2), not money
+        self.assertEqual(rows["Swettka"]["registration"], 2)
+        # Ostin has no registration
+        self.assertEqual(rows["Ostin"]["registration"], 0)
+
+    def test_dashboard_percent_unchanged_by_registrations(self):
+        """Attendance percent is based on hours, not registration money."""
+        self._login()
+        # Create registration for Swettka
+        reg_msg = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=21,
+            telegram_user_id=100,
+            telegram_username="swettka",
+            text="рега 5 кланов",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Registration.objects.create(
+            player=self.player,
+            telegram_message=reg_msg,
+            clans_count=5,
+            payment_kk=Decimal("50.00"),
+            description="",
+            photo_file_id="photo123",
+            registered_at=timezone.now(),
+        )
+
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        self.assertEqual(response.status_code, 200)
+        rows = {row["nickname"]: row for row in response.context["rows"]}
+        # Percent should be based on hours only (1 hour DEF = 1/5 = 20% for 1 day period, etc.)
+        # The exact value depends on days_in_period, but it should NOT include registration money
+        self.assertEqual(rows["Swettka"]["total_hours"], Decimal("1"))
+        # Registration money is in adena but not in percent calculation
+        self.assertEqual(rows["Swettka"]["registration"], 5)
+
+
+class RegistrationSettingsTests(TestCase):
+    """Tests for RegistrationRate CRUD in settings."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="kl",
+            password="test-password-123",
+        )
+        # Clear any seeded registration rates
+        RegistrationRate.objects.all().delete()
+
+    def _login(self):
+        self.client.login(username="kl", password="test-password-123")
+
+    def test_settings_shows_registration_rates_section(self):
+        self._login()
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Тарифы за регистрацию", content)
+
+    def test_settings_add_registration_rate(self):
+        self._login()
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "add_reg_rate": "1",
+                "start_time": "08:00",
+                "end_time": "16:00",
+                "rate_kk": "15.00",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+        rate = RegistrationRate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
+        self.assertEqual(rate.rate_kk, Decimal("15.00"))
+        self.assertTrue(rate.active)
+        self.assertEqual(rate.order, 0)
+
+    def test_settings_edit_registration_rate(self):
+        self._login()
+        rate = RegistrationRate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("10.00"),
+            order=1,
+        )
+
+        response = self.client.get(reverse("settings") + f"?edit_reg={rate.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="edit_reg_rate"', response.content.decode())
+
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "edit_reg_rate": str(rate.pk),
+                "start_time": "09:00",
+                "end_time": "17:00",
+                "rate_kk": "25.00",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+
+        rate.refresh_from_db()
+        self.assertEqual(rate.start_time, time(9, 0))
+        self.assertEqual(rate.end_time, time(17, 0))
+        self.assertEqual(rate.rate_kk, Decimal("25.00"))
+        self.assertEqual(RegistrationRate.objects.count(), 1)
+
+    def test_settings_delete_registration_rate(self):
+        self._login()
+        rate = RegistrationRate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("10.00"),
+        )
+        response = self.client.post(
+            reverse("settings"),
+            {"delete_reg_rate": str(rate.pk)},
+        )
+        self.assertRedirects(response, reverse("settings"))
+        self.assertEqual(RegistrationRate.objects.count(), 0)
+
+    def test_settings_registration_rate_form_hidden_by_default(self):
+        self._login()
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('id="regAddForm"', content)
+        self.assertIn(
+            '<button type="button" class="btn" data-toggle-form="regAddForm">',
+            content,
+        )
+        self.assertRegex(content, r'id="regAddForm"[^>]*\shidden')

@@ -29,6 +29,11 @@ _TYPE_TOKEN_RE = re.compile(r'[+\s]+')
 _WAVE_TIME_RE = re.compile(r'^(\d{1,2})[.:](\d{2})$')
 _TIME_WITH_REST_RE = re.compile(r'^(\d{1,2})[.:](\d{2})(?:[.,;]?\s*(.*))?$')
 
+# Registration parser
+_REG_KEYWORDS = {"рега", "регистрация"}
+_CLANS_RE = re.compile(r'^(\d+)\s*(.*)$', re.IGNORECASE)
+_CLANT_WORDS_RE = re.compile(r'^(?:кланами|кланов|клан|клана)\b\s*(.*)$', re.IGNORECASE)
+
 
 class ParserError(ValueError):
     """Raised when an activity message cannot be parsed."""
@@ -41,6 +46,12 @@ class ParsedActivity:
     has_cast: bool
     nickname: str
     wave_start: time
+    description: str
+
+
+@dataclass
+class ParsedRegistration:
+    clans_count: int
     description: str
 
 
@@ -204,4 +215,60 @@ def parse_activity_message(text: str) -> ParsedActivity:
         nickname=nickname,
         wave_start=wave_start,
         description=description,
+    )
+
+
+def parse_registration_message(text: str) -> ParsedRegistration:
+    """Parse a Telegram registration message into structured data.
+
+    Expected format: ``рега N кланов описание`` or ``регистрация N кланов описание``.
+    The keyword (рега/регистрация) must be at the start (case-insensitive, word boundary).
+    Then an integer number of clans is required, optionally followed by "кланами/кланов/клан".
+    The rest is description (may be empty).
+    """
+    stripped = text.strip()
+    if not stripped:
+        raise ParserError("registration_empty")
+
+    lowered = stripped.lower()
+
+    # Check for keyword at start (word boundary)
+    keyword = None
+    for kw in _REG_KEYWORDS:
+        if lowered.startswith(kw):
+            # Ensure word boundary: next char is space or end of string
+            if len(stripped) == len(kw) or stripped[len(kw)].isspace():
+                keyword = kw
+                break
+
+    if keyword is None:
+        raise ParserError("registration_missing_keyword")
+
+    # Extract the rest after keyword
+    rest = stripped[len(keyword):].strip()
+    if not rest:
+        raise ParserError("registration_missing_clans_count")
+
+    # Parse clans count and description
+    match = _CLANS_RE.match(rest)
+    if not match:
+        raise ParserError("registration_invalid_clans_count")
+
+    clans_count_str, description = match.groups()
+    try:
+        clans_count = int(clans_count_str)
+    except ValueError:
+        raise ParserError("registration_invalid_clans_count")
+
+    if clans_count <= 0:
+        raise ParserError("registration_invalid_clans_count")
+
+    # Strip optional "кланами/кланов/клан" word from description
+    clan_word_match = _CLANT_WORDS_RE.match(description)
+    if clan_word_match:
+        description = clan_word_match.group(1)
+
+    return ParsedRegistration(
+        clans_count=clans_count,
+        description=description.strip(),
     )
