@@ -1,6 +1,5 @@
 """Adapter between raw Telegram updates and the activity service."""
 import logging
-import re
 from datetime import datetime
 from django.utils import timezone
 from django.conf import settings
