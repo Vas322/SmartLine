@@ -292,3 +292,140 @@ class ScheduleMirrorServiceTests(TestCase):
             is_active=True,
         )
         self.assertEqual(schedule_mirror_service.get_current_text(), "Current schedule text")
+
+    @mock.patch("core.services.schedule_mirror_service._bot")
+    def test_publish_current_text_sends_new_message_and_updates_mirror(self, mock_bot_factory):
+        """publish_current_text sends new message and updates mirror with target_message_id."""
+        mock_bot = self._mock_bot()
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 777}}
+        mock_bot_factory.return_value = mock_bot
+
+        mirror = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=999,
+            alliance_bot_username="x5_fort_bot",
+            last_text="Новое расписание на неделю",
+            is_active=True,
+        )
+
+        result = schedule_mirror_service.publish_current_text(mirror_id=mirror.id, user=self.user)
+
+        self.assertEqual(result.target_message_id, 777)
+        self.assertTrue(result.is_active)
+        self.assertIsNotNone(result.last_synced_at)
+        self.assertEqual(result.created_by, self.user)
+
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="Новое расписание на неделю", message_thread_id=5734
+        )
+
+    @mock.patch("core.services.schedule_mirror_service._bot")
+    def test_publish_current_text_raises_when_text_empty(self, mock_bot_factory):
+        """publish_current_text raises ValueError when last_text is empty."""
+        mock_bot = self._mock_bot()
+        mock_bot_factory.return_value = mock_bot
+
+        mirror = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=999,
+            alliance_bot_username="x5_fort_bot",
+            last_text="",
+            is_active=True,
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            schedule_mirror_service.publish_current_text(mirror_id=mirror.id)
+        self.assertIn("Нет текста расписания для отправки", str(ctx.exception))
+
+    @mock.patch("core.services.schedule_mirror_service._bot")
+    @mock.patch("core.services.schedule_mirror_service.ScheduleMirror.objects.get")
+    def test_publish_current_text_uses_default_target_when_target_empty(self, mock_get, mock_bot_factory):
+        """publish_current_text uses CLAN_CHAT_ID when target_chat_id is falsy (0/None)."""
+        mock_bot = self._mock_bot()
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 888}}
+        mock_bot_factory.return_value = mock_bot
+
+        # Create a mock mirror with target_chat_id=0 (falsy) to test fallback
+        mock_mirror = mock.Mock()
+        mock_mirror.id = 1
+        mock_mirror.source_chat_id = -5329088669
+        mock_mirror.target_chat_id = 0  # falsy, should trigger fallback
+        mock_mirror.target_message_id = None
+        mock_mirror.alliance_bot_username = "x5_fort_bot"
+        mock_mirror.last_text = "Текст из дефолтного чата"
+        mock_mirror.is_active = True
+        mock_mirror.created_by = None
+        mock_mirror.save = mock.Mock()
+        mock_get.return_value = mock_mirror
+
+        result = schedule_mirror_service.publish_current_text(mirror_id=1)
+
+        # Verify fallback to CLAN_CHAT_ID was used
+        mock_bot.send_message.assert_called_once_with(
+            chat_id=-1000000000, text="Текст из дефолтного чата", message_thread_id=5734
+        )
+        # Verify mirror was updated with the default target_chat_id
+        self.assertEqual(mock_mirror.target_chat_id, -1000000000)
+        self.assertEqual(mock_mirror.target_message_id, 888)
+        self.assertTrue(mock_mirror.is_active)
+        mock_mirror.save.assert_called_once()
+
+    @mock.patch("core.services.schedule_mirror_service._bot")
+    def test_publish_current_text_deactivates_other_active_same_source(self, mock_bot_factory):
+        """Publishing from one mirror deactivates other active mirrors for same source_chat."""
+        mock_bot = self._mock_bot()
+        mock_bot.send_message.return_value = {"ok": True, "result": {"message_id": 999}}
+        mock_bot_factory.return_value = mock_bot
+
+        # Create two active mirrors for same source_chat_id but different source_message_id
+        mirror1 = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=111,
+            alliance_bot_username="x5_fort_bot",
+            last_text="Первое расписание",
+            is_active=True,
+        )
+        mirror2 = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=200,
+            target_chat_id=-1000000000,
+            target_message_id=222,
+            alliance_bot_username="x5_fort_bot",
+            last_text="Второе расписание",
+            is_active=True,
+        )
+
+        # Publish from mirror2
+        result = schedule_mirror_service.publish_current_text(mirror_id=mirror2.id)
+
+        # mirror2 should be updated with new target_message_id
+        self.assertEqual(result.target_message_id, 999)
+        self.assertTrue(result.is_active)
+
+        # mirror1 should be deactivated
+        mirror1.refresh_from_db()
+        self.assertFalse(mirror1.is_active)
+
+    def test_get_schedule_text_returns_stored_and_empty(self):
+        """get_schedule_text returns stored last_text; empty string for empty last_text."""
+        mirror = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=999,
+            alliance_bot_username="x5_fort_bot",
+            last_text="Сохранённый текст",
+            is_active=True,
+        )
+
+        self.assertEqual(schedule_mirror_service.get_schedule_text(mirror_id=mirror.id), "Сохранённый текст")
+
+        mirror.last_text = ""
+        mirror.save(update_fields=["last_text"])
+        self.assertEqual(schedule_mirror_service.get_schedule_text(mirror_id=mirror.id), "")
