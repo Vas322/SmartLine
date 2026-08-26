@@ -213,3 +213,58 @@ def get_current_text() -> str:
     """Get current active schedule text."""
     mirror = ScheduleMirror.objects.filter(is_active=True).first()
     return mirror.last_text if mirror else ""
+
+
+def get_schedule_text(*, mirror_id: int) -> str:
+    """Return stored last_text (kept fresh by auto-mirror). Variant A: no channel fetch."""
+    mirror = ScheduleMirror.objects.get(id=mirror_id)
+    return mirror.last_text or ""
+
+
+def publish_current_text(*, mirror_id: int, user=None) -> ScheduleMirror:
+    """Send current last_text to target group as a NEW message; update the same mirror row."""
+    mirror = ScheduleMirror.objects.get(id=mirror_id)
+    text = mirror.last_text or ""
+    if not text:
+        raise ValueError(
+            "Нет текста расписания для отправки. Заполните поле «Последний текст расписания»."
+        )
+    target_chat_id = mirror.target_chat_id or _default_target_chat_id()
+    if target_chat_id is None:
+        raise ValueError(
+            "Не удалось определить целевую группу: задайте target_chat_id или CLAN_CHAT_ID."
+        )
+    bot = _bot()
+    target_thread_id = settings.SCHEDULE_MIRROR_TARGET_THREAD_ID
+    try:
+        sent = bot.send_message(
+            chat_id=target_chat_id, text=text, message_thread_id=target_thread_id
+        )
+    except TelegramAPIError as exc:
+        raise ValueError(f"Не удалось отправить сообщение в группу клана: {exc}")
+    target_message_id = (sent.get("result") or {}).get("message_id")
+    if target_message_id is None:
+        raise ValueError("Telegram API не вернул message_id отправленного сообщения.")
+    # Deactivate other active mirrors for the same source chat (consistent with _apply_to_target)
+    ScheduleMirror.objects.filter(
+        source_chat_id=mirror.source_chat_id, is_active=True
+    ).exclude(id=mirror.id).update(is_active=False)
+    mirror.target_chat_id = target_chat_id
+    mirror.target_message_id = target_message_id
+    mirror.last_text = text
+    mirror.last_synced_at = timezone.now()
+    mirror.is_active = True
+    if user is not None:
+        mirror.created_by = user
+    mirror.save(
+        update_fields=[
+            "target_chat_id",
+            "target_message_id",
+            "last_text",
+            "last_synced_at",
+            "is_active",
+            "created_by",
+            "updated_at",
+        ]
+    )
+    return mirror

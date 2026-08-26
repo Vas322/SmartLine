@@ -22,7 +22,6 @@ from core.forms import (
     PlayerForm,
     RateForm,
     RegistrationRateForm,
-    ScheduleMirrorForm,
 )
 from core.models import (
     Activity,
@@ -509,27 +508,7 @@ def schedule_mirror(request):
             messages.success(request, "Синхронизация выполнена.")
             return redirect("schedule_mirror")
 
-        form = ScheduleMirrorForm(request.POST)
-        if form.is_valid():
-            try:
-                schedule_mirror_service.setup_mirror(
-                    source_chat_id=form.cleaned_data["source_chat_id"],
-                    source_message_id=form.cleaned_data["message_id"],
-                    target_chat_id=form.cleaned_data["target_chat_id"],
-                    alliance_bot_username=form.cleaned_data["alliance_bot_username"],
-                    label=form.cleaned_data["label"],
-                    user=request.user,
-                    text=form.cleaned_data.get("schedule_text") or "",
-                )
-                messages.success(request, "Расписание успешно добавлено/обновлено.")
-                return redirect("schedule_mirror")
-            except ValueError as exc:
-                form.add_error(None, str(exc))
-    else:
-        form = ScheduleMirrorForm()
-
     context = {
-        "form": form,
         "current_mirror": current_mirror,
         "current_text": current_text,
     }

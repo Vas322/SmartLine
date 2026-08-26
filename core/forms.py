@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 
-from core.models import CastRate, Instruction, Player, Rate, RegistrationRate, ScheduleMirror
+from core.models import CastRate, Instruction, Player, Rate, RegistrationRate
 
 _PERIOD_CHOICES = [
     ("today", "Сегодня"),
@@ -302,58 +302,3 @@ class InstructionForm(forms.ModelForm):
                 attrs={"class": "field-content auto-grow"}
             ),
         }
-
-
-class ScheduleMirrorForm(forms.Form):
-    source_chat_id = forms.IntegerField(
-        initial=lambda: settings.SCHEDULE_SOURCE_CHAT_ID,
-        label="ID исходного чата (мостовая группа)",
-        help_text="Chat ID группы, где бот альянса публикует расписание",
-    )
-    alliance_bot_username = forms.CharField(
-        max_length=64,
-        initial=lambda: settings.ALLIANCE_BOT_USERNAME,
-        label="Username бота альянса",
-        help_text="Без @, например: x5_fort_bot",
-    )
-    target_chat_id = forms.IntegerField(
-        required=False,
-        initial=lambda: settings.CLAN_CHAT_ID or "",
-        label="ID целевого чата (основная группа клана)",
-        help_text="Оставьте пустым — подставится основная группа (CLAN_CHAT_ID или чат последнего сообщения)",
-    )
-    message_id = forms.IntegerField(
-        required=True,
-        label="ID сообщения с расписанием",
-        help_text="ID сообщения от бота альянса (узнать через @getidsbot или в логах)",
-    )
-    label = forms.CharField(
-        max_length=255,
-        required=False,
-        label="Название/метка",
-        help_text="Необязательная метка для удобства (например: «Расписание на неделю»)",
-    )
-    schedule_text = forms.CharField(
-        required=False,
-        widget=forms.Textarea(attrs={"rows": 6, "placeholder": "Вставьте текст расписания здесь..."}),
-        label="Текст расписания (необязательно)",
-        help_text=(
-            "Бот не может прочитать чужое сообщение по API. Чтобы в админке и при синхронизации был актуальный текст — "
-            "вставьте сюда текст расписания вручную. Если оставить пустым, текст появится после первой правки сообщения ботом альянса."
-        ),
-    )
-
-    def clean(self) -> dict:
-        cleaned = super().clean()
-        target_chat_id = cleaned.get("target_chat_id")
-        if not target_chat_id:
-            # Lazy import to avoid circular imports
-            from core.services.schedule_mirror_service import _default_target_chat_id
-            default_id = _default_target_chat_id()
-            if default_id is None:
-                raise forms.ValidationError(
-                    "Не удалось определить целевую группу: задайте CLAN_CHAT_ID в настройках "
-                    "или убедитесь, что в системе есть обработанные Telegram-сообщения."
-                )
-            cleaned["target_chat_id"] = default_id
-        return cleaned
