@@ -11,9 +11,6 @@
         <h2>Текущее активное расписание</h2>
         {% if current_mirror %}
             <div class="mirror-info">
-                <p><strong>Источник:</strong> chat_id={{ current_mirror.source_chat_id }}, message_id={{ current_mirror.source_message_id }}</p>
-                <p><strong>Цель:</strong> chat_id={{ current_mirror.target_chat_id }}, message_id={{ current_mirror.target_message_id }}</p>
-                <p><strong>Бот альянса:</strong> @{{ current_mirror.alliance_bot_username }}</p>
                 {% if current_mirror.label %}<p><strong>Метка:</strong> {{ current_mirror.label }}</p>{% endif %}
                 <p><strong>Последняя синхронизация:</strong> {{ current_mirror.last_synced_at|date:"d.m.Y H:i:s" }}</p>
             </div>

@@ -699,8 +699,30 @@ class ScheduleMirrorViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Текущее расписание", content)
+        self.assertNotIn("chat_id=-5329088669", content)
+        self.assertNotIn("message_id=100", content)
+
+    def test_admin_change_form_shows_schedule_source_info(self):
+        from django.contrib.auth.models import User as AuthUser
+        admin_user = AuthUser.objects.create_superuser(username="admin", password="admin-pass", email="a@example.com")
+        self.client.login(username="admin", password="admin-pass")
+        from core.models import ScheduleMirror
+        mirror = ScheduleMirror.objects.create(
+            source_chat_id=-5329088669,
+            source_message_id=100,
+            target_chat_id=-1000000000,
+            target_message_id=999,
+            alliance_bot_username="x5_fort_bot",
+            last_text="Текущее расписание",
+            is_active=True,
+        )
+        response = self.client.get(reverse("admin:core_schedulemirror_change", args=[mirror.pk]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
         self.assertIn("chat_id=-5329088669", content)
         self.assertIn("message_id=100", content)
+        self.assertIn("chat_id=-1000000000", content)
+        self.assertIn("x5_fort_bot", content)
 
 
 class RegistrationDashboardTests(TestCase):

@@ -1,0 +1,11 @@
+{% extends "admin/change_form.html" %}
+{% block form_top %}
+  {% if original %}
+  <div class="schedule-mirror-source-info" style="margin: 0 0 1em; padding: 0.75em 1em; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;">
+    <p style="margin: 0 0 0.4em;"><strong>Текущее активное расписание</strong></p>
+    <p style="margin: 0.2em 0;"><strong>Источник:</strong> chat_id={{ original.source_chat_id }}, message_id={{ original.source_message_id }}</p>
+    <p style="margin: 0.2em 0;"><strong>Цель:</strong> chat_id={{ original.target_chat_id }}, message_id={{ original.target_message_id }}</p>
+    <p style="margin: 0.2em 0;"><strong>Бот альянса:</strong> @{{ original.alliance_bot_username }}</p>
+  </div>
+  {% endif %}
+{% endblock %}

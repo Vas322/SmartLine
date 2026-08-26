@@ -71,6 +71,7 @@ class ScheduleMirrorAdmin(admin.ModelAdmin):
     search_fields = ("alliance_bot_username", "label", "source_chat_id", "target_chat_id")
     readonly_fields = ("last_synced_at", "created_at", "updated_at", "created_by")
     actions = ["action_refresh_schedule", "action_publish_schedule"]
+    change_form_template = "admin/core/schedulemirror/change_form.html"
 
     @admin.action(description="Обновить расписание (показать последний текст из канала)")
     def action_refresh_schedule(self, request, queryset):
