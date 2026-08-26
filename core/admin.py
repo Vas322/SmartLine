@@ -1,7 +1,7 @@
 """Django admin registration for the core models."""
 from django.contrib import admin
 
-from core.models import Activity, CastRate, Player, ProcessingError, Registration, RegistrationRate, TelegramMessage
+from core.models import Activity, CastRate, Player, ProcessingError, Registration, RegistrationRate, ScheduleMirror, TelegramMessage
 
 
 @admin.register(Player)
@@ -52,3 +52,20 @@ class RegistrationAdmin(admin.ModelAdmin):
 class ProcessingErrorAdmin(admin.ModelAdmin):
     list_display = ("reason", "status", "created_at")
     list_filter = ("status",)
+
+
+@admin.register(ScheduleMirror)
+class ScheduleMirrorAdmin(admin.ModelAdmin):
+    list_display = (
+        "source_chat_id",
+        "source_message_id",
+        "target_chat_id",
+        "target_message_id",
+        "alliance_bot_username",
+        "label",
+        "is_active",
+        "last_synced_at",
+    )
+    list_filter = ("is_active",)
+    search_fields = ("alliance_bot_username", "label", "source_chat_id", "target_chat_id")
+    readonly_fields = ("last_text", "last_synced_at", "created_at", "updated_at", "created_by")

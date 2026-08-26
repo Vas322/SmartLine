@@ -8,47 +8,6 @@
     <h1>Зеркалирование расписания фортов</h1>
 
     <div class="card">
-        <h2>Добавить / обновить расписание</h2>
-        <form method="post" class="form-vertical">
-            {% csrf_token %}
-            <div class="form-row">
-                <label for="{{ form.source_chat_id.id_for_label }}">{{ form.source_chat_id.label }}</label>
-                {{ form.source_chat_id }}
-                {% if form.source_chat_id.help_text %}<span class="help-text">{{ form.source_chat_id.help_text }}</span>{% endif %}
-                {% if form.source_chat_id.errors %}<span class="error">{{ form.source_chat_id.errors }}</span>{% endif %}
-            </div>
-            <div class="form-row">
-                <label for="{{ form.alliance_bot_username.id_for_label }}">{{ form.alliance_bot_username.label }}</label>
-                {{ form.alliance_bot_username }}
-                {% if form.alliance_bot_username.help_text %}<span class="help-text">{{ form.alliance_bot_username.help_text }}</span>{% endif %}
-                {% if form.alliance_bot_username.errors %}<span class="error">{{ form.alliance_bot_username.errors }}</span>{% endif %}
-            </div>
-            <div class="form-row">
-                <label for="{{ form.target_chat_id.id_for_label }}">{{ form.target_chat_id.label }}</label>
-                {{ form.target_chat_id }}
-                {% if form.target_chat_id.help_text %}<span class="help-text">{{ form.target_chat_id.help_text }}</span>{% endif %}
-                {% if form.target_chat_id.errors %}<span class="error">{{ form.target_chat_id.errors }}</span>{% endif %}
-            </div>
-            <div class="form-row">
-                <label for="{{ form.message_id.id_for_label }}">{{ form.message_id.label }}</label>
-                {{ form.message_id }}
-                {% if form.message_id.help_text %}<span class="help-text">{{ form.message_id.help_text }}</span>{% endif %}
-                {% if form.message_id.errors %}<span class="error">{{ form.message_id.errors }}</span>{% endif %}
-            </div>
-            <div class="form-row">
-                <label for="{{ form.label.id_for_label }}">{{ form.label.label }}</label>
-                {{ form.label }}
-                {% if form.label.help_text %}<span class="help-text">{{ form.label.help_text }}</span>{% endif %}
-                {% if form.label.errors %}<span class="error">{{ form.label.errors }}</span>{% endif %}
-            </div>
-            {% if form.non_field_errors %}
-                <div class="form-errors">{{ form.non_field_errors }}</div>
-            {% endif %}
-            <button type="submit" class="btn btn-primary">Добавить / Обновить расписание</button>
-        </form>
-    </div>
-
-    <div class="card">
         <h2>Текущее активное расписание</h2>
         {% if current_mirror %}
             <div class="mirror-info">
@@ -63,7 +22,7 @@
                 <pre>{{ current_text|default:"(пусто)" }}</pre>
             </div>
         {% else %}
-            <p class="empty-state">Активное расписание не настроено.</p>
+            <p class="empty-state">Активное расписание не настроено. Настройте его в <a href="{% url 'admin:core_schedulemirror_changelist' %}">Django admin</a>.</p>
         {% endif %}
     </div>
 

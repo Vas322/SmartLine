@@ -229,6 +229,8 @@ class ScheduleMirror(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "Расписание"
+        verbose_name_plural = "Расписания"
         constraints = [
             models.UniqueConstraint(
                 fields=["source_chat_id", "source_message_id"],
