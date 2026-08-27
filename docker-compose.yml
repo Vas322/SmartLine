@@ -45,7 +45,7 @@ services:
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       PGUSER: ${POSTGRES_USER:-smartline}
-      PGHOST: ${POSTGRES_HOST:-db}
+      PGHOST: ${POSTGRES_HOST:-smartline-db}
       PGDATABASE: ${POSTGRES_DB:-smartline}
     networks:
       - smartline_net
