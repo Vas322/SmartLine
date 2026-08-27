@@ -135,6 +135,7 @@ class Command(BaseCommand):
         cmd = [
             "gpg",
             "--batch",
+            "--symmetric",
             "--pinentry-mode", "loopback",
             "--passphrase", passphrase,
             "--cipher-algo", "AES256",

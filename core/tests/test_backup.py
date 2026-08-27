@@ -138,6 +138,7 @@ class BackupCommandPostgresTests(TestCase):
         args = gpg_call[0][0]
 
         self.assertIn("--batch", args)
+        self.assertIn("--symmetric", args)
         self.assertIn("--pinentry-mode", args)
         self.assertIn("loopback", args)
         self.assertIn("--passphrase", args)
