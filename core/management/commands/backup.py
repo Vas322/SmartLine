@@ -184,9 +184,8 @@ class Command(BaseCommand):
 
         client = yadisk.Client(token=token)
         try:
-            # Create backup directory if it doesn't exist
-            if not client.exists(backup_dir):
-                client.mkdir(backup_dir)
+            # Create backup directory (and parent directories) if they don't exist
+            self._ensure_remote_dir(client, backup_dir)
 
             # Upload database dump
             db_remote_path = f"{backup_dir.rstrip('/')}/{db_file.name}"
@@ -198,6 +197,25 @@ class Command(BaseCommand):
                 client.upload(str(repo_bundle), bundle_remote_path)
         finally:
             client.close()
+
+    def _ensure_remote_dir(self, client, backup_dir):
+        """Create the remote directory and all missing parent directories on Yandex Disk.
+
+        Yandex Disk API does not create intermediate folders automatically,
+        so each level is created separately.
+        """
+        path = backup_dir.rstrip("/")
+        if path.startswith("disk:"):
+            _, rest = path.split(":", 1)
+            parts = [p for p in rest.split("/") if p]
+            current = "disk:/"
+        else:
+            parts = [p for p in path.split("/") if p]
+            current = ""
+        for part in parts:
+            current = current.rstrip("/") + "/" + part
+            if not client.exists(current):
+                client.mkdir(current)
 
     def _rotate_backups(self, token, backup_dir):
         """Keep only the 14 most recent backups for each prefix."""

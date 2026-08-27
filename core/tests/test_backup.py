@@ -465,3 +465,18 @@ class BackupCommandEdgeCasesTests(TestCase):
 
         # 20 - 14 = 6 removed for each type = 12 total
         self.assertEqual(mock_client.remove.call_count, 12)
+
+    @patch("yadisk.Client")
+    @patch("core.management.commands.backup.subprocess.run")
+    def test_creates_nested_remote_dir_recursively(self, mock_subprocess_run, mock_yadisk_client):
+        mock_subprocess_run.side_effect = _backup_subprocess_side_effect
+        mock_client = MagicMock()
+        mock_yadisk_client.return_value = mock_client
+        mock_client.exists.return_value = False  # ничего не существует
+        mock_client.listdir.return_value = []
+
+        call_command("backup")
+
+        # /Smartline, /Smartline/backups, /Smartline/backups/test -> 3 mkdir
+        self.assertEqual(mock_client.mkdir.call_count, 3)
+        self.assertEqual(mock_client.upload.call_count, 2)
