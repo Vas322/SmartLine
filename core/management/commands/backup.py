@@ -170,7 +170,12 @@ class Command(BaseCommand):
             )
             return None
 
-        cmd = ["git", "-C", str(repo_root), "bundle", "create", str(bundle_path), "--all"]
+        cmd = [
+            "git",
+            "-c", f"safe.directory={repo_root}",
+            "-C", str(repo_root),
+            "bundle", "create", str(bundle_path), "--all",
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.warning("Git bundle creation failed: %s", result.stderr)

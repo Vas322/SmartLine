@@ -172,6 +172,7 @@ class BackupCommandPostgresTests(TestCase):
         self.assertIn("create", args)
         self.assertIn("--all", args)
         self.assertTrue(any(".bundle" in arg for arg in args))
+        self.assertTrue(any("safe.directory" in arg for arg in args))
 
     @patch("yadisk.Client")
     @patch("core.management.commands.backup.subprocess.run")
