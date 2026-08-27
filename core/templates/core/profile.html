@@ -1,0 +1,8 @@
+{% extends "core/base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h1>Профиль</h1>
+<p><strong>Имя пользователя:</strong> {{ user.username }}</p>
+<p><strong>Email:</strong> {{ user.email }}</p>
+<p><a href="{% url 'password_reset' %}">Изменить пароль</a></p>
+{% endblock %}

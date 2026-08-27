@@ -21,10 +21,14 @@
             {% if user.is_staff %}
                 <a href="{% url 'schedule_mirror' %}">Расписание</a>
             {% endif %}
+            <a href="{% url 'profile' %}">{{ user.username }}</a>
             <form action="{% url 'logout' %}" method="post" style="display:inline; background:none; border:none; padding:0; margin-left:auto; margin-bottom:0;">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Выйти ({{ user.username }})</button>
+                <button type="submit" class="btn btn-danger">Выйти</button>
             </form>
+        {% else %}
+            <a href="{% url 'login' %}">Войти</a>
+            <a href="{% url 'signup' %}">Регистрация</a>
         {% endif %}
     </header>
     <main>

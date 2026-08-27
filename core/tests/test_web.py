@@ -30,6 +30,7 @@ class WebInterfaceTests(TestCase):
         self.user = User.objects.create_user(
             username="kl",
             password="test-password-123",
+            is_staff=True,
         )
         self.player = Player.objects.create(nickname="Swettka")
         self.message = TelegramMessage.objects.create(
@@ -53,11 +54,19 @@ class WebInterfaceTests(TestCase):
         self.client.login(username="kl", password="test-password-123")
 
     def test_pages_redirect_anonymous_to_login(self):
-        for url_name in ["dashboard", "players", "activities", "telegram_messages", "processing_errors", "settings"]:
+        # member_required views redirect to /login/
+        for url_name in ["dashboard", "instructions"]:
             response = self.client.get(reverse(url_name))
             self.assertRedirects(
                 response,
                 f"{reverse('login')}?next={reverse(url_name)}",
+            )
+        # staff_member_required views redirect to /admin/login/
+        for url_name in ["players", "activities", "telegram_messages", "processing_errors", "settings"]:
+            response = self.client.get(reverse(url_name))
+            self.assertRedirects(
+                response,
+                f"/admin/login/?next={reverse(url_name)}",
             )
 
     def test_login_page_available(self):
@@ -383,17 +392,16 @@ class WebInterfaceTests(TestCase):
     def test_player_delete_requires_login(self):
         response = self.client.post(reverse("player_delete", args=[self.player.pk]))
         self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
+        self.assertIn("/admin/login/", response.url)
 
     def test_player_edit_requires_staff(self):
-        self._login()
+        non_staff = User.objects.create_user("nostaff", "ns@test.com", "pass12345!")
+        self.client.login(username="nostaff", password="pass12345!")
         response = self.client.get(reverse("player_edit", args=[self.player.pk]))
         self.assertEqual(response.status_code, 302)
         self.assertIn("admin", response.url)
 
     def test_player_edit_updates_nickname_and_user_id(self):
-        self.user.is_staff = True
-        self.user.save()
         self._login()
         response = self.client.post(
             reverse("player_edit", args=[self.player.pk]),

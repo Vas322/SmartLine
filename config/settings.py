@@ -151,6 +151,15 @@ YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN", "")
 YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/Smartline/backups")
 BACKUP_ENCRYPTION_PASSPHRASE = os.getenv("BACKUP_ENCRYPTION_PASSPHRASE", "")
 
+# Email
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "True").lower() in ("1", "true", "yes")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Smartline <noreply@smartline>")
+
 CSRF_TRUSTED_ORIGINS = [
     host.strip()
     for host in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
