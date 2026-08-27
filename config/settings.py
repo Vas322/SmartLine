@@ -1,4 +1,4 @@
-"""Django settings for Smartline project."""
+"""Django settings for the project."""
 import os
 from pathlib import Path
 
@@ -148,7 +148,7 @@ if SCHEDULE_MIRROR_TARGET_THREAD_ID:
 
 # Yandex Disk backup
 YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN", "")
-YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/Smartline/backups")
+YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/project-backups/backups")
 BACKUP_ENCRYPTION_PASSPHRASE = os.getenv("BACKUP_ENCRYPTION_PASSPHRASE", "")
 
 # Email
@@ -158,7 +158,7 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "True").lower() in ("1", "true", "yes")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Smartline <noreply@smartline>")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
 
 CSRF_TRUSTED_ORIGINS = [
     host.strip()

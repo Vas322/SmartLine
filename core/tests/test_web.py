@@ -3,7 +3,7 @@ from datetime import time, timedelta
 from decimal import Decimal
 from unittest import mock
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -741,6 +741,8 @@ class RegistrationDashboardTests(TestCase):
             username="kl",
             password="test-password-123",
         )
+        members_group, _ = Group.objects.get_or_create(name="Members")
+        self.user.groups.add(members_group)
         self.player = Player.objects.create(nickname="Swettka", telegram_user_id=100)
         self.player2 = Player.objects.create(nickname="Ostin", telegram_user_id=200)
         self.message = TelegramMessage.objects.create(
@@ -855,6 +857,7 @@ class RegistrationSettingsTests(TestCase):
         self.user = User.objects.create_user(
             username="kl",
             password="test-password-123",
+            is_staff=True,
         )
         # Clear any seeded registration rates
         RegistrationRate.objects.all().delete()
