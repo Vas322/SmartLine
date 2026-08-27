@@ -214,12 +214,24 @@ class BackupCommandPostgresTests(TestCase):
         mock_yadisk_client.return_value = mock_client
 
         # Create 16 db files and 16 repo files (14 should be kept, 2 removed each)
+        def _make_item(name, path):
+            obj = MagicMock()
+            obj.name = name
+            obj.path = path
+            return obj
+
         db_items = [
-            {"name": f"smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg", "path": f"/Smartline/backups/test/smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg"}
+            _make_item(
+                f"smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg",
+                f"/Smartline/backups/test/smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg"
+            )
             for i in range(1, 17)
         ]
         repo_items = [
-            {"name": f"smartline_repo_2025-01-{i:02d}_1200.bundle", "path": f"/Smartline/backups/test/smartline_repo_2025-01-{i:02d}_1200.bundle"}
+            _make_item(
+                f"smartline_repo_2025-01-{i:02d}_1200.bundle",
+                f"/Smartline/backups/test/smartline_repo_2025-01-{i:02d}_1200.bundle"
+            )
             for i in range(1, 17)
         ]
         mock_client.listdir.return_value = db_items + repo_items
@@ -421,12 +433,24 @@ class BackupCommandEdgeCasesTests(TestCase):
         mock_yadisk_client.return_value = mock_client
 
         # Create 20 files of each type (6 should be removed each)
+        def _make_item(name, path):
+            obj = MagicMock()
+            obj.name = name
+            obj.path = path
+            return obj
+
         db_items = [
-            {"name": f"smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg", "path": f"/Smartline/backups/test/smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg"}
+            _make_item(
+                f"smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg",
+                f"/Smartline/backups/test/smartline_db_2025-01-{i:02d}_1200.sql.gz.gpg"
+            )
             for i in range(1, 21)
         ]
         repo_items = [
-            {"name": f"smartline_repo_2025-01-{i:02d}_1200.bundle", "path": f"/Smartline/backups/test/smartline_repo_2025-01-{i:02d}_1200.bundle"}
+            _make_item(
+                f"smartline_repo_2025-01-{i:02d}_1200.bundle",
+                f"/Smartline/backups/test/smartline_repo_2025-01-{i:02d}_1200.bundle"
+            )
             for i in range(1, 21)
         ]
         mock_client.listdir.return_value = db_items + repo_items

@@ -168,10 +168,8 @@ class Command(BaseCommand):
         client = yadisk.Client(token=token)
         try:
             # Create backup directory if it doesn't exist
-            try:
+            if not client.exists(backup_dir):
                 client.mkdir(backup_dir)
-            except yadisk.exceptions.PathExistsError:
-                pass  # Directory already exists
 
             # Upload database dump
             db_remote_path = f"{backup_dir.rstrip('/')}/{db_file.name}"
@@ -197,11 +195,11 @@ class Command(BaseCommand):
             repo_files = []
 
             for item in items:
-                name = item.get("name", "")
+                name = getattr(item, "name", "")
                 if name.startswith("smartline_db_") and name.endswith(".gpg"):
-                    db_files.append((name, item.get("path", "")))
+                    db_files.append((name, getattr(item, "path", "")))
                 elif name.startswith("smartline_repo_") and name.endswith(".bundle"):
-                    repo_files.append((name, item.get("path", "")))
+                    repo_files.append((name, getattr(item, "path", "")))
 
             # Sort by name (timestamp) descending - newest first
             db_files.sort(key=lambda x: x[0], reverse=True)
