@@ -26,6 +26,8 @@ services:
     networks:
       - smartline_net
       - caddy_net
+    volumes:
+      - ./.git:/app/.git:ro
     restart: unless-stopped
 
   smartline-bot:

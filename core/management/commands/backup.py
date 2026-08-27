@@ -53,9 +53,12 @@ class Command(BaseCommand):
             encrypted_path = self._encrypt_file(db_dump_path, encryption_passphrase, tmp_path)
             logger.info("Encrypted database dump: %s", encrypted_path.name)
 
-            # 3. Git bundle
+            # 3. Git bundle (best-effort: skipped if no git repo, e.g. production image)
             repo_bundle_path = self._create_git_bundle(timestamp, tmp_path)
-            logger.info("Created git bundle: %s", repo_bundle_path.name)
+            if repo_bundle_path is None:
+                logger.warning("Git bundle skipped (no git repository or bundle failed).")
+            else:
+                logger.info("Created git bundle: %s", repo_bundle_path.name)
 
             # 4. Upload to Yandex Disk (skip in dry-run)
             if not dry_run:
@@ -70,10 +73,11 @@ class Command(BaseCommand):
                 # 5. Rotation
                 self._rotate_backups(yandex_token, yandex_backup_dir)
             else:
+                extra = f" and {repo_bundle_path.name}" if repo_bundle_path is not None else ""
                 logger.info(
-                    "DRY-RUN: Would upload %s and %s to %s",
+                    "DRY-RUN: Would upload %s%s to %s",
                     encrypted_path.name,
-                    repo_bundle_path.name,
+                    extra,
                     yandex_backup_dir,
                 )
                 logger.info("DRY-RUN: Would rotate old backups in %s", yandex_backup_dir)
@@ -150,15 +154,27 @@ class Command(BaseCommand):
         return output_path
 
     def _create_git_bundle(self, timestamp, tmp_path):
-        """Create git bundle of the entire repository."""
+        """Create git bundle of the entire repository (best-effort).
+
+        Returns the bundle path, or None if no git repository is available
+        (e.g. production Docker image without .git) or bundling fails.
+        """
         # commands -> management -> core -> root
         repo_root = Path(__file__).resolve().parents[3]
         bundle_path = tmp_path / f"smartline_repo_{timestamp}.bundle"
 
+        # Skip if there is no git repository (common in production images)
+        if not (repo_root / ".git").is_dir():
+            logger.warning(
+                "Git repository not found at %s; skipping git bundle.", repo_root
+            )
+            return None
+
         cmd = ["git", "-C", str(repo_root), "bundle", "create", str(bundle_path), "--all"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise CommandError(f"Git bundle creation failed: {result.stderr}")
+            logger.warning("Git bundle creation failed: %s", result.stderr)
+            return None
 
         return bundle_path
 
@@ -176,9 +192,10 @@ class Command(BaseCommand):
             db_remote_path = f"{backup_dir.rstrip('/')}/{db_file.name}"
             client.upload(str(db_file), db_remote_path)
 
-            # Upload git bundle
-            bundle_remote_path = f"{backup_dir.rstrip('/')}/{repo_bundle.name}"
-            client.upload(str(repo_bundle), bundle_remote_path)
+            # Upload git bundle (only if it was created)
+            if repo_bundle is not None:
+                bundle_remote_path = f"{backup_dir.rstrip('/')}/{repo_bundle.name}"
+                client.upload(str(repo_bundle), bundle_remote_path)
         finally:
             client.close()
 

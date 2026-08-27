@@ -390,11 +390,10 @@ class BackupCommandEdgeCasesTests(TestCase):
 
     @patch("yadisk.Client")
     @patch("core.management.commands.backup.subprocess.run")
-    def test_git_bundle_failure_raises_error(self, mock_subprocess_run, mock_yadisk_client):
-        # First call (pg_dump) succeeds, second (gpg) succeeds, third (git) fails
-        call_count = [0]
+    def test_git_bundle_failure_is_non_fatal(self, mock_subprocess_run, mock_yadisk_client):
+        # pg_dump and gpg succeed, but git bundle fails: backup must NOT raise,
+        # git bundle is skipped (best-effort) and the rest completes.
         def git_fail_side_effect(cmd, **kwargs):
-            call_count[0] += 1
             if cmd and cmd[0] == "git" and "bundle" in cmd and "create" in cmd:
                 return _make_completed_process(returncode=1, stderr="git error")
             return _backup_subprocess_side_effect(cmd, **kwargs)
@@ -403,9 +402,15 @@ class BackupCommandEdgeCasesTests(TestCase):
         mock_yadisk_client.return_value = mock_client
         mock_client.listdir.return_value = []
 
-        with self.assertRaises(CommandError) as ctx:
-            call_command("backup", "--dry-run")
-        self.assertIn("Git bundle creation failed", str(ctx.exception))
+        # Should complete without raising (dry-run)
+        call_command("backup", "--dry-run")
+
+        # git bundle was attempted exactly once
+        git_calls = [
+            c for c in mock_subprocess_run.call_args_list
+            if c[0][0] and c[0][0][0] == "git"
+        ]
+        self.assertEqual(len(git_calls), 1)
 
     @patch("yadisk.Client")
     @patch("core.management.commands.backup.subprocess.run")
