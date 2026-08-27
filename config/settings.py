@@ -148,7 +148,7 @@ if SCHEDULE_MIRROR_TARGET_THREAD_ID:
 
 # Yandex Disk backup
 YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN", "")
-YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/project-backups/backups")
+YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/Smartline/backups")
 BACKUP_ENCRYPTION_PASSPHRASE = os.getenv("BACKUP_ENCRYPTION_PASSPHRASE", "")
 
 # Email
