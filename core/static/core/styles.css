@@ -87,6 +87,12 @@ header a {
 header a:hover {
     color: #fff;
 }
+.header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
 main {
     max-width: 1200px;
     margin: 24px auto;
