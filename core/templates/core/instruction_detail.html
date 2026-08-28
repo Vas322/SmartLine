@@ -7,6 +7,8 @@
     {{ instruction.content|linebreaks }}
 </div>
 <p class="instruction-meta">Слаг: {{ instruction.slug }} · Обновлено: {{ instruction.updated_at|date:"d.m.Y H:i" }}</p>
+{% if user.is_staff %}
 <a class="btn" href="{% url 'instruction_edit' instruction.pk %}">Редактировать</a>
+{% endif %}
 <p><a href="{% url 'instructions' %}">← Назад к списку</a></p>
 {% endblock %}

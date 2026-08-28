@@ -1,18 +1,28 @@
 """Thin views for the Smartline web interface."""
 from datetime import timedelta
 from decimal import Decimal
+import logging
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login
+from django.contrib.auth.models import User, Group
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib import messages
+from django.core.mail import send_mail
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_bytes, force_str
 from django.views.decorators.http import require_POST
 
+from core.decorators import member_required
 from core.forms import (
     ActivityFilterForm,
     CastRateForm,
@@ -22,6 +32,7 @@ from core.forms import (
     PlayerForm,
     RateForm,
     RegistrationRateForm,
+    SignUpForm,
 )
 from core.models import (
     Activity,
@@ -60,7 +71,7 @@ def _unique_instruction_slug(base: str) -> str:
     return slug
 
 
-@login_required
+@member_required
 def dashboard(request):
     form = PeriodForm(request.GET or None, initial={"period": "month"})
     date_from, date_to = form.get_date_range()
@@ -161,7 +172,7 @@ def dashboard(request):
     return render(request, "core/dashboard.html", context)
 
 
-@login_required
+@staff_member_required
 def player_detail(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
     form = PeriodForm(request.GET or None, initial={"period": "month"})
@@ -232,7 +243,7 @@ def player_detail(request, pk: int):
     return render(request, "core/player_detail.html", context)
 
 
-@login_required
+@staff_member_required
 def players(request):
     players_qs = Player.objects.order_by("nickname")
     if request.method == "POST":
@@ -258,7 +269,7 @@ def player_edit(request, pk: int):
     return render(request, "core/player_edit.html", {"form": form, "player": player})
 
 
-@login_required
+@staff_member_required
 @require_POST
 def toggle_player(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
@@ -267,7 +278,7 @@ def toggle_player(request, pk: int):
     return redirect("players")
 
 
-@login_required
+@staff_member_required
 @require_POST
 def delete_player(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
@@ -275,7 +286,7 @@ def delete_player(request, pk: int):
     return redirect("players")
 
 
-@login_required
+@staff_member_required
 def activities(request):
     form = ActivityFilterForm(request.GET or None)
     activities_qs = (
@@ -290,7 +301,7 @@ def activities(request):
     )
 
 
-@login_required
+@staff_member_required
 def telegram_messages(request):
     messages = TelegramMessage.objects.order_by("-created_at")
     return render(
@@ -300,7 +311,7 @@ def telegram_messages(request):
     )
 
 
-@login_required
+@staff_member_required
 def processing_errors(request):
     errors = (
         ProcessingError.objects.select_related("telegram_message")
@@ -309,7 +320,7 @@ def processing_errors(request):
     return render(request, "core/processing_errors.html", {"errors": errors})
 
 
-@login_required
+@staff_member_required
 def settings_view(request):
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
     edit_cast_rate_pk = request.GET.get("edit_cast") or request.POST.get("edit_cast_rate")
@@ -438,7 +449,7 @@ def settings_view(request):
     )
 
 
-@login_required
+@member_required
 def instructions(request):
     if request.method == "POST":
         action = request.POST.get("action")
@@ -466,7 +477,7 @@ def instructions(request):
     )
 
 
-@login_required
+@member_required
 def instruction_detail(request, pk: int):
     instr = get_object_or_404(Instruction, pk=pk)
     return render(
@@ -476,7 +487,7 @@ def instruction_detail(request, pk: int):
     )
 
 
-@login_required
+@staff_member_required
 def instruction_edit(request, pk: int):
     instr = get_object_or_404(Instruction, pk=pk)
     if request.method == "POST":
@@ -513,3 +524,77 @@ def schedule_mirror(request):
         "current_text": current_text,
     }
     return render(request, "core/schedule_mirror.html", context)
+
+
+logger = logging.getLogger(__name__)
+
+MEMBERS_GROUP = "Members"
+
+
+def _send_activation_email(request, user):
+    """Send email with activation link."""
+    token = default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    activation_path = reverse("activate", kwargs={"uidb64": uid, "token": token})
+    activation_url = request.build_absolute_uri(activation_path)
+    subject = "Smartline — Подтверждение регистрации"
+    message = (
+        f"Здравствуйте, {user.username}!\n\n"
+        f"Для завершения регистрации перейдите по ссылке:\n"
+        f"{activation_url}\n\n"
+        f"Ссылка действительна в течение 48 часов.\n\n"
+        f"Если вы не регистрировались в Smartline — игнорируйте это письмо."
+    )
+    send_mail(subject, message, None, [user.email])
+
+
+def signup_view(request):
+    """User registration with email verification."""
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    if request.method == "POST":
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = User.objects.create_user(
+                username=form.cleaned_data["username"],
+                email=form.cleaned_data["email"],
+                password=form.cleaned_data["password"],
+                is_active=False,
+            )
+            _send_activation_email(request, user)
+            logger.info("Registration: user %s created, activation email sent", user.username)
+            return redirect("activation_sent")
+    else:
+        form = SignUpForm()
+    return render(request, "core/signup.html", {"form": form})
+
+
+def activate_view(request, uidb64, token):
+    """Activate user account from email link."""
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        members_group, _ = Group.objects.get_or_create(name=MEMBERS_GROUP)
+        user.groups.add(members_group)
+        logger.info("Activation: user %s activated", user.username)
+        return render(request, "core/activation_complete.html")
+    
+    logger.warning("Activation failed: invalid token or user")
+    return render(request, "core/activation_invalid.html")
+
+
+def activation_sent_view(request):
+    """Show 'check your email' message."""
+    return render(request, "core/activation_sent.html")
+
+
+@login_required
+def profile_view(request):
+    """User profile page."""
+    return render(request, "core/profile.html")
