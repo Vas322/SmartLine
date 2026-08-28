@@ -20,3 +20,6 @@ logs/
 
 # opencode agents (local workflow config)
 .opencode/agents/
+
+# Local backlog (не выгружать на GitHub)
+docs/BACKLOG.md
