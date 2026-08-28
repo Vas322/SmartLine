@@ -531,11 +531,12 @@ logger = logging.getLogger(__name__)
 MEMBERS_GROUP = "Members"
 
 
-def _send_activation_email(user):
+def _send_activation_email(request, user):
     """Send email with activation link."""
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    activation_url = f"/activate/{uid}/{token}/"
+    activation_path = reverse("activate", kwargs={"uidb64": uid, "token": token})
+    activation_url = request.build_absolute_uri(activation_path)
     subject = "Smartline — Подтверждение регистрации"
     message = (
         f"Здравствуйте, {user.username}!\n\n"
@@ -560,7 +561,7 @@ def signup_view(request):
                 password=form.cleaned_data["password"],
                 is_active=False,
             )
-            _send_activation_email(user)
+            _send_activation_email(request, user)
             logger.info("Registration: user %s created, activation email sent", user.username)
             return redirect("activation_sent")
     else:

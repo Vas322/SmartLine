@@ -3,6 +3,8 @@ from django.contrib.auth.models import User, Group
 from django.test import TestCase, Client
 from django.core import mail
 
+from core.forms import SignUpForm
+
 
 class SignUpTest(TestCase):
     """Tests for user registration."""
@@ -33,6 +35,17 @@ class SignUpTest(TestCase):
         })
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Подтверждение регистрации", mail.outbox[0].subject)
+
+    def test_signup_activation_email_has_absolute_url(self):
+        self.client.post("/register/", {
+            "email": "test@example.com",
+            "username": "testuser",
+            "password": "StrongPass123!",
+            "password_confirm": "StrongPass123!",
+        })
+        body = mail.outbox[0].body
+        self.assertIn("/activate/", body)
+        self.assertIn("http", body)
 
     def test_signup_duplicate_email(self):
         User.objects.create_user("existing", "test@example.com", "pass12345!")
@@ -192,6 +205,18 @@ class AccessControlTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.url)
 
+    def test_inactive_member_redirected_from_protected_pages(self):
+        user = User.objects.create_user(
+            "inactive_member", "im@test.com", "pass12345!", is_active=False
+        )
+        members_group, _ = Group.objects.get_or_create(name="Members")
+        user.groups.add(members_group)
+        client = Client()
+        client.login(username="inactive_member", password="pass12345!")
+        response = client.get("/instructions/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
 
 class ProfileTest(TestCase):
     """Tests for profile page."""
@@ -229,3 +254,17 @@ class LoginLinksTest(TestCase):
     def test_login_page_has_password_reset_link(self):
         response = self.client.get("/login/")
         self.assertContains(response, "/password-reset/")
+
+
+class SignUpFormTest(TestCase):
+    """Tests for SignUpForm password validation."""
+
+    def test_weak_password_is_invalid(self):
+        form = SignUpForm(data={
+            "email": "test@example.com",
+            "username": "testuser",
+            "password": "1",
+            "password_confirm": "1",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("password", form.errors)

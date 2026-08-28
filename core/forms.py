@@ -7,6 +7,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from core.models import CastRate, Instruction, Player, Rate, RegistrationRate
 
@@ -346,4 +348,9 @@ class SignUpForm(forms.Form):
         password_confirm = cleaned.get("password_confirm")
         if password and password_confirm and password != password_confirm:
             self.add_error("password_confirm", "Пароли не совпадают.")
+        if password:
+            try:
+                validate_password(password)
+            except ValidationError as e:
+                self.add_error("password", list(e.messages))
         return cleaned

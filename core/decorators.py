@@ -1,9 +1,8 @@
 """Custom decorators for access control."""
 from functools import wraps
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect
+from django.contrib.auth.views import redirect_to_login
 
 
 def member_required(view_func):
@@ -11,7 +10,8 @@ def member_required(view_func):
     @wraps(view_func)
     @login_required
     def _wrapped(request, *args, **kwargs):
-        if request.user.is_staff or request.user.groups.filter(name="Members").exists():
+        user = request.user
+        if user.is_active and (user.is_staff or user.groups.filter(name="Members").exists()):
             return view_func(request, *args, **kwargs)
-        return redirect(settings.LOGIN_URL)
+        return redirect_to_login(request.get_full_path())
     return _wrapped
