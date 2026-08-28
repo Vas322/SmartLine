@@ -1036,3 +1036,65 @@ class StaffAccessTests(TestCase):
             reverse("schedule_mirror"), {"action": "reconcile"}
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_member_instructions_page_hides_add_and_delete(self):
+        """Member instructions page hides add/delete buttons but keeps detail links."""
+        self._login_member()
+        response = self.client.get(reverse("instructions"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn("Добавить инструкцию", content)
+        self.assertNotIn("Удалить", content)
+        self.assertIn(
+            reverse("instruction_detail", args=[self.instruction.pk]), content
+        )
+
+    def test_staff_instructions_page_shows_add_and_delete(self):
+        """Staff instructions page shows add/delete buttons."""
+        self._login_staff()
+        response = self.client.get(reverse("instructions"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Добавить инструкцию", content)
+        self.assertIn("Удалить", content)
+
+    def test_member_instructions_add_post_forbidden(self):
+        """Member cannot add an instruction (POST returns 403)."""
+        self._login_member()
+        response = self.client.post(
+            reverse("instructions"), {"action": "add"}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_member_instructions_delete_post_forbidden(self):
+        """Member cannot delete an instruction (POST returns 403)."""
+        self._login_member()
+        response = self.client.post(
+            reverse("instructions"),
+            {"action": "delete", "pk": self.instruction.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_instructions_add_post_ok(self):
+        """Staff can add an instruction (POST redirects)."""
+        self._login_staff()
+        count_before = Instruction.objects.count()
+        response = self.client.post(
+            reverse("instructions"), {"action": "add"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Instruction.objects.count(), count_before + 1)
+
+    def test_member_dashboard_nick_not_linked(self):
+        """Member dashboard nick is plain text (no player profile link)."""
+        self._login_member()
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("/player/", response.content.decode())
+
+    def test_staff_dashboard_nick_linked(self):
+        """Staff dashboard nick links to the player profile."""
+        self._login_staff()
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("/player/", response.content.decode())

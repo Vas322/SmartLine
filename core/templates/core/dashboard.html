@@ -26,7 +26,7 @@
     </tr>
     {% for row in rows %}
     <tr>
-        <td><a href="{% url 'player_detail' row.pk %}">{{ row.nickname }}</a></td>
+        <td>{% if user.is_staff %}<a href="{% url 'player_detail' row.pk %}">{{ row.nickname }}</a>{% else %}{{ row.nickname }}{% endif %}</td>
         <td>{{ row.total_hours }}</td>
         <td>{{ row.adena }}</td>
         <td>{{ row.registration }}</td>

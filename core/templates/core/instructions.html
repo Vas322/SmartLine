@@ -2,11 +2,13 @@
 {% block title %}Инструкции{% endblock %}
 {% block content %}
 <h1>Инструкции</h1>
+{% if user.is_staff %}
 <form method="post" action="{% url 'instructions' %}">
     {% csrf_token %}
     <input type="hidden" name="action" value="add">
     <button type="submit" class="btn">Добавить инструкцию</button>
 </form>
+{% endif %}
 <table>
     <tr>
         <th>Название</th>
@@ -20,12 +22,14 @@
         <td>{{ instr.updated_at|date:"d.m.Y H:i" }}</td>
         <td>{{ instr.updated_by.username|default:"—" }}</td>
         <td>
+            {% if user.is_staff %}
             <form method="post" action="{% url 'instructions' %}" class="inline-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="pk" value="{{ instr.pk }}">
                 <button type="submit" class="btn btn-danger" onclick="return confirm('Удалить инструкцию «{{ instr.title }}»?')">Удалить</button>
             </form>
+            {% endif %}
         </td>
     </tr>
     {% empty %}

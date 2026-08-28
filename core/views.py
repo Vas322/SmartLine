@@ -453,6 +453,8 @@ def settings_view(request):
 def instructions(request):
     if request.method == "POST":
         action = request.POST.get("action")
+        if action in ("add", "delete") and not request.user.is_staff:
+            return HttpResponseForbidden("Недостаточно прав для управления инструкциями.")
         if action == "add":
             slug = _unique_instruction_slug("instruction")
             instr = None
