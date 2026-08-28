@@ -55,18 +55,19 @@ class WebInterfaceTests(TestCase):
 
     def test_pages_redirect_anonymous_to_login(self):
         # member_required views redirect to /login/
-        for url_name in ["dashboard", "instructions"]:
+        for url_name in ["dashboard", "instructions", "schedule_mirror"]:
             response = self.client.get(reverse(url_name))
             self.assertRedirects(
                 response,
                 f"{reverse('login')}?next={reverse(url_name)}",
             )
-        # staff_member_required views redirect to /admin/login/
+        # staff_or_404 views also use login_required, so anonymous users
+        # redirect to /login/ (not to the admin login).
         for url_name in ["players", "activities", "telegram_messages", "processing_errors", "settings"]:
             response = self.client.get(reverse(url_name))
             self.assertRedirects(
                 response,
-                f"/admin/login/?next={reverse(url_name)}",
+                f"{reverse('login')}?next={reverse(url_name)}",
             )
 
     def test_login_page_available(self):
@@ -673,12 +674,12 @@ class ScheduleMirrorViewTests(TestCase):
     def _login_non_staff(self):
         self.client.login(username="player", password="test-password-123")
 
-    def test_schedule_mirror_requires_staff(self):
-        """Non-staff users should be redirected (302 to admin/login)."""
+    def test_schedule_mirror_requires_login(self):
+        """Non-staff users who are not Members are redirected to /login/."""
         self._login_non_staff()
         response = self.client.get(reverse("schedule_mirror"))
         self.assertEqual(response.status_code, 302)
-        self.assertIn("admin", response.url)
+        self.assertIn("/login/", response.url)
 
     def test_schedule_mirror_reconcile_action(self):
         """POST with action=reconcile calls reconcile_all and redirects."""
@@ -944,3 +945,85 @@ class RegistrationSettingsTests(TestCase):
             content,
         )
         self.assertRegex(content, r'id="regAddForm"[^>]*\shidden')
+
+
+@override_settings(
+    TELEGRAM_BOT_TOKEN="12345:TESTTOKEN",
+    SCHEDULE_SOURCE_CHAT_ID=-5329088669,
+    ALLIANCE_BOT_USERNAME="x5_fort_bot",
+    CLAN_CHAT_ID=-1000000000,
+)
+class StaffAccessTests(TestCase):
+    """Tests for hiding staff pages from non-staff Members."""
+
+    def setUp(self):
+        self.member_user = User.objects.create_user(
+            username="member", password="test-password-123", is_staff=False
+        )
+        members_group, _ = Group.objects.get_or_create(name="Members")
+        self.member_user.groups.add(members_group)
+        self.staff_user = User.objects.create_user(
+            username="kl", password="test-password-123", is_staff=True
+        )
+        self.instruction = Instruction.objects.create(
+            slug="how-to", title="Инструкция", content="Текст"
+        )
+
+    def _login_member(self):
+        self.client.login(username="member", password="test-password-123")
+
+    def _login_staff(self):
+        self.client.login(username="kl", password="test-password-123")
+
+    def test_member_nav_hides_staff_links(self):
+        """Member header shows Dashboard/Instructions/Schedule, not staff links."""
+        self._login_member()
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("players"))
+        self.assertNotContains(response, reverse("activities"))
+        self.assertNotContains(response, reverse("telegram_messages"))
+        self.assertNotContains(response, reverse("processing_errors"))
+        self.assertNotContains(response, reverse("settings"))
+        self.assertContains(response, reverse("instructions"))
+        self.assertContains(response, reverse("schedule_mirror"))
+
+    def test_staff_nav_shows_all_links(self):
+        """Staff header shows all links including staff pages."""
+        self._login_staff()
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("players"))
+        self.assertContains(response, reverse("activities"))
+        self.assertContains(response, reverse("telegram_messages"))
+        self.assertContains(response, reverse("processing_errors"))
+        self.assertContains(response, reverse("settings"))
+
+    def test_member_direct_access_to_staff_pages_returns_404(self):
+        """Non-staff Members get 404 when hitting staff URLs directly."""
+        self._login_member()
+        for url_name, kwargs in [
+            ("players", {}),
+            ("activities", {}),
+            ("telegram_messages", {}),
+            ("processing_errors", {}),
+            ("settings", {}),
+            ("instruction_edit", {"pk": self.instruction.pk}),
+        ]:
+            response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertEqual(response.status_code, 404, url_name)
+
+    def test_member_schedule_mirror_returns_200(self):
+        """Members can read the schedule (GET returns 200)."""
+        self._login_member()
+        response = self.client.get(reverse("schedule_mirror"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Синхронизировать сейчас")
+
+    def test_member_schedule_mirror_reconcile_returns_403(self):
+        """Members cannot trigger a reconcile (POST returns 403)."""
+        self._login_member()
+        response = self.client.post(
+            reverse("schedule_mirror"), {"action": "reconcile"}
+        )
+        self.assertEqual(response.status_code, 403)

@@ -35,7 +35,7 @@ class InstructionsAccessTests(TestCase):
             {"slug": "x", "title": "Y", "content": "d"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn("/login/", response["Location"])
 
     def test_list_shows_seeded_instruction(self):
         self.client.force_login(_create_member_user())

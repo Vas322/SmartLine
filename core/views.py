@@ -15,6 +15,7 @@ from django.core.mail import send_mail
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
@@ -22,7 +23,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str
 from django.views.decorators.http import require_POST
 
-from core.decorators import member_required
+from core.decorators import member_required, staff_or_404
 from core.forms import (
     ActivityFilterForm,
     CastRateForm,
@@ -243,7 +244,7 @@ def player_detail(request, pk: int):
     return render(request, "core/player_detail.html", context)
 
 
-@staff_member_required
+@staff_or_404
 def players(request):
     players_qs = Player.objects.order_by("nickname")
     if request.method == "POST":
@@ -286,7 +287,7 @@ def delete_player(request, pk: int):
     return redirect("players")
 
 
-@staff_member_required
+@staff_or_404
 def activities(request):
     form = ActivityFilterForm(request.GET or None)
     activities_qs = (
@@ -301,7 +302,7 @@ def activities(request):
     )
 
 
-@staff_member_required
+@staff_or_404
 def telegram_messages(request):
     messages = TelegramMessage.objects.order_by("-created_at")
     return render(
@@ -311,7 +312,7 @@ def telegram_messages(request):
     )
 
 
-@staff_member_required
+@staff_or_404
 def processing_errors(request):
     errors = (
         ProcessingError.objects.select_related("telegram_message")
@@ -320,7 +321,7 @@ def processing_errors(request):
     return render(request, "core/processing_errors.html", {"errors": errors})
 
 
-@staff_member_required
+@staff_or_404
 def settings_view(request):
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
     edit_cast_rate_pk = request.GET.get("edit_cast") or request.POST.get("edit_cast_rate")
@@ -487,7 +488,7 @@ def instruction_detail(request, pk: int):
     )
 
 
-@staff_member_required
+@staff_or_404
 def instruction_edit(request, pk: int):
     instr = get_object_or_404(Instruction, pk=pk)
     if request.method == "POST":
@@ -506,7 +507,7 @@ def instruction_edit(request, pk: int):
     )
 
 
-@staff_member_required
+@member_required
 def schedule_mirror(request):
     """Manage schedule mirroring from alliance bot to clan group."""
     current_mirror = ScheduleMirror.objects.filter(is_active=True).first()
@@ -515,6 +516,8 @@ def schedule_mirror(request):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "reconcile":
+            if not request.user.is_staff:
+                return HttpResponseForbidden("Только для персонала.")
             schedule_mirror_service.reconcile_all()
             messages.success(request, "Синхронизация выполнена.")
             return redirect("schedule_mirror")
