@@ -393,14 +393,13 @@ class WebInterfaceTests(TestCase):
     def test_player_delete_requires_login(self):
         response = self.client.post(reverse("player_delete", args=[self.player.pk]))
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response.url)
+        self.assertIn("/login/", response.url)
 
     def test_player_edit_requires_staff(self):
         non_staff = User.objects.create_user("nostaff", "ns@test.com", "pass12345!")
         self.client.login(username="nostaff", password="pass12345!")
         response = self.client.get(reverse("player_edit", args=[self.player.pk]))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("admin", response.url)
+        self.assertEqual(response.status_code, 404)
 
     def test_player_edit_updates_nickname_and_user_id(self):
         self._login()
@@ -968,6 +967,7 @@ class StaffAccessTests(TestCase):
         self.instruction = Instruction.objects.create(
             slug="how-to", title="Инструкция", content="Текст"
         )
+        self.player = Player.objects.create(nickname="Swettka")
 
     def _login_member(self):
         self.client.login(username="member", password="test-password-123")
@@ -1009,8 +1009,17 @@ class StaffAccessTests(TestCase):
             ("processing_errors", {}),
             ("settings", {}),
             ("instruction_edit", {"pk": self.instruction.pk}),
+            ("player_detail", {"pk": self.player.pk}),
+            ("player_edit", {"pk": self.player.pk}),
         ]:
             response = self.client.get(reverse(url_name, kwargs=kwargs))
+            self.assertEqual(response.status_code, 404, url_name)
+
+        # toggle/delete require POST; staff_or_404 still blocks non-staff first.
+        for url_name in ["player_toggle", "player_delete"]:
+            response = self.client.post(
+                reverse(url_name, kwargs={"pk": self.player.pk})
+            )
             self.assertEqual(response.status_code, 404, url_name)
 
     def test_member_schedule_mirror_returns_200(self):

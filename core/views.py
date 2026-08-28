@@ -4,7 +4,6 @@ from decimal import Decimal
 import logging
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib.auth.models import User, Group
@@ -173,7 +172,7 @@ def dashboard(request):
     return render(request, "core/dashboard.html", context)
 
 
-@staff_member_required
+@staff_or_404
 def player_detail(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
     form = PeriodForm(request.GET or None, initial={"period": "month"})
@@ -257,7 +256,7 @@ def players(request):
     return render(request, "core/players.html", {"players": players_qs, "form": form})
 
 
-@staff_member_required
+@staff_or_404
 def player_edit(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
     if request.method == "POST":
@@ -270,7 +269,7 @@ def player_edit(request, pk: int):
     return render(request, "core/player_edit.html", {"form": form, "player": player})
 
 
-@staff_member_required
+@staff_or_404
 @require_POST
 def toggle_player(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
@@ -279,7 +278,7 @@ def toggle_player(request, pk: int):
     return redirect("players")
 
 
-@staff_member_required
+@staff_or_404
 @require_POST
 def delete_player(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
