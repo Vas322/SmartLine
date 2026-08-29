@@ -16,11 +16,11 @@ from core.services.activity_service import (
 )
 
 
-def _process(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None):
+def _process(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None, user_id: int = 100):
     return process_telegram_message(
         chat_id=chat_id,
         message_id=message_id,
-        user_id=100,
+        user_id=user_id,
         username="test_user",
         text=text,
         message_date=timezone.now(),
@@ -28,11 +28,11 @@ def _process(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id
     )
 
 
-def _process_edit(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None):
+def _process_edit(text: str, chat_id: int = 1, message_id: int = 1, message_thread_id: Optional[int] = None, user_id: int = 100):
     return process_telegram_edit(
         chat_id=chat_id,
         message_id=message_id,
-        user_id=100,
+        user_id=user_id,
         username="test_user",
         text=text,
         message_date=timezone.now(),
@@ -375,18 +375,201 @@ class ProcessTelegramEditTests(TestCase):
             TelegramMessage.Status.ERROR,
         )
 
-    def test_edit_on_processed_message_is_ignored(self):
+    def test_edit_on_processed_message_updates_activity(self):
         Player.objects.create(nickname="Swettka")
         first = _process("+1 | деф | Swettka | 11.56 | Первая волна")
         self.assertEqual(first.status, ProcessResultStatus.ACTIVITY_CREATED)
 
-        result = _process_edit("+2 | фарм | Swettka | 11.56 | Вторая волна")
+        # Правка: тип деф -> фарм, количество оставляем 1 (чтобы проверить именно смену типа)
+        result = _process_edit("+1 | фарм | Swettka | 11.56 | Вторая волна")
 
-        self.assertEqual(result.status, ProcessResultStatus.EDIT_IGNORED)
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
         self.assertEqual(Activity.objects.count(), 1)
         activity = Activity.objects.get()
         self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(activity.activity_type, "FARM")
+        self.assertEqual(activity.payment_kk, Decimal("0"))
+        self.assertIn("активность DEF → FARM", result.changes_text)
+        tm = result.telegram_message
+        self.assertEqual(tm.edit_count, 1)
+        self.assertEqual(tm.original_text, "+1 | деф | Swettka | 11.56 | Первая волна")
+        self.assertIn("+1 | деф | Swettka | 11.56 | Первая волна", tm.edit_history)
+
+    def test_edit_changes_activity_type(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+
+        result = _process_edit("+1 | фарм | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "FARM")
+        self.assertEqual(activity.payment_kk, Decimal("0"))
+        self.assertIn("активность DEF → FARM", result.changes_text)
+
+    def test_edit_changes_cast_shows_combined_label(self):
+        """Правка деф -> деф+каст показывает объединённую метку и пересчитывает оплату."""
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+
+        result = _process_edit("+1 | деф+каст | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        activity = Activity.objects.get()
+        self.assertTrue(activity.has_cast)
         self.assertEqual(activity.activity_type, "DEF")
+        self.assertIn("активность DEF → DEF+CAST", result.changes_text)
+        # При 11:56 DEF=75, CAST=75, итого 150
+        self.assertEqual(activity.payment_kk, Decimal("150.00"))
+
+    def test_edit_changes_wave_time(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 21.56")
+        original = Activity.objects.get()
+        self.assertEqual(original.wave_start_time, time(21, 56))
+        self.assertEqual(original.payment_kk, Decimal("50.00"))
+
+        result = _process_edit("+1 | деф | Swettka | 12.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.wave_start_time, time(12, 56))
+        # Ставка для 12:56 = 75 (08:01-16:00), отличается от исходной 50 для 21:56
+        self.assertEqual(activity.payment_kk, Decimal("75.00"))
+        self.assertNotEqual(activity.payment_kk, original.payment_kk)
+        self.assertIn("начало волны 21:56 → 12:56", result.changes_text)
+
+    def test_edit_changes_amount(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+        original = Activity.objects.get()
+        self.assertEqual(original.amount, Decimal("1"))
+        self.assertEqual(original.payment_kk, Decimal("75.00"))
+
+        result = _process_edit("+0.5 | деф | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.amount, Decimal("0.5"))
+        # Для 11:56 ставка 75: было 75 (1 час), стало 37.5 (0.5 часа)
+        self.assertEqual(activity.payment_kk, Decimal("37.50"))
+        # DecimalField хранит 2 знака, поэтому отображается "1.00 → 0.5"
+        self.assertIn("время на волне 1.00 → 0.5", result.changes_text)
+
+    def test_edit_changes_multiple_fields(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 21.56")
+
+        result = _process_edit("+0.5 | фарм | Swettka | 12.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "FARM")
+        self.assertEqual(activity.amount, Decimal("0.5"))
+        self.assertEqual(activity.wave_start_time, time(12, 56))
+        self.assertEqual(activity.payment_kk, Decimal("0"))
+        self.assertIn("активность DEF → FARM", result.changes_text)
+        self.assertIn("время на волне 1.00 → 0.5", result.changes_text)
+        self.assertIn("начало волны 21:56 → 12:56", result.changes_text)
+
+    def test_edit_no_changes_returns_ignored(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56 | Первая волна")
+
+        result = _process_edit("+1 | деф | Swettka | 11.56 | Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_IGNORED)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertEqual(activity.amount, Decimal("1"))
+        tm = result.telegram_message
+        self.assertEqual(tm.edit_count, 0)
+
+    def test_edit_recalculates_payment_def_to_farm(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+        original = Activity.objects.get()
+        self.assertEqual(original.payment_kk, Decimal("75.00"))
+
+        result = _process_edit("+1 | фарм | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        self.assertEqual(Activity.objects.get().payment_kk, Decimal("0"))
+
+    def test_edit_recalculates_payment_farm_to_def(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | фарм | Swettka | 11.56")
+        original = Activity.objects.get()
+        self.assertEqual(original.payment_kk, Decimal("0"))
+
+        result = _process_edit("+1 | деф | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        self.assertEqual(Activity.objects.get().payment_kk, Decimal("75.00"))
+
+    def test_edit_stores_history(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56 | Первая волна")
+
+        result = _process_edit("+2 | деф | Swettka | 11.56 | Вторая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.EDIT_ACCEPTED)
+        tm = result.telegram_message
+        self.assertNotEqual(tm.original_text, "")
+        self.assertEqual(tm.original_text, "+1 | деф | Swettka | 11.56 | Первая волна")
+        self.assertEqual(tm.edit_count, 1)
+        self.assertTrue(tm.edit_history)
+        self.assertIn("+1 | деф | Swettka | 11.56 | Первая волна", tm.edit_history)
+
+    def test_edit_multiple_times(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 21.56")
+
+        r1 = _process_edit("+1 | фарм | Swettka | 21.56")
+        self.assertEqual(r1.status, ProcessResultStatus.EDIT_ACCEPTED)
+        r2 = _process_edit("+1 | деф | Swettka | 21.56")
+        self.assertEqual(r2.status, ProcessResultStatus.EDIT_ACCEPTED)
+        r3 = _process_edit("+1 | деф | Swettka | 12.56")
+        self.assertEqual(r3.status, ProcessResultStatus.EDIT_ACCEPTED)
+
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(activity.wave_start_time, time(12, 56))
+        tm = Activity.objects.get().telegram_message
+        self.assertEqual(tm.edit_count, 3)
+        self.assertGreaterEqual(len(tm.edit_history), 2)
+
+    def test_edit_invalid_text_sets_error(self):
+        Player.objects.create(nickname="Swettka")
+        _process("+1 | деф | Swettka | 11.56")
+        self.assertEqual(Activity.objects.get().activity_type, "DEF")
+
+        result = _process_edit("+abc | деф | Swettka | 11.56")
+
+        self.assertEqual(result.status, ProcessResultStatus.PROCESSING_ERROR)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertEqual(activity.amount, Decimal("1"))
+        self.assertEqual(result.telegram_message.edit_count, 0)
+
+    @patch("core.services.activity_service.notify_group_reply")
+    def test_edit_nick_mismatch_on_edit(self, mock_notify):
+        """Правка с несовпадающим ником на уже обработанном сообщении -> NICK_MISMATCH, Activity не меняется."""
+        Player.objects.create(nickname="Swettka", telegram_user_id=100)
+        first = _process("+1 | деф | Swettka | 11.56 | Первая волна", user_id=100)
+        self.assertEqual(first.status, ProcessResultStatus.ACTIVITY_CREATED)
+
+        result = _process_edit("+1 | деф | Swettkaa | 11.56 | Первая волна", user_id=100)
+        self.assertEqual(result.status, ProcessResultStatus.NICK_MISMATCH)
+        self.assertEqual(Activity.objects.count(), 1)
+        activity = Activity.objects.get()
+        self.assertEqual(activity.player.nickname, "Swettka")
+        self.assertEqual(activity.activity_type, "DEF")
+        self.assertEqual(result.telegram_message.edit_count, 0)
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        self.assertIn("Возможно вы ошиблись ником", args[1])
 
     def test_edit_without_existing_message_processes_as_new(self):
         Player.objects.create(nickname="Swettka")

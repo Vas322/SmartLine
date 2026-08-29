@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Optional, Tuple
 
 from django.db import transaction
+from django.utils import timezone
 
 from core.models import Activity, Player, ProcessingError, Registration, TelegramMessage
 from core.parsers import (
@@ -31,6 +32,7 @@ class ProcessResultStatus(str, Enum):
     DUPLICATE = "DUPLICATE"
     PROCESSING_ERROR = "PROCESSING_ERROR"
     EDIT_IGNORED = "EDIT_IGNORED"
+    EDIT_ACCEPTED = "EDIT_ACCEPTED"
     NICK_MISMATCH = "NICK_MISMATCH"
     REGISTRATION_CREATED = "REGISTRATION_CREATED"
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -42,6 +44,7 @@ class ProcessResult:
     telegram_message: Optional[TelegramMessage] = None
     activities: Optional[list] = None
     processing_error: Optional[ProcessingError] = None
+    changes_text: Optional[str] = None
 
 
 def get_or_create_telegram_message(
@@ -304,12 +307,96 @@ def process_telegram_edit(
             message_thread_id=message_thread_id,
         )
 
-    # уже засчитано -> не пересчитывать
+    # уже засчитано -> пересчитать с учётом правок
     if tm.status == TelegramMessage.Status.PROCESSED:
-        notify_group_reply(tm, "Сообщение уже учтено — правка игнорируется.")
+        # Парсим новый текст
+        try:
+            parsed = parse_activity_message(stripped)
+        except ParserError as exc:
+            logger.warning("Edit parse error chat_id=%s message_id=%s: %s", chat_id, message_id, exc)
+            return _create_processing_error(tm, str(exc))
+
+        # Находим существующую Activity (внутри транзакции, с блокировкой строки)
+        with transaction.atomic():
+            activity = Activity.objects.select_for_update().filter(telegram_message=tm).first()
+            if activity is None:
+                # Fallback: создаём как при ERROR->PROCESSED (resolve player, compute, create)
+                try:
+                    player, nick_changed, old_nick, is_new_player, mismatch = _resolve_player(parsed.nickname, user_id)
+                except ParserError as exc:
+                    return _create_processing_error(tm, str(exc))
+                if mismatch:
+                    tm.status = TelegramMessage.Status.ERROR
+                    tm.save(update_fields=["status"])
+                    notify_group_reply(tm, _nick_mismatch_text(username, player.nickname), message_thread_id=message_thread_id)
+                    return ProcessResult(status=ProcessResultStatus.NICK_MISMATCH, telegram_message=tm)
+                payment = _compute_payment(parsed)
+                activity = Activity.objects.create(
+                    player=player, telegram_message=tm, amount=parsed.amount,
+                    activity_type=parsed.activity_type, has_cast=parsed.has_cast,
+                    description=parsed.description, wave_start_time=parsed.wave_start, payment_kk=payment,
+                )
+                tm.status = TelegramMessage.Status.PROCESSED
+                tm.save(update_fields=["status"])
+                if nick_changed:
+                    notify_group_reply(tm, f"Ник изменён: {old_nick} → {player.nickname}")
+                elif is_new_player:
+                    notify_group_reply(tm, f"Зарегистрирован новый игрок! На {player.nickname} будет приходить оплата!")
+                return ProcessResult(status=ProcessResultStatus.ACTIVITY_CREATED, telegram_message=tm, activities=[activity])
+
+            # Проверка ника на правке: несовпадение -> уведомить, NICK_MISMATCH.
+            # Activity и tm.status НЕ меняются, т.к. Activity уже валидна и засчитана.
+            try:
+                player, nick_changed, old_nick, is_new_player, mismatch = _resolve_player(parsed.nickname, user_id)
+            except ParserError as exc:
+                return _create_processing_error(tm, str(exc))
+            if mismatch:
+                notify_group_reply(tm, _nick_mismatch_text(username, player.nickname), message_thread_id=message_thread_id)
+                return ProcessResult(status=ProcessResultStatus.NICK_MISMATCH, telegram_message=tm)
+
+            # Сравниваем и собираем изменения.
+            # Тип активности и признак каста объединяем в одну человекочитаемую
+            # метку "TYPE[+каст]", чтобы правка показывала "было -> стало" целиком.
+            changes = []
+            old_label = f"{activity.activity_type}{'+CAST' if activity.has_cast else ''}"
+            new_label = f"{parsed.activity_type}{'+CAST' if parsed.has_cast else ''}"
+            if old_label != new_label:
+                changes.append(f"активность {old_label} → {new_label}")
+            if activity.amount != parsed.amount:
+                changes.append(f"время на волне {activity.amount} → {parsed.amount}")
+            if activity.wave_start_time != parsed.wave_start:
+                old_t = activity.wave_start_time.strftime("%H:%M") if activity.wave_start_time else "—"
+                new_t = parsed.wave_start.strftime("%H:%M")
+                changes.append(f"начало волны {old_t} → {new_t}")
+
+            if not changes:
+                return ProcessResult(status=ProcessResultStatus.EDIT_IGNORED, telegram_message=tm)
+
+            if tm.edit_count == 0:
+                tm.original_text = tm.text
+            tm.edit_history.append(tm.text)
+            tm.text = stripped
+            tm.edit_count += 1
+            tm.message_date = message_date
+            tm.save(update_fields=["text", "original_text", "edit_history", "edit_count", "message_date"])
+
+            activity.activity_type = parsed.activity_type
+            activity.amount = parsed.amount
+            activity.has_cast = parsed.has_cast
+            activity.wave_start_time = parsed.wave_start
+            activity.payment_kk = _compute_payment(parsed)
+            activity.edited_at = timezone.now()
+            activity.save(update_fields=[
+                "activity_type", "amount", "has_cast", "wave_start_time", "payment_kk", "edited_at",
+            ])
+
+        changes_text = "; ".join(changes)
+        logger.info("Activity edit accepted chat_id=%s message_id=%s changes=%s", chat_id, message_id, changes_text)
         return ProcessResult(
-            status=ProcessResultStatus.EDIT_IGNORED,
+            status=ProcessResultStatus.EDIT_ACCEPTED,
             telegram_message=tm,
+            activities=[activity],
+            changes_text=changes_text,
         )
 
     # было ERROR -> переобработать
