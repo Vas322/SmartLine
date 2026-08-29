@@ -11,7 +11,10 @@ from core.services.activity_service import (
     process_registration_message,
     ProcessResultStatus,
 )
-from core.services.notification_service import notify_activity_reaction
+from core.services.notification_service import (
+    notify_activity_reaction,
+    notify_edit_accepted,
+)
 from core.services import schedule_mirror_service
 
 logger = logging.getLogger(__name__)
@@ -205,6 +208,8 @@ def handle_update(update: dict) -> None:
 
         if result.status in (ProcessResultStatus.ACTIVITY_CREATED, ProcessResultStatus.REGISTRATION_CREATED):
             notify_activity_reaction(result.telegram_message, "🎉")
+        if result.status == ProcessResultStatus.EDIT_ACCEPTED:
+            notify_edit_accepted(result.telegram_message, result.changes_text, message_thread_id)
         logger.info(
             "Processed message chat_id=%s message_id=%s status=%s",
             chat_id,

@@ -34,6 +34,9 @@ class TelegramMessage(models.Model):
     telegram_user_id = models.BigIntegerField(null=True, blank=True)
     telegram_username = models.CharField(max_length=64, blank=True)
     text = models.TextField()
+    original_text = models.TextField(blank=True, default="", help_text="Оригинальный текст до первого редактирования")
+    edit_count = models.PositiveIntegerField(default=0, help_text="Количество редактирований")
+    edit_history = models.JSONField(default=list, blank=True, help_text="Цепочка предыдущих текстов сообщения")
     message_date = models.DateTimeField()
     status = models.CharField(
         max_length=16,
@@ -110,6 +113,7 @@ class Activity(models.Model):
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True, help_text="Время последнего редактирования")
 
     def __str__(self) -> str:
         return f"{self.player_id} {self.activity_type} {self.amount}"

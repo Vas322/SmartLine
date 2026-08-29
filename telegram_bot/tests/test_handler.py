@@ -198,6 +198,41 @@ class HandleUpdateTests(SimpleTestCase):
             "+1 | деф | Swettka | Первая волна",
         )
 
+    @mock.patch("telegram_bot.handler.notify_edit_accepted")
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_edit",
+        return_value=ProcessResult(
+            status=ProcessResultStatus.EDIT_ACCEPTED,
+            telegram_message=mock.MagicMock(),
+            changes_text="активность DEF → FARM",
+        ),
+    )
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_edit_accepted_calls_notify_edit_accepted(
+        self, mock_process, mock_edit, mock_notify
+    ):
+        handle_update(_make_edit_update())
+
+        mock_notify.assert_called_once()
+        args, _ = mock_notify.call_args
+        self.assertIn("активность DEF → FARM", args[1])
+
+    @mock.patch("telegram_bot.handler.notify_edit_accepted")
+    @mock.patch(
+        "telegram_bot.handler.process_telegram_edit",
+        return_value=ProcessResult(
+            status=ProcessResultStatus.EDIT_IGNORED,
+            telegram_message=mock.MagicMock(),
+        ),
+    )
+    @mock.patch("telegram_bot.handler.process_telegram_message")
+    def test_edit_ignored_does_not_notify(
+        self, mock_process, mock_edit, mock_notify
+    ):
+        handle_update(_make_edit_update())
+
+        mock_notify.assert_not_called()
+
 
 class ScheduleMirrorRoutingTests(SimpleTestCase):
     """Tests that schedule mirror messages are routed correctly."""

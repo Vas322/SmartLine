@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 _ERROR_TEMPLATE_HINT = "+время на волне | тип | ники | время начала волны | описание"
 _ERROR_EXAMPLE_HINT = "+1 | деф+каст | Swettka | 11.56 | Деф и каст"
 _ERROR_CTA = "Просьба отредактировать свое сообщение по шаблону. Да прибудет с тобой сила, спартанец!"
+EDIT_ACCEPTED_PREFIX = "✅ Правки приняты. Исправлено: "
 
 _TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
@@ -109,6 +110,12 @@ def notify_group_reply(telegram_message, text: str, message_thread_id: Optional[
         )
         return False
     return True
+
+
+def notify_edit_accepted(telegram_message, changes_text: str, message_thread_id: Optional[int] = None) -> bool:
+    """Ответ в группу о принятой правке активности."""
+    text = f"{EDIT_ACCEPTED_PREFIX}{changes_text}"
+    return notify_group_reply(telegram_message, text, message_thread_id=message_thread_id)
 
 
 def notify_activity_reaction(telegram_message, emoji: str = "🎉") -> bool:
