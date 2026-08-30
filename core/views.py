@@ -11,6 +11,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib import messages
 from django.core.mail import send_mail
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
@@ -206,39 +207,38 @@ def player_detail(request, pk: int):
 
     summary = {
         "total_hours": total_hours,
-        "adena": totals["payment"] or Decimal("0",),
+        "adena": totals["payment"] or Decimal("0"),
         "def_hours": def_hours,
         "farm_hours": farm_hours,
         "percent": _percent(total_hours, days_in_period),
     }
 
-    daily_rows = (
+    sort = request.GET.get("sort", "desc")
+    order = "created_at" if sort == "asc" else "-created_at"
+    activities_qs = (
         Activity.objects.filter(
             player=player, created_at__range=(date_from, date_to)
         )
-        .annotate(day=TruncDate("created_at"))
-        .values("day")
-        .annotate(hours=Sum("amount"))
+        .select_related("telegram_message")
+        .order_by(order)
     )
-    hours_by_day = {
-        row["day"]: row["hours"] or Decimal("0") for row in daily_rows
-    }
+    paginator = Paginator(activities_qs, 50)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
 
-    daily = []
-    current = date_from.date()
-    last = date_to.date()
-    while current <= last:
-        daily.append((current, hours_by_day.get(current, Decimal("0"))))
-        current += timedelta(days=1)
+    cast_count = Activity.objects.filter(
+        player=player, created_at__range=(date_from, date_to), has_cast=True
+    ).count()
 
     context = {
         "form": form,
         "player": player,
         "date_from": date_from,
         "date_to": date_to,
-        "days_in_period": days_in_period,
         "summary": summary,
-        "daily": daily,
+        "page_obj": page_obj,
+        "sort": sort,
+        "cast_count": cast_count,
     }
     return render(request, "core/player_detail.html", context)
 
