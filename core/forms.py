@@ -179,7 +179,7 @@ class PeriodForm(forms.Form):
     def _get_period_dates(self):
         """Return (start_date, end_date) as date objects for the chosen period."""
         if self.is_valid():
-            period = self.cleaned_data.get("period") or "today"
+            period = self.cleaned_data.get("period") or self.initial.get("period") or "today"
             date_from = self.cleaned_data.get("date_from")
             date_to = self.cleaned_data.get("date_to")
         else:

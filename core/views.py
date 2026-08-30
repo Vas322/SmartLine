@@ -180,6 +180,23 @@ def player_detail(request, pk: int):
     date_from, date_to = form.get_date_range()
     days_in_period = form.get_days_in_period()
 
+    if form.is_valid():
+        applied_period = form.cleaned_data.get("period") or form.initial.get("period") or "month"
+        applied_date_from = (
+            form.cleaned_data["date_from"].isoformat()
+            if form.cleaned_data.get("date_from")
+            else ""
+        )
+        applied_date_to = (
+            form.cleaned_data["date_to"].isoformat()
+            if form.cleaned_data.get("date_to")
+            else ""
+        )
+    else:
+        applied_period = form.initial.get("period") or "month"
+        applied_date_from = ""
+        applied_date_to = ""
+
     totals = Activity.objects.filter(
         player=player, created_at__range=(date_from, date_to)
     ).aggregate(
@@ -239,6 +256,9 @@ def player_detail(request, pk: int):
         "page_obj": page_obj,
         "sort": sort,
         "cast_count": cast_count,
+        "applied_period": applied_period,
+        "applied_date_from": applied_date_from,
+        "applied_date_to": applied_date_to,
     }
     return render(request, "core/player_detail.html", context)
 

@@ -1,4 +1,5 @@
 """Tests for the Smartline web interface."""
+import re
 from datetime import time, timedelta
 from decimal import Decimal
 from unittest import mock
@@ -196,6 +197,136 @@ class WebInterfaceTests(TestCase):
         )
         content_asc = response_asc.content.decode()
         self.assertLess(content_asc.index("старое"), content_asc.index("новое"))
+
+    def test_player_detail_sort_keeps_default_period(self):
+        """Sorting with no period in URL keeps the default month period, not today."""
+        from datetime import timedelta
+        self._login()
+        player = self.player
+        # активность за вчера — попадает в месяц, но НЕ в "today"
+        yesterday_tm = TelegramMessage.objects.create(
+            telegram_chat_id=10, telegram_message_id=9401,
+            text="+1 | деф | Yesterday | вчера",
+            original_text="+1 | деф | Yesterday | вчера",
+            message_date=timezone.now() - timedelta(days=1),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        act = Activity.objects.create(
+            player=player, telegram_message=yesterday_tm,
+            amount=Decimal("1"), activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("75.00"),
+        )
+        # смещаем created_at на сутки назад, чтобы активность была именно "вчера"
+        Activity.objects.filter(pk=act.pk).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+        # переход по ссылке сортировки без period — период должен остаться месяцем
+        response = self.client.get(
+            reverse("player_detail", args=[player.pk]) + "?sort=asc"
+        )
+        content = response.content.decode()
+        self.assertIn("вчера", content)
+        # ссылка сортировки должна содержать период=month (значение по умолчанию)
+        self.assertIn("period=month", content)
+
+    def test_player_detail_sort_keeps_custom_period_and_dates(self):
+        """Sorting after choosing a custom period keeps period=custom and both dates."""
+        self._login()
+        url = reverse("player_detail", args=[self.player.pk])
+        # Применить произвольный период с датами
+        r1 = self.client.get(
+            url,
+            {"period": "custom", "date_from": "2026-08-01", "date_to": "2026-08-30"},
+        )
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.context["applied_period"], "custom")
+        content1 = r1.content.decode()
+        # Ссылка сортировки должна содержать период=custom и обе даты в ISO-формате
+        m = re.search(r'href="(\?period=[^"]*)"', content1)
+        self.assertIsNotNone(m, "sort link not found")
+        sort_link = m.group(1).replace("&amp;", "&")
+        self.assertIn("period=custom", sort_link)
+        self.assertIn("date_from=2026-08-01", sort_link)
+        self.assertIn("date_to=2026-08-30", sort_link)
+
+        # Клик по сортировке «Дата» — период и даты сохраняются
+        r2 = self.client.get(url + sort_link)
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.context["applied_period"], "custom")
+        self.assertEqual(r2.context["applied_date_from"], "2026-08-01")
+        self.assertEqual(r2.context["applied_date_to"], "2026-08-30")
+        self.assertTrue(r2.context["form"].is_valid())
+        content2 = r2.content.decode()
+        self.assertIn("period=custom", content2)
+        self.assertIn("date_from=2026-08-01", content2)
+        self.assertIn("date_to=2026-08-30", content2)
+
+    def test_player_detail_pagination_keeps_custom_period(self):
+        """Clicking pagination after choosing a custom period keeps period and dates."""
+        self._login()
+        player = self.player
+        for i in range(55):
+            tm = TelegramMessage.objects.create(
+                telegram_chat_id=10,
+                telegram_message_id=9900 + i,
+                text=f"+1 | деф | Test | #{i}",
+                message_date=timezone.now(),
+                status=TelegramMessage.Status.PROCESSED,
+            )
+            Activity.objects.create(
+                player=player,
+                telegram_message=tm,
+                amount=Decimal("1"),
+                activity_type=Activity.ActivityType.DEF,
+                has_cast=False,
+                payment_kk=Decimal("75.00"),
+            )
+        url = reverse("player_detail", args=[player.pk])
+        # Применить произвольный период с датами
+        r1 = self.client.get(
+            url,
+            {"period": "custom", "date_from": "2026-08-01", "date_to": "2026-08-30"},
+        )
+        content1 = r1.content.decode()
+        self.assertIn("period=custom", content1)
+        self.assertIn("date_from=2026-08-01", content1)
+        self.assertIn("date_to=2026-08-30", content1)
+        # Ссылка «Вперёд» (пагинация) сохраняет период и даты
+        self.assertIn("page=2", content1)
+        m = re.search(
+            r'href="(\?period=custom&date_from=2026-08-01&date_to=2026-08-30&sort=[^"]*&page=2)"',
+            content1,
+        )
+        self.assertIsNotNone(m, "pagination next link with custom period not found")
+        next_link = m.group(1).replace("&amp;", "&")
+        self.assertIn("period=custom", next_link)
+        self.assertIn("date_from=2026-08-01", next_link)
+        self.assertIn("date_to=2026-08-30", next_link)
+
+        # Клик по «Вперёд» — период и даты сохраняются
+        r2 = self.client.get(url + next_link)
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.context["applied_period"], "custom")
+        self.assertEqual(r2.context["applied_date_from"], "2026-08-01")
+        self.assertEqual(r2.context["applied_date_to"], "2026-08-30")
+        self.assertIn("Стр. 2 из 2", r2.content.decode())
+
+    def test_player_detail_sort_keeps_explicit_period(self):
+        """Sorting with an explicitly chosen today/week/month period keeps that period."""
+        self._login()
+        url = reverse("player_detail", args=[self.player.pk])
+        for period in ["today", "week", "month"]:
+            r1 = self.client.get(url, {"period": period})
+            self.assertEqual(r1.status_code, 200, period)
+            self.assertEqual(r1.context["applied_period"], period, period)
+            # Ссылка сортировки содержит выбранный период
+            content1 = r1.content.decode()
+            self.assertIn(f"period={period}", content1)
+            # Клик по сортировке — период не сбрасывается
+            r2 = self.client.get(url, {"period": period, "sort": "asc"})
+            self.assertEqual(r2.status_code, 200, period)
+            self.assertEqual(r2.context["applied_period"], period, period)
+            self.assertTrue(r2.context["form"].is_valid(), period)
 
     def test_player_detail_cast_block(self):
         """CAST stat card shows count of has_cast activities."""
