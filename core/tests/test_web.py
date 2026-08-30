@@ -113,7 +113,141 @@ class WebInterfaceTests(TestCase):
             reverse("player_detail", args=[self.player.pk])
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn("По дням", response.content.decode())
+        self.assertIn("Активности", response.content.decode())
+
+    def test_player_detail_table_columns(self):
+        """Table shows all required columns."""
+        self._login()
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        content = response.content.decode()
+        for col in ["#", "Дата", "Тип", "Начало волны", "Часов", "Оплата, кк", "Сообщение"]:
+            self.assertIn(col, content)
+
+    def test_player_detail_pagination(self):
+        """55 activities on one player → 2 pages."""
+        self._login()
+        player = self.player
+        for i in range(55):
+            tm = TelegramMessage.objects.create(
+                telegram_chat_id=10,
+                telegram_message_id=9001 + i,
+                text=f"+1 | деф | Test | #{i}",
+                message_date=timezone.now(),
+                status=TelegramMessage.Status.PROCESSED,
+            )
+            Activity.objects.create(
+                player=player,
+                telegram_message=tm,
+                amount=Decimal("1"),
+                activity_type=Activity.ActivityType.DEF,
+                has_cast=False,
+                payment_kk=Decimal("75.00"),
+            )
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        content = response.content.decode()
+        self.assertIn("Стр. 1 из 2", content)
+        self.assertIn("Вперёд", content)
+
+        response_page2 = self.client.get(
+            reverse("player_detail", args=[self.player.pk]) + "?page=2"
+        )
+        self.assertEqual(response_page2.status_code, 200)
+        self.assertIn("Стр. 2 из 2", response_page2.content.decode())
+
+    def test_player_detail_sort_default_desc_and_toggle(self):
+        """Default order is descending by date; clicking Дата toggles."""
+        self._login()
+        player = self.player
+        old_tm = TelegramMessage.objects.create(
+            telegram_chat_id=10, telegram_message_id=9101,
+            text="+1 | деф | Old | старое",
+            original_text="+1 | деф | Old | старое",
+            message_date=timezone.now() - timedelta(days=2),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        new_tm = TelegramMessage.objects.create(
+            telegram_chat_id=10, telegram_message_id=9102,
+            text="+1 | деф | New | новое",
+            original_text="+1 | деф | New | новое",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=player, telegram_message=old_tm,
+            amount=Decimal("1"), activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("75.00"),
+        )
+        Activity.objects.create(
+            player=player, telegram_message=new_tm,
+            amount=Decimal("1"), activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("75.00"),
+        )
+
+        response = self.client.get(reverse("player_detail", args=[player.pk]))
+        content = response.content.decode()
+        self.assertLess(content.index("новое"), content.index("старое"))
+
+        response_asc = self.client.get(
+            reverse("player_detail", args=[player.pk]) + "?sort=asc"
+        )
+        content_asc = response_asc.content.decode()
+        self.assertLess(content_asc.index("старое"), content_asc.index("новое"))
+
+    def test_player_detail_cast_block(self):
+        """CAST stat card shows count of has_cast activities."""
+        self._login()
+        player = self.player
+        for i in range(3):
+            tm = TelegramMessage.objects.create(
+                telegram_chat_id=10, telegram_message_id=9201 + i,
+                text=f"+1 | деф | C{i} | каст",
+                message_date=timezone.now(),
+                status=TelegramMessage.Status.PROCESSED,
+            )
+            Activity.objects.create(
+                player=player, telegram_message=tm,
+                amount=Decimal("1"), activity_type=Activity.ActivityType.DEF,
+                has_cast=True, payment_kk=Decimal("75.00"),
+            )
+        response = self.client.get(reverse("player_detail", args=[player.pk]))
+        content = response.content.decode()
+        self.assertIn('<h3>CAST</h3><div class="value">3</div>', content)
+
+    def test_player_detail_cast_type_no_duplicate(self):
+        """CAST activity type with has_cast does not render CAST+CAST."""
+        self._login()
+        player = self.player
+        tm = TelegramMessage.objects.create(
+            telegram_chat_id=10, telegram_message_id=9301,
+            text="+1 | каст | Test | каст",
+            original_text="+1 | каст | Test | каст",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        Activity.objects.create(
+            player=player, telegram_message=tm,
+            amount=Decimal("1"), activity_type=Activity.ActivityType.CAST,
+            has_cast=True, payment_kk=Decimal("0.00"),
+        )
+        response = self.client.get(reverse("player_detail", args=[player.pk]))
+        content = response.content.decode()
+        self.assertNotIn("CAST+CAST", content)
+
+    def test_player_detail_empty_period(self):
+        """No activities for the period shows empty message."""
+        self._login()
+        Player.objects.create(nickname="EmptyPlayer")
+        # Use a date range that has no activities
+        response = self.client.get(
+            reverse("player_detail", args=[Player.objects.get(nickname="EmptyPlayer").pk]),
+            {"period": "custom", "date_from": "2020-01-01", "date_to": "2020-01-01"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Записей за период нет.", response.content.decode())
 
     def test_dashboard_shows_percent_and_columns(self):
         self._login()
