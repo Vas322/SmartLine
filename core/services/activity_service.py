@@ -165,6 +165,7 @@ def process_telegram_message(
         "telegram_user_id": user_id,
         "telegram_username": username,
         "text": stripped,
+        "original_text": stripped,
         "message_date": message_date,
     }
 
