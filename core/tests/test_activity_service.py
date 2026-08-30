@@ -68,6 +68,16 @@ class ProcessTelegramMessageTests(TestCase):
             TelegramMessage.Status.PROCESSED,
         )
 
+    def test_valid_message_sets_original_text(self):
+        Player.objects.create(nickname="Swettka")
+        result = _process("+1 | деф | Swettka | 11.56 | Первая волна")
+
+        self.assertEqual(result.status, ProcessResultStatus.ACTIVITY_CREATED)
+        tm = result.telegram_message
+        self.assertEqual(tm.text, "+1 | деф | Swettka | 11.56 | Первая волна")
+        self.assertEqual(tm.original_text, tm.text)
+        self.assertEqual(tm.edit_count, 0)
+
     def test_duplicate_message_returns_duplicate(self):
         Player.objects.create(nickname="Swettka")
         first = _process("+1 | деф | Swettka | 11.56 | Первая волна")
