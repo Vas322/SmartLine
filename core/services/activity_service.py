@@ -167,6 +167,7 @@ def process_telegram_message(
         "text": stripped,
         "original_text": stripped,
         "message_date": message_date,
+        "message_thread_id": message_thread_id,
     }
 
     with transaction.atomic():
@@ -405,23 +406,24 @@ def process_telegram_edit(
         ProcessingError.objects.filter(telegram_message=tm).delete()
         tm.text = stripped
         tm.message_date = message_date
+        tm.message_thread_id = message_thread_id
         try:
             parsed = parse_activity_message(stripped)
         except ParserError as exc:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             return _create_processing_error(tm, str(exc))
 
         try:
             player, nick_changed, old_nick, is_new_player, mismatch = _resolve_player(parsed.nickname, user_id)
         except ParserError as exc:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             return _create_processing_error(tm, str(exc))
 
         if mismatch:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             notify_group_reply(
                 tm,
                 _nick_mismatch_text(username, player.nickname),
@@ -445,7 +447,7 @@ def process_telegram_edit(
             payment_kk=payment,
         )
         tm.status = TelegramMessage.Status.PROCESSED
-        tm.save(update_fields=["status", "text", "message_date"])
+        tm.save(update_fields=["status", "text", "message_date", "message_thread_id"])
 
     if nick_changed:
         notify_group_reply(tm, f"Ник изменён: {old_nick} → {player.nickname}")
@@ -555,6 +557,7 @@ def process_registration_message(
         "telegram_username": username,
         "text": stripped,
         "message_date": message_date,
+        "message_thread_id": message_thread_id,
     }
 
     with transaction.atomic():
@@ -704,13 +707,14 @@ def process_registration_edit(
         ProcessingError.objects.filter(telegram_message=tm).delete()
         tm.text = stripped
         tm.message_date = message_date
+        tm.message_thread_id = message_thread_id
 
         # Parse registration message
         try:
             parsed = parse_registration_message(stripped)
         except ParserError as exc:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             logger.warning(
                 "Registration edit parser error chat_id=%s message_id=%s: %s",
                 chat_id,
@@ -722,7 +726,7 @@ def process_registration_edit(
         # Check for photo
         if not has_photo:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             return _create_registration_error(
                 tm,
                 "registration_no_screenshot",
@@ -733,7 +737,7 @@ def process_registration_edit(
         player, _, _, _, _ = _resolve_registration_player(user_id)
         if player is None:
             tm.status = TelegramMessage.Status.ERROR
-            tm.save(update_fields=["text", "message_date", "status"])
+            tm.save(update_fields=["text", "message_date", "message_thread_id", "status"])
             return _create_registration_error(
                 tm,
                 "registration_unregistered_sender",
@@ -755,7 +759,7 @@ def process_registration_edit(
         )
 
         tm.status = TelegramMessage.Status.PROCESSED
-        tm.save(update_fields=["status", "text", "message_date"])
+        tm.save(update_fields=["status", "text", "message_date", "message_thread_id"])
 
         logger.info(
             "Registration created (edit) chat_id=%s message_id=%s player=%s clans=%s payment=%s",

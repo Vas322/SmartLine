@@ -200,15 +200,23 @@ class WebInterfaceTests(TestCase):
 
     def test_player_detail_sort_keeps_default_period(self):
         """Sorting with no period in URL keeps the default month period, not today."""
-        from datetime import timedelta
         self._login()
         player = self.player
-        # активность за вчера — попадает в месяц, но НЕ в "today"
+        # активность в текущем календарном месяце — попадает в "month", но НЕ в "today"
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        # если «вчера» — уже прошлый месяц (сегодня 1-е число), берём первый день
+        # текущего месяца, чтобы активность гарантированно попала в дефолтный
+        # период "month" (границы месяца как в PeriodForm._get_period_dates)
+        target_date = (
+            yesterday if yesterday.month == today.month else today.replace(day=1)
+        )
+        days_back = (today - target_date).days
         yesterday_tm = TelegramMessage.objects.create(
             telegram_chat_id=10, telegram_message_id=9401,
             text="+1 | деф | Yesterday | вчера",
             original_text="+1 | деф | Yesterday | вчера",
-            message_date=timezone.now() - timedelta(days=1),
+            message_date=timezone.now() - timedelta(days=days_back),
             status=TelegramMessage.Status.PROCESSED,
         )
         act = Activity.objects.create(
@@ -216,9 +224,10 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1"), activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("75.00"),
         )
-        # смещаем created_at на сутки назад, чтобы активность была именно "вчера"
+        # смещаем created_at на то же число дней назад, чтобы активность была
+        # в текущем календарном месяце (входит в "month", но не в "today")
         Activity.objects.filter(pk=act.pk).update(
-            created_at=timezone.now() - timedelta(days=1)
+            created_at=timezone.now() - timedelta(days=days_back)
         )
         # переход по ссылке сортировки без period — период должен остаться месяцем
         response = self.client.get(
@@ -281,34 +290,43 @@ class WebInterfaceTests(TestCase):
                 has_cast=False,
                 payment_kk=Decimal("75.00"),
             )
+        # Период = весь текущий месяц: он гарантированно покрывает активности,
+        # создаваемые в тесте «сейчас» (created_at = timezone.now()).
+        today = timezone.localdate()
+        date_from = today.replace(day=1)
+        next_month = date_from.replace(day=28) + timedelta(days=4)
+        date_to = next_month.replace(day=1) - timedelta(days=1)
+        date_from_str = date_from.isoformat()
+        date_to_str = date_to.isoformat()
+
         url = reverse("player_detail", args=[player.pk])
         # Применить произвольный период с датами
         r1 = self.client.get(
             url,
-            {"period": "custom", "date_from": "2026-08-01", "date_to": "2026-08-30"},
+            {"period": "custom", "date_from": date_from_str, "date_to": date_to_str},
         )
         content1 = r1.content.decode()
         self.assertIn("period=custom", content1)
-        self.assertIn("date_from=2026-08-01", content1)
-        self.assertIn("date_to=2026-08-30", content1)
+        self.assertIn(f"date_from={date_from_str}", content1)
+        self.assertIn(f"date_to={date_to_str}", content1)
         # Ссылка «Вперёд» (пагинация) сохраняет период и даты
         self.assertIn("page=2", content1)
         m = re.search(
-            r'href="(\?period=custom&date_from=2026-08-01&date_to=2026-08-30&sort=[^"]*&page=2)"',
+            rf'href="(\?period=custom&date_from={date_from_str}&date_to={date_to_str}&sort=[^"]*&page=2)"',
             content1,
         )
         self.assertIsNotNone(m, "pagination next link with custom period not found")
         next_link = m.group(1).replace("&amp;", "&")
         self.assertIn("period=custom", next_link)
-        self.assertIn("date_from=2026-08-01", next_link)
-        self.assertIn("date_to=2026-08-30", next_link)
+        self.assertIn(f"date_from={date_from_str}", next_link)
+        self.assertIn(f"date_to={date_to_str}", next_link)
 
         # Клик по «Вперёд» — период и даты сохраняются
         r2 = self.client.get(url + next_link)
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.context["applied_period"], "custom")
-        self.assertEqual(r2.context["applied_date_from"], "2026-08-01")
-        self.assertEqual(r2.context["applied_date_to"], "2026-08-30")
+        self.assertEqual(r2.context["applied_date_from"], date_from_str)
+        self.assertEqual(r2.context["applied_date_to"], date_to_str)
         self.assertIn("Стр. 2 из 2", r2.content.decode())
 
     def test_player_detail_sort_keeps_explicit_period(self):
@@ -1363,3 +1381,129 @@ class StaffAccessTests(TestCase):
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("/player/", response.content.decode())
+
+
+class TelegramSettingsAdminTests(TestCase):
+    """Staff (КЛ) должен иметь возможность управлять группами (и темами внутри них)."""
+
+    def setUp(self):
+        from core.models import TelegramSettings
+
+        self.settings = TelegramSettings.objects.create(
+            name="Основная группа",
+            group_chat_id=-1001234567890,
+            is_active=True,
+        )
+        self.staff_user = User.objects.create_user(
+            username="kl", password="test-password-123", is_staff=True
+        )
+        self.non_staff_user = User.objects.create_user(
+            username="player", password="test-password-123", is_staff=False
+        )
+
+    def test_staff_can_open_change_form_for_existing_group(self):
+        """Staff (is_staff) видит change/ без 403 даже без явных прав на change."""
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.get(
+            reverse("admin:core_telegramsettings_change", args=[self.settings.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_staff_change_form_contains_group_fields(self):
+        """Форма change содержит поля name, group_chat_id и is_active."""
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.get(
+            reverse("admin:core_telegramsettings_change", args=[self.settings.pk])
+        )
+        content = response.content.decode()
+        self.assertIn("id_name", content)
+        self.assertIn("id_group_chat_id", content)
+        self.assertIn("id_is_active", content)
+
+    def test_staff_change_form_shows_topics_inline(self):
+        """Инлайн тем группы присутствует на форме change группы."""
+        from core.models import TelegramTopic
+
+        TelegramTopic.objects.create(
+            name="FORTS", thread_id=12, is_active=True, group=self.settings
+        )
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.get(
+            reverse("admin:core_telegramsettings_change", args=[self.settings.pk])
+        )
+        content = response.content.decode()
+        self.assertIn("FORTS", content)
+
+    def test_non_staff_cannot_open_change_form(self):
+        """Обычный пользователь (не staff) не имеет доступа к change/.
+
+        Django admin для неавторизованного в админке пользователя
+        перенаправляет на login страницу админки (302), а не отдаёт 403.
+        """
+        self.client.login(username="player", password="test-password-123")
+        response = self.client.get(
+            reverse("admin:core_telegramsettings_change", args=[self.settings.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)
+
+    def test_staff_can_save_group(self):
+        """Staff может сохранить изменённую группу (POST не 403)."""
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.post(
+            reverse("admin:core_telegramsettings_change", args=[self.settings.pk]),
+            {
+                "name": "Основная группа",
+                "group_chat_id": "-1009876543210",
+                "is_active": "on",
+                "topics-TOTAL_FORMS": "0",
+                "topics-INITIAL_FORMS": "0",
+                "topics-MIN_NUM_FORMS": "0",
+                "topics-MAX_NUM_FORMS": "1000",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.settings.refresh_from_db()
+        self.assertEqual(self.settings.group_chat_id, -1009876543210)
+
+    def test_staff_can_add_group(self):
+        """Staff может создать новую группу (has_add_permission=True)."""
+        from core.models import TelegramSettings
+
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.post(
+            reverse("admin:core_telegramsettings_add"),
+            {
+                "name": "Вторая группа",
+                "group_chat_id": "-1005556667777",
+                "is_active": "",
+                "topics-TOTAL_FORMS": "0",
+                "topics-INITIAL_FORMS": "0",
+                "topics-MIN_NUM_FORMS": "0",
+                "topics-MAX_NUM_FORMS": "1000",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            TelegramSettings.objects.filter(name="Вторая группа").exists()
+        )
+
+    def test_only_one_active_group_in_admin(self):
+        """Попытка сделать две активные группы через админку отклоняется (констрейнт БД)."""
+        from core.models import TelegramSettings
+
+        self.client.login(username="kl", password="test-password-123")
+        response = self.client.post(
+            reverse("admin:core_telegramsettings_add"),
+            {
+                "name": "Конфликтная группа",
+                "group_chat_id": "-1005556667778",
+                "is_active": "on",
+                "topics-TOTAL_FORMS": "1",
+                "topics-INITIAL_FORMS": "0",
+                "topics-MIN_NUM_FORMS": "0",
+                "topics-MAX_NUM_FORMS": "1000",
+            },
+        )
+        # Новая активная группа не сохраняется (конфликт с существующей активной).
+        self.assertEqual(TelegramSettings.objects.filter(is_active=True).count(), 1)

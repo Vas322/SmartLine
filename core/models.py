@@ -38,6 +38,12 @@ class TelegramMessage(models.Model):
     edit_count = models.PositiveIntegerField(default=0, help_text="Количество редактирований")
     edit_history = models.JSONField(default=list, blank=True, help_text="Цепочка предыдущих текстов сообщения")
     message_date = models.DateTimeField()
+    message_thread_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Тема",
+        help_text="message_thread_id форумной темы, из которой пришло сообщение (если есть).",
+    )
     status = models.CharField(
         max_length=16,
         choices=Status.choices,
@@ -55,6 +61,168 @@ class TelegramMessage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.telegram_chat_id}:{self.telegram_message_id}"
+
+
+class OutgoingMessage(models.Model):
+    """Исходящее сообщение, отправленное из веб-интерфейса в Telegram."""
+
+    class Status(models.TextChoices):
+        SENT = "SENT", "Отправлено"
+        ERROR = "ERROR", "Ошибка"
+        PENDING = "PENDING", "В очереди"
+
+    telegram_chat_id = models.BigIntegerField(
+        verbose_name="ID чата",
+    )
+    telegram_message_id = models.BigIntegerField(
+        verbose_name="ID сообщения в Telegram",
+        help_text="ID, присвоенный Telegram при отправке.",
+    )
+    text = models.TextField(
+        verbose_name="Текст",
+    )
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="outgoing_messages",
+        verbose_name="Отправил",
+    )
+    sent_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Отправлено",
+    )
+    reply_to_message_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="ID исходного сообщения",
+        help_text="ID сообщения, на которое дан ответ (reply).",
+    )
+    reply_to_text = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Текст исходного сообщения",
+    )
+    topic_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Тема",
+        help_text="Название темы, в которую отправлено сообщение (для аудита).",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.SENT,
+        verbose_name="Статус",
+    )
+    error_text = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Текст ошибки",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Создано",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Исходящее сообщение"
+        verbose_name_plural = "Исходящие сообщения"
+
+    def __str__(self) -> str:
+        return f"{self.telegram_chat_id}:{self.telegram_message_id} ({self.status})"
+
+
+class TelegramTopic(models.Model):
+    """Форумная тема группы для выбора при отправке нового сообщения."""
+
+    group = models.ForeignKey(
+        "TelegramSettings",
+        on_delete=models.CASCADE,
+        related_name="topics",
+        verbose_name="Группа",
+    )
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название темы",
+    )
+    thread_id = models.BigIntegerField(
+        verbose_name="ID темы в Telegram",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Активна",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Создано",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Обновлено",
+    )
+
+    class Meta:
+        verbose_name = "Телеграм-тема"
+        verbose_name_plural = "Телеграм-темы"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "name"],
+                name="uniq_topic_name_per_group",
+            ),
+            models.UniqueConstraint(
+                fields=["group", "thread_id"],
+                name="uniq_topic_thread_per_group",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class TelegramSettings(models.Model):
+    """Группа Telegram, в которую отправляются новые сообщения из веб-интерфейса."""
+
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название группы",
+    )
+    group_chat_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name="ID группы в Telegram",
+        help_text="Числовой ID группы Telegram (например, -1001234567890), в которую отправляются новые сообщения из веб-интерфейса.",
+    )
+    is_active = models.BooleanField(
+        default=False,
+        verbose_name="Активная группа",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Создано",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Обновлено",
+    )
+
+    class Meta:
+        verbose_name = "Группа"
+        verbose_name_plural = "Группы"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=models.Q(is_active=True),
+                name="uniq_active_telegram_group",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Rate(models.Model):

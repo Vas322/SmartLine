@@ -1,6 +1,7 @@
 """Thin views for the Smartline web interface."""
 from datetime import timedelta
 from decimal import Decimal
+import json
 import logging
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 
@@ -15,7 +16,7 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
@@ -39,6 +40,7 @@ from core.models import (
     Activity,
     CastRate,
     Instruction,
+    OutgoingMessage,
     Player,
     ProcessingError,
     Rate,
@@ -46,8 +48,10 @@ from core.models import (
     RegistrationRate,
     ScheduleMirror,
     TelegramMessage,
+    TelegramSettings,
+    TelegramTopic,
 )
-from core.services import schedule_mirror_service
+from core.services import messaging_service, schedule_mirror_service
 
 
 def _percent(total_hours: Decimal, days_in_period: int) -> Decimal:
@@ -321,14 +325,152 @@ def activities(request):
     )
 
 
+def _active_group_topics():
+    """Темы активной группы для выбора при отправке нового сообщения."""
+    active = TelegramSettings.objects.filter(is_active=True).first()
+    if active is None:
+        return []
+    return active.topics.filter(is_active=True).order_by("name")
+
+
 @staff_or_404
 def telegram_messages(request):
-    messages = TelegramMessage.objects.order_by("-created_at")
-    return render(
-        request,
-        "core/telegram_messages.html",
-        {"telegram_messages": messages},
-    )
+    """Telegram messages page with Incoming / Outgoing / All tabs.
+
+    All three tables are rendered on the page (each with its own pagination,
+    20 records per page) and switched via JS without reload. The active tab is
+    restored from ?tab= on initial load.
+    """
+    per_page = 20
+
+    incoming_count = TelegramMessage.objects.count()
+    outgoing_count = OutgoingMessage.objects.count()
+
+    incoming_qs = TelegramMessage.objects.order_by("-created_at")
+    outgoing_qs = OutgoingMessage.objects.select_related("sent_by").order_by("-created_at")
+
+    incoming_paginator = Paginator(incoming_qs, per_page)
+    outgoing_paginator = Paginator(outgoing_qs, per_page)
+
+    incoming_page = incoming_paginator.get_page(request.GET.get("incoming_page"))
+    outgoing_page = outgoing_paginator.get_page(request.GET.get("outgoing_page"))
+
+    # Merged chronological list for the "All" tab.
+    combined = []
+    for tm in TelegramMessage.objects.all().values(
+        "id", "created_at", "message_date", "text", "telegram_chat_id",
+        "telegram_message_id", "telegram_username", "status",
+    ):
+        combined.append(
+            {
+                "kind": "incoming",
+                "sort_key": tm["created_at"],
+                "tm": tm,
+            }
+        )
+    for om in OutgoingMessage.objects.all().values(
+        "id", "created_at", "sent_at", "text", "telegram_chat_id",
+        "telegram_message_id", "sent_by__username", "topic_name",
+        "reply_to_message_id", "reply_to_text", "status",
+    ):
+        combined.append(
+            {
+                "kind": "outgoing",
+                "sort_key": om["sent_at"] or om["created_at"],
+                "om": om,
+            }
+        )
+    combined.sort(key=lambda item: item["sort_key"], reverse=True)
+
+    all_paginator = Paginator(combined, per_page)
+    all_page = all_paginator.get_page(request.GET.get("all_page"))
+
+    tab = request.GET.get("tab", "incoming")
+    if tab not in ("incoming", "outgoing", "all"):
+        tab = "incoming"
+
+    context = {
+        "tab": tab,
+        "incoming_page": incoming_page,
+        "outgoing_page": outgoing_page,
+        "all_page": all_page,
+        "incoming_count": incoming_count,
+        "outgoing_count": outgoing_count,
+        "total_count": incoming_count + outgoing_count,
+        "telegram_topics": _active_group_topics(),
+    }
+    return render(request, "core/telegram_messages.html", context)
+
+
+def _read_json_body(request):
+    """Return dict from JSON body or form-encoded POST (fallback)."""
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            return json.loads(request.body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return {}
+    return request.POST.dict()
+
+
+@require_POST
+def send_reply(request):
+    """AJAX API: reply to an incoming Telegram message."""
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+
+    data = _read_json_body(request)
+    telegram_message_id = data.get("telegram_message_id")
+    text = data.get("text", "")
+
+    if telegram_message_id is None:
+        return JsonResponse({"ok": False, "error": "Не указан telegram_message_id."}, status=400)
+    telegram_message = get_object_or_404(TelegramMessage, pk=telegram_message_id)
+
+    try:
+        outgoing = messaging_service.send_reply(
+            user=request.user,
+            telegram_message=telegram_message,
+            text=text,
+        )
+    except messaging_service.MessagingError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Unexpected error sending reply")
+        return JsonResponse({"ok": False, "error": "Не удалось отправить сообщение."}, status=500)
+
+    return JsonResponse({"ok": True, "message_id": outgoing.telegram_message_id})
+
+
+@require_POST
+def send_message(request):
+    """AJAX API: send a new message to the clan group."""
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+
+    data = _read_json_body(request)
+    text = data.get("text", "")
+    raw_thread_id = data.get("thread_id")
+
+    thread_id = None
+    if raw_thread_id not in (None, ""):
+        try:
+            thread_id = int(raw_thread_id)
+        except (TypeError, ValueError):
+            return JsonResponse({"ok": False, "error": "Некорректный thread_id."}, status=400)
+
+    try:
+        outgoing = messaging_service.send_new_message(
+            user=request.user,
+            text=text,
+            thread_id=thread_id,
+        )
+    except messaging_service.MessagingError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Unexpected error sending new message")
+        return JsonResponse({"ok": False, "error": "Не удалось отправить сообщение."}, status=500)
+
+    return JsonResponse({"ok": True, "message_id": outgoing.telegram_message_id})
 
 
 @staff_or_404

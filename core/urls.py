@@ -59,6 +59,16 @@ urlpatterns = [
     path("players/edit/<int:pk>/", views.player_edit, name="player_edit"),
     path("activities/", views.activities, name="activities"),
     path("telegram-messages/", views.telegram_messages, name="telegram_messages"),
+    path(
+        "telegram-messages/send-reply/",
+        views.send_reply,
+        name="send_reply",
+    ),
+    path(
+        "telegram-messages/send-message/",
+        views.send_message,
+        name="send_message",
+    ),
     path("processing_errors/", views.processing_errors, name="processing_errors"),
     path("instructions/", views.instructions, name="instructions"),
     path(

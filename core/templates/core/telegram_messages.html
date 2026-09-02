@@ -2,28 +2,231 @@
 {% block title %}Telegram-сообщения{% endblock %}
 {% block content %}
 <h1>Telegram-сообщения</h1>
-<table>
-    <tr>
-        <th>Chat ID</th>
-        <th>Message ID</th>
-        <th>User ID</th>
-        <th>Username</th>
-        <th>Текст</th>
-        <th>Дата сообщения</th>
-        <th>Статус</th>
-    </tr>
-    {% for message in telegram_messages %}
-    <tr>
-        <td>{{ message.telegram_chat_id }}</td>
-        <td>{{ message.telegram_message_id }}</td>
-        <td>{{ message.telegram_user_id|default:"-" }}</td>
-        <td>{{ message.telegram_username|default:"-" }}</td>
-        <td>{{ message.text }}</td>
-        <td>{{ message.message_date|date:"d.m.Y H:i" }}</td>
-        <td>{{ message.status }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="7" class="muted">Сообщений нет.</td></tr>
-    {% endfor %}
-</table>
+
+<div class="toolbar">
+    <button type="button" class="btn" id="new-message-btn">Новое сообщение</button>
+</div>
+
+<ul class="tabs">
+    <li>
+        <button type="button" class="tab-btn{% if tab == 'incoming' %} active{% endif %}" data-tab="incoming">
+            Входящие ({{ incoming_count }})
+        </button>
+    </li>
+    <li>
+        <button type="button" class="tab-btn{% if tab == 'outgoing' %} active{% endif %}" data-tab="outgoing">
+            Исходящие ({{ outgoing_count }})
+        </button>
+    </li>
+    <li>
+        <button type="button" class="tab-btn{% if tab == 'all' %} active{% endif %}" data-tab="all">
+            Все ({{ total_count }})
+        </button>
+    </li>
+</ul>
+
+{# ==================== Входящие ==================== #}
+<section class="tab-panel{% if tab != 'incoming' %} hidden{% endif %}" data-panel="incoming">
+    <table>
+        <tr>
+            <th>Chat ID</th>
+            <th>Message ID</th>
+            <th>Username</th>
+            <th>Тема</th>
+            <th>Текст</th>
+            <th>Дата сообщения</th>
+            <th>Статус</th>
+            <th></th>
+        </tr>
+        {% for message in incoming_page %}
+        <tr class="incoming-row" data-message-id="{{ message.pk }}" data-message-text="{{ message.text }}">
+            <td>{{ message.telegram_chat_id }}</td>
+            <td>{{ message.telegram_message_id }}</td>
+            <td>{{ message.telegram_username|default:"-" }}</td>
+            <td>{{ message.message_thread_id|default:"-" }}</td>
+            <td>{{ message.text }}</td>
+            <td>{{ message.message_date|date:"d.m.Y H:i" }}</td>
+            <td>{{ message.status }}</td>
+            <td>
+                <button type="button" class="btn reply-btn">Ответить</button>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="muted">Входящих сообщений нет.</td></tr>
+        {% endfor %}
+    </table>
+    {% if incoming_page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if incoming_page.has_previous %}
+            <a class="btn" href="?tab=incoming&incoming_page={{ incoming_page.previous_page_number }}">← Назад</a>
+        {% else %}
+            <span class="btn disabled">← Назад</span>
+        {% endif %}
+        <span class="page-info">Стр. {{ incoming_page.number }} из {{ incoming_page.paginator.num_pages }}</span>
+        {% if incoming_page.has_next %}
+            <a class="btn" href="?tab=incoming&incoming_page={{ incoming_page.next_page_number }}">Вперёд →</a>
+        {% else %}
+            <span class="btn disabled">Вперёд →</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+{# ==================== Исходящие ==================== #}
+<section class="tab-panel{% if tab != 'outgoing' %} hidden{% endif %}" data-panel="outgoing">
+    <table>
+        <tr>
+            <th>Дата</th>
+            <th>Отправил</th>
+            <th>Тема</th>
+            <th>Текст</th>
+            <th>Ответ на</th>
+            <th>Статус</th>
+        </tr>
+        {% for om in outgoing_page %}
+        <tr class="outgoing-row">
+            <td>{{ om.sent_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ om.sent_by.username }}</td>
+            <td>{% if om.topic_name %}{{ om.topic_name }}{% else %}Общий поток{% endif %}</td>
+            <td title="{{ om.text }}">{{ om.text|truncatechars:60 }}</td>
+            <td>
+                {% if om.reply_to_text %}
+                    <span class="muted" title="{{ om.reply_to_text }}">{{ om.reply_to_text|truncatechars:40 }}</span>
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>{{ om.get_status_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="muted">Исходящих сообщений нет.</td></tr>
+        {% endfor %}
+    </table>
+    {% if outgoing_page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if outgoing_page.has_previous %}
+            <a class="btn" href="?tab=outgoing&outgoing_page={{ outgoing_page.previous_page_number }}">← Назад</a>
+        {% else %}
+            <span class="btn disabled">← Назад</span>
+        {% endif %}
+        <span class="page-info">Стр. {{ outgoing_page.number }} из {{ outgoing_page.paginator.num_pages }}</span>
+        {% if outgoing_page.has_next %}
+            <a class="btn" href="?tab=outgoing&outgoing_page={{ outgoing_page.next_page_number }}">Вперёд →</a>
+        {% else %}
+            <span class="btn disabled">Вперёд →</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+{# ==================== Все ==================== #}
+<section class="tab-panel{% if tab != 'all' %} hidden{% endif %}" data-panel="all">
+    <table>
+        <tr>
+            <th>Тип</th>
+            <th>Дата</th>
+            <th>Кто / Отправил</th>
+            <th>Тема</th>
+            <th>Текст</th>
+            <th></th>
+        </tr>
+        {% for item in all_page %}
+            {% if item.kind == 'incoming' %}
+            <tr class="incoming-row" data-message-id="{{ item.tm.id }}" data-message-text="{{ item.tm.text }}">
+                <td>Вх.</td>
+                <td>{{ item.tm.message_date|date:"d.m.Y H:i" }}</td>
+                <td>{{ item.tm.telegram_username|default:"-" }}</td>
+                <td>{{ item.tm.message_thread_id|default:"-" }}</td>
+                <td title="{{ item.tm.text }}">{{ item.tm.text|truncatechars:60 }}</td>
+                <td>
+                    <button type="button" class="btn reply-btn">Ответить</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr class="outgoing-row all-outgoing">
+                <td>Исх.</td>
+                <td>{{ item.om.sent_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ item.om.sent_by__username }}</td>
+                <td>{% if item.om.topic_name %}{{ item.om.topic_name }}{% else %}Общий поток{% endif %}</td>
+                <td title="{{ item.om.text }}">{{ item.om.text|truncatechars:60 }}</td>
+                <td></td>
+            </tr>
+            {% endif %}
+        {% empty %}
+        <tr><td colspan="6" class="muted">Сообщений нет.</td></tr>
+        {% endfor %}
+    </table>
+    {% if all_page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if all_page.has_previous %}
+            <a class="btn" href="?tab=all&all_page={{ all_page.previous_page_number }}">← Назад</a>
+        {% else %}
+            <span class="btn disabled">← Назад</span>
+        {% endif %}
+        <span class="page-info">Стр. {{ all_page.number }} из {{ all_page.paginator.num_pages }}</span>
+        {% if all_page.has_next %}
+            <a class="btn" href="?tab=all&all_page={{ all_page.next_page_number }}">Вперёд →</a>
+        {% else %}
+            <span class="btn disabled">Вперёд →</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+{# ==================== Модальное окно: Ответить ==================== #}
+<div id="reply-modal" class="modal-overlay" hidden>
+    <div class="modal-box modal-wide">
+        <h2>Ответить</h2>
+        <div class="reply-original">
+            <div class="field-label">Исходное сообщение</div>
+            <div id="reply-original-text" class="reply-original-text"></div>
+        </div>
+        <div>
+            <label class="field-label" for="reply-text">Ваш ответ</label>
+            <textarea id="reply-text" rows="4" class="field-content auto-grow"></textarea>
+            <div class="char-hint" id="reply-char-hint"></div>
+            <div class="emoji-toolbar">
+                <button type="button" class="btn emoji-toggle" data-for="reply-text" title="Эмодзи">😊</button>
+                <div class="emoji-palette hidden" data-for="reply-text"></div>
+            </div>
+            <div class="modal-error" id="reply-modal-error" hidden></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn" id="reply-cancel">Отмена</button>
+            <button type="button" class="btn" id="reply-next" disabled>Отправить</button>
+        </div>
+    </div>
+</div>
+
+{# ==================== Модальное окно: Новое сообщение ==================== #}
+<div id="new-message-modal" class="modal-overlay" hidden>
+    <div class="modal-box modal-wide">
+        <h2>Новое сообщение</h2>
+        <div>
+            <label class="field-label" for="new-message-text">Текст сообщения</label>
+            <textarea id="new-message-text" rows="4" class="field-content auto-grow"></textarea>
+            <div class="char-hint" id="new-message-char-hint"></div>
+            <div class="emoji-toolbar">
+                <button type="button" class="btn emoji-toggle" data-for="new-message-text" title="Эмодзи">😊</button>
+                <div class="emoji-palette hidden" data-for="new-message-text"></div>
+            </div>
+            <div class="modal-error" id="new-message-modal-error" hidden></div>
+        </div>
+        <div>
+            <label class="field-label" for="new-message-topic">Тема</label>
+            <select id="new-message-topic">
+                <option value="">Общий поток</option>
+                {% for topic in telegram_topics %}
+                <option value="{{ topic.thread_id }}">{{ topic.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn" id="new-message-cancel">Отмена</button>
+            <button type="button" class="btn" id="new-message-next" disabled>Отправить</button>
+        </div>
+    </div>
+</div>
+
+<div id="send-result-toast" class="toast" hidden></div>
 {% endblock %}

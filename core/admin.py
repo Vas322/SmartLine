@@ -1,7 +1,7 @@
 """Django admin registration for the core models."""
 from django.contrib import admin, messages
 
-from core.models import Activity, CastRate, Player, ProcessingError, Registration, RegistrationRate, ScheduleMirror, TelegramMessage
+from core.models import Activity, CastRate, OutgoingMessage, Player, ProcessingError, Registration, RegistrationRate, ScheduleMirror, TelegramMessage, TelegramSettings, TelegramTopic
 from core.services import schedule_mirror_service
 
 
@@ -21,6 +21,58 @@ class PlayerAdmin(admin.ModelAdmin):
 class TelegramMessageAdmin(admin.ModelAdmin):
     list_display = ("telegram_chat_id", "telegram_message_id", "status", "created_at")
     search_fields = ("telegram_chat_id", "telegram_message_id", "text")
+
+
+@admin.register(OutgoingMessage)
+class OutgoingMessageAdmin(admin.ModelAdmin):
+    list_display = (
+        "sent_at",
+        "sent_by",
+        "text_snippet",
+        "topic_name",
+        "status",
+    )
+    search_fields = ("text", "reply_to_text")
+    list_filter = ("status",)
+
+    def text_snippet(self, obj):
+        return (obj.text or "")[:60]
+    text_snippet.short_description = "Текст"
+
+
+class TelegramTopicInline(admin.TabularInline):
+    model = TelegramTopic
+    fk_name = "group"
+    extra = 0
+
+    def has_add_permission(self, request, obj=None):
+        return request.user.is_staff
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_staff
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_staff
+
+
+@admin.register(TelegramSettings)
+class TelegramSettingsAdmin(admin.ModelAdmin):
+    """Группы Telegram с инлайновыми темами."""
+
+    list_display = ("name", "group_chat_id", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "group_chat_id")
+    fields = ("name", "group_chat_id", "is_active")
+    inlines = [TelegramTopicInline]
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_staff
+
+    def has_add_permission(self, request):
+        return request.user.is_staff
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_staff
 
 
 @admin.register(Activity)
