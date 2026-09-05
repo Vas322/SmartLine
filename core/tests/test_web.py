@@ -1521,7 +1521,7 @@ class DashboardFilterZeroActivityTests(TestCase):
         # Filter (hiding zero-activity players) must not affect total payout:
         # 75 from the active player; passive player contributes 0.
         # Note: Django renders Decimal("75.00") as "75" (no decimal part).
-        self.assertIn("75", content)
+        self.assertRegex(content, r"Итого за период:\s*75\s*кк")
 
 
 class TelegramSettingsAdminTests(TestCase):
