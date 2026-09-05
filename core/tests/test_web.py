@@ -1506,6 +1506,7 @@ class DashboardFilterZeroActivityTests(TestCase):
             telegram_message=msg1,
             amount=Decimal("1"),
             activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("75.00"),
             description="Волна",
         )
         # Player without any activity — should not appear but payout must not be affected
@@ -1517,6 +1518,10 @@ class DashboardFilterZeroActivityTests(TestCase):
         self.assertIn("АктивныйИгрок", content)
         self.assertNotIn("ПассивныйИгрок", content)
         self.assertIn("Итого за период", content)
+        # Filter (hiding zero-activity players) must not affect total payout:
+        # 75 from the active player; passive player contributes 0.
+        # Note: Django renders Decimal("75.00") as "75" (no decimal part).
+        self.assertIn("75", content)
 
 
 class TelegramSettingsAdminTests(TestCase):
