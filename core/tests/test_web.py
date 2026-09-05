@@ -64,7 +64,7 @@ class WebInterfaceTests(TestCase):
             )
         # staff_or_404 views also use login_required, so anonymous users
         # redirect to /login/ (not to the admin login).
-        for url_name in ["players", "activities", "telegram_messages", "processing_errors", "settings"]:
+        for url_name in ["players", "activities", "telegram_messages", "settings"]:
             response = self.client.get(reverse(url_name))
             self.assertRedirects(
                 response,
@@ -77,7 +77,7 @@ class WebInterfaceTests(TestCase):
 
     def test_pages_available_after_login(self):
         self._login()
-        for url_name in ["dashboard", "players", "activities", "telegram_messages", "processing_errors", "settings"]:
+        for url_name in ["dashboard", "players", "activities", "telegram_messages", "settings"]:
             response = self.client.get(reverse(url_name))
             self.assertEqual(response.status_code, 200, url_name)
 
@@ -1266,7 +1266,6 @@ class StaffAccessTests(TestCase):
         self.assertNotContains(response, reverse("players"))
         self.assertNotContains(response, reverse("activities"))
         self.assertNotContains(response, reverse("telegram_messages"))
-        self.assertNotContains(response, reverse("processing_errors"))
         self.assertNotContains(response, reverse("settings"))
         self.assertContains(response, reverse("instructions"))
         self.assertContains(response, reverse("schedule_mirror"))
@@ -1279,7 +1278,6 @@ class StaffAccessTests(TestCase):
         self.assertContains(response, reverse("players"))
         self.assertContains(response, reverse("activities"))
         self.assertContains(response, reverse("telegram_messages"))
-        self.assertContains(response, reverse("processing_errors"))
         self.assertContains(response, reverse("settings"))
 
     def test_member_direct_access_to_staff_pages_returns_404(self):
@@ -1289,7 +1287,6 @@ class StaffAccessTests(TestCase):
             ("players", {}),
             ("activities", {}),
             ("telegram_messages", {}),
-            ("processing_errors", {}),
             ("settings", {}),
             ("instruction_edit", {"pk": self.instruction.pk}),
             ("player_detail", {"pk": self.player.pk}),

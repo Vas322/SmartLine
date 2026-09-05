@@ -23,3 +23,6 @@ logs/
 
 # Local backlog (не выгружать на GitHub)
 docs/BACKLOG.md
+
+# Local context (не выгружать на GitHub)
+CONTEXT.md

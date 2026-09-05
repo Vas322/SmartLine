@@ -2,7 +2,9 @@
 import logging
 from typing import Optional
 
-from core.models import OutgoingMessage, TelegramMessage, TelegramSettings, TelegramTopic
+from core.models import OutgoingMessage, TelegramMessage, TelegramSettings, TelegramTopic, ScheduledMessage
+from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,8 @@ def _create_outgoing(
     reply_to_message_id: Optional[int],
     reply_to_text: str,
     topic_name: str,
+    source: str = OutgoingMessage.Source.MANUAL_NEW,
+    scheduled_message: Optional[ScheduledMessage] = None,
 ) -> OutgoingMessage:
     """Create an OutgoingMessage audit record in PENDING state.
 
@@ -61,6 +65,8 @@ def _create_outgoing(
         topic_name=topic_name,
         status=OutgoingMessage.Status.PENDING,
         error_text="",
+        source=source,
+        scheduled_message=scheduled_message,
     )
 
 
@@ -70,14 +76,24 @@ def _update_outgoing(
     status: str,
     message_id: int = 0,
     error_text: str = "",
+    raise_on_error: bool = False,
 ) -> None:
-    """Update an existing OutgoingMessage with the final send result."""
+    """Update an existing OutgoingMessage with the final send result.
+
+    By default a failure to save leaves the record PENDING (auditable
+    "stuck" attempt) and is swallowed. Pass raise_on_error=True when the
+    call runs inside an enclosing transaction.atomic() that must roll back
+    on failure (e.g. send_scheduled_message) — the exception is re-raised
+    so the transaction can be rolled back consistently.
+    """
     outgoing.telegram_message_id = message_id
     outgoing.status = status
     outgoing.error_text = error_text
     try:
         outgoing.save(update_fields=["telegram_message_id", "status", "error_text"])
     except Exception:
+        if raise_on_error:
+            raise
         # Запись остаётся в PENDING — аудируемая «подвисшая» попытка.
         logger.exception(
             "Failed to finalize OutgoingMessage pk=%s to status=%s; record stays PENDING",
@@ -114,6 +130,7 @@ def send_reply(user, telegram_message: TelegramMessage, text: str) -> OutgoingMe
         reply_to_message_id=telegram_message.telegram_message_id,
         reply_to_text=telegram_message.text,
         topic_name=topic_name,
+        source=OutgoingMessage.Source.MANUAL_REPLY,
     )
 
     # Шаг 2: вызов Telegram API.
@@ -187,6 +204,7 @@ def send_new_message(user, text: str, thread_id: Optional[int] = None) -> Outgoi
         reply_to_message_id=None,
         reply_to_text="",
         topic_name=topic_name,
+        source=OutgoingMessage.Source.MANUAL_NEW,
     )
 
     # Шаг 2: вызов Telegram API.
@@ -224,6 +242,97 @@ def send_new_message(user, text: str, thread_id: Optional[int] = None) -> Outgoi
 
     logger.info(
         "Sent new message chat_id=%s thread_id=%s new_message_id=%s",
+        chat_id,
+        thread_id,
+        telegram_message_id,
+    )
+    return outgoing
+
+
+def send_scheduled_message(schedule: ScheduledMessage) -> OutgoingMessage:
+    """Send a message from a schedule (automatic).
+
+    Uses the same logic as send_new_message but:
+    - source=SCHEDULED
+    - scheduled_message=schedule
+    - user=None (automatic messages have no manual sender)
+    - thread_id from schedule.topic.thread_id if topic exists
+    - Updates schedule.last_sent_at on success.
+    """
+    normalized = _normalize_text(schedule.text)
+
+    telegram_settings = TelegramSettings.objects.filter(is_active=True).first()
+    chat_id = telegram_settings.group_chat_id if telegram_settings else None
+    if chat_id is None:
+        logger.error("No active Telegram group configured; cannot send scheduled message")
+        raise MessagingError(
+            "Не настроена активная группа Telegram для отправки сообщений (Группы). "
+            "Автоматическая отправка недоступна."
+        )
+
+    from telegram_bot.bot import TelegramBot
+
+    thread_id = schedule.topic.thread_id if schedule.topic else None
+    topic_name = _topic_name_by_thread_id(thread_id)
+
+    # Шаг 1: аудит-запись в PENDING до обращения к Telegram.
+    # user=None for automatic messages (sent_by is nullable)
+    outgoing = _create_outgoing(
+        user=None,
+        chat_id=chat_id,
+        text=normalized,
+        reply_to_message_id=None,
+        reply_to_text="",
+        topic_name=topic_name,
+        source=OutgoingMessage.Source.SCHEDULED,
+        scheduled_message=schedule,
+    )
+
+    # Шаг 2: вызов Telegram API.
+    try:
+        sent = TelegramBot().send_message(
+            chat_id=chat_id,
+            text=normalized,
+            message_thread_id=thread_id,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to send scheduled message schedule_id=%s chat_id=%s thread_id=%s: %s",
+            schedule.pk,
+            chat_id,
+            thread_id,
+            type(exc).__name__,
+        )
+        # Шаг 4: фиксируем ошибку в той же записи, затем пробрасываем.
+        _update_outgoing(
+            outgoing,
+            status=OutgoingMessage.Status.ERROR,
+            message_id=0,
+            error_text=str(exc),
+        )
+        raise MessagingError(str(exc)) from exc
+
+    result = (sent or {}).get("result") or {}
+    telegram_message_id = result.get("message_id") or 0
+
+    # Шаг 3: успех — фиксируем message_id и SENT в той же записи,
+    # а также last_sent_at на расписании. Оба обновления в одной транзакции,
+    # чтобы при сбое одного не было повторной отправки дубликата на следующем цикле.
+    with transaction.atomic():
+        _update_outgoing(
+            outgoing,
+            status=OutgoingMessage.Status.SENT,
+            message_id=telegram_message_id,
+            raise_on_error=True,
+        )
+
+        # Update last_sent_at on the schedule
+        schedule.last_sent_at = timezone.now()
+        schedule.save(update_fields=["last_sent_at"])
+
+    logger.info(
+        "Sent scheduled message schedule_id=%s chat_id=%s thread_id=%s new_message_id=%s",
+        schedule.pk,
         chat_id,
         thread_id,
         telegram_message_id,

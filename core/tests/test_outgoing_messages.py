@@ -6,7 +6,14 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import OutgoingMessage, TelegramMessage, TelegramSettings, TelegramTopic
+from core.error_messages import friendly_error_message
+from core.models import (
+    OutgoingMessage,
+    ProcessingError,
+    TelegramMessage,
+    TelegramSettings,
+    TelegramTopic,
+)
 from telegram_bot.bot import TelegramAPIError
 
 _GROUP_CHAT_ID = -1001234567890
@@ -85,18 +92,32 @@ class OutgoingMessagesViewTests(TestCase):
         content = response.content.decode()
         self.assertIn("Входящие (1)", content)
         self.assertIn("Исходящие (0)", content)
-        self.assertIn("Все (1)", content)
+        self.assertIn("Ошибки (0)", content)
+        self.assertNotIn("Все (", content)
+        self.assertNotIn("Обычные", content)
 
     def test_default_tab_is_incoming(self):
         self._login("kl")
         response = self.client.get(reverse("telegram_messages"))
         self.assertEqual(response.context["tab"], "incoming")
 
-    def test_tab_param_all(self):
+    def test_tab_param_outgoing(self):
         self._login("kl")
-        response = self.client.get(reverse("telegram_messages"), {"tab": "all"})
+        response = self.client.get(reverse("telegram_messages"), {"tab": "outgoing"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["tab"], "all")
+        self.assertEqual(response.context["tab"], "outgoing")
+
+    def test_tab_param_errors(self):
+        self._login("kl")
+        response = self.client.get(reverse("telegram_messages"), {"tab": "errors"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["tab"], "errors")
+
+    def test_unknown_tab_falls_back_to_incoming(self):
+        self._login("kl")
+        response = self.client.get(reverse("telegram_messages"), {"tab": "regular"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["tab"], "incoming")
 
     def test_incoming_and_outgoing_pagination_20(self):
         self._login("kl")
@@ -127,19 +148,73 @@ class OutgoingMessagesViewTests(TestCase):
         self.assertEqual(len(response.context["outgoing_page"].object_list), 20)
         self.assertEqual(response.context["outgoing_page"].paginator.num_pages, 2)
 
-    def test_all_tab_merges_and_paginates(self):
+    def test_regular_messages_show_in_incoming_tab(self):
+        """REGULAR-сообщения показываются во «Входящих» вместе с PROCESSED."""
         self._login("kl")
+        TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=7000,
+            text="обычное сообщение",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.REGULAR,
+        )
+        response = self.client.get(reverse("telegram_messages"), {"tab": "incoming"})
+        content = response.content.decode()
+        self.assertIn("обычное сообщение", content)
+        self.assertEqual(response.context["incoming_count"], 2)  # PROCESSED + REGULAR
+
+    def test_errors_tab_paginates(self):
+        self._login("kl")
+        # 25 ERROR messages with their ProcessingError records
+        base_id = 8000
         for i in range(25):
-            OutgoingMessage.objects.create(
-                telegram_chat_id=_GROUP_CHAT_ID,
-                telegram_message_id=3000 + i,
-                text=f"out {i}",
-                sent_by=self.staff,
+            tm = TelegramMessage.objects.create(
+                telegram_chat_id=10,
+                telegram_message_id=base_id + i,
+                text=f"ошибка {i}",
+                message_date=timezone.now(),
+                status=TelegramMessage.Status.ERROR,
             )
-        response = self.client.get(reverse("telegram_messages"), {"tab": "all"})
+            ProcessingError.objects.create(
+                telegram_message=tm,
+                reason="invalid_amount",
+            )
+        response = self.client.get(reverse("telegram_messages"), {"tab": "errors"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context["all_page"].object_list), 20)
-        self.assertEqual(response.context["all_page"].paginator.num_pages, 2)
+        self.assertEqual(len(response.context["errors_page"].object_list), 20)
+        self.assertEqual(response.context["errors_page"].paginator.num_pages, 2)
+
+    def test_errors_tab_shows_friendly_reason(self):
+        """Причина ошибки отображается читаемым текстом через error_messages."""
+        self._login("kl")
+        tm = TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=9000,
+            text="+abc | деф | Swettka | оп",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.ERROR,
+        )
+        ProcessingError.objects.create(
+            telegram_message=tm,
+            reason="invalid_amount",
+        )
+        response = self.client.get(reverse("telegram_messages"), {"tab": "errors"})
+        content = response.content.decode()
+        self.assertIn(friendly_error_message("invalid_amount"), content)
+        self.assertNotIn("invalid_amount", content)
+
+    def test_error_messages_not_in_incoming_tab(self):
+        """Сообщения со статусом ERROR не показываются во «Входящих»."""
+        self._login("kl")
+        TelegramMessage.objects.create(
+            telegram_chat_id=10,
+            telegram_message_id=9001,
+            text="+abc | деф | Swettka | оп",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.ERROR,
+        )
+        response = self.client.get(reverse("telegram_messages"), {"tab": "incoming"})
+        self.assertEqual(response.context["incoming_count"], 1)  # только PROCESSED
 
     def test_outgoing_table_shows_topic_and_sender(self):
         self._login("kl")

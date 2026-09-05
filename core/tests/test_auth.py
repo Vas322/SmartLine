@@ -184,13 +184,9 @@ class AccessControlTest(TestCase):
         response = self.member.get("/settings/")
         self.assertEqual(response.status_code, 404)
 
-    def test_member_cannot_access_errors(self):
-        response = self.member.get("/processing_errors/")
-        self.assertEqual(response.status_code, 404)
-
     def test_staff_can_access_all(self):
         for url in ["/", "/players/", "/activities/", "/instructions/", "/settings/",
-                     "/processing_errors/", "/telegram-messages/"]:
+                     "/telegram-messages/"]:
             response = self.staff.get(url)
             self.assertEqual(response.status_code, 200, f"Staff denied access to {url}")
 

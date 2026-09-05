@@ -69,7 +69,6 @@ urlpatterns = [
         views.send_message,
         name="send_message",
     ),
-    path("processing_errors/", views.processing_errors, name="processing_errors"),
     path("instructions/", views.instructions, name="instructions"),
     path(
         "instructions/<int:pk>/",

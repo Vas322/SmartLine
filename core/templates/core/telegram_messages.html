@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load error_extras %}
 {% block title %}Telegram-сообщения{% endblock %}
 {% block content %}
 <h1>Telegram-сообщения</h1>
@@ -19,8 +20,8 @@
         </button>
     </li>
     <li>
-        <button type="button" class="tab-btn{% if tab == 'all' %} active{% endif %}" data-tab="all">
-            Все ({{ total_count }})
+        <button type="button" class="tab-btn{% if tab == 'errors' %} active{% endif %}" data-tab="errors">
+            Ошибки ({{ errors_count }})
         </button>
     </li>
 </ul>
@@ -46,7 +47,7 @@
             <td>{{ message.message_thread_id|default:"-" }}</td>
             <td>{{ message.text }}</td>
             <td>{{ message.message_date|date:"d.m.Y H:i" }}</td>
-            <td>{{ message.status }}</td>
+            <td>{{ message.get_status_display }}</td>
             <td>
                 <button type="button" class="btn reply-btn">Ответить</button>
             </td>
@@ -119,53 +120,40 @@
     {% endif %}
 </section>
 
-{# ==================== Все ==================== #}
-<section class="tab-panel{% if tab != 'all' %} hidden{% endif %}" data-panel="all">
+{# ==================== Ошибки ==================== #}
+<section class="tab-panel{% if tab != 'errors' %} hidden{% endif %}" data-panel="errors">
     <table>
         <tr>
-            <th>Тип</th>
             <th>Дата</th>
-            <th>Кто / Отправил</th>
+            <th>Username</th>
             <th>Тема</th>
-            <th>Текст</th>
-            <th></th>
+            <th>Текст сообщения</th>
+            <th>Ошибка</th>
+            <th>Статус</th>
         </tr>
-        {% for item in all_page %}
-            {% if item.kind == 'incoming' %}
-            <tr class="incoming-row" data-message-id="{{ item.tm.id }}" data-message-text="{{ item.tm.text }}">
-                <td>Вх.</td>
-                <td>{{ item.tm.message_date|date:"d.m.Y H:i" }}</td>
-                <td>{{ item.tm.telegram_username|default:"-" }}</td>
-                <td>{{ item.tm.message_thread_id|default:"-" }}</td>
-                <td title="{{ item.tm.text }}">{{ item.tm.text|truncatechars:60 }}</td>
-                <td>
-                    <button type="button" class="btn reply-btn">Ответить</button>
-                </td>
-            </tr>
-            {% else %}
-            <tr class="outgoing-row all-outgoing">
-                <td>Исх.</td>
-                <td>{{ item.om.sent_at|date:"d.m.Y H:i" }}</td>
-                <td>{{ item.om.sent_by__username }}</td>
-                <td>{% if item.om.topic_name %}{{ item.om.topic_name }}{% else %}Общий поток{% endif %}</td>
-                <td title="{{ item.om.text }}">{{ item.om.text|truncatechars:60 }}</td>
-                <td></td>
-            </tr>
-            {% endif %}
+        {% for error in errors_page %}
+        <tr>
+            <td>{{ error.created_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ error.telegram_message.telegram_username|default:"-" }}</td>
+            <td>{{ error.telegram_message.message_thread_id|default:"-" }}</td>
+            <td title="{{ error.telegram_message.text }}">{{ error.telegram_message.text|truncatechars:60 }}</td>
+            <td>{{ error.reason|friendly_error }}</td>
+            <td>{{ error.get_status_display }}</td>
+        </tr>
         {% empty %}
-        <tr><td colspan="6" class="muted">Сообщений нет.</td></tr>
+        <tr><td colspan="6" class="muted">Ошибок нет.</td></tr>
         {% endfor %}
     </table>
-    {% if all_page.paginator.num_pages > 1 %}
+    {% if errors_page.paginator.num_pages > 1 %}
     <div class="pagination">
-        {% if all_page.has_previous %}
-            <a class="btn" href="?tab=all&all_page={{ all_page.previous_page_number }}">← Назад</a>
+        {% if errors_page.has_previous %}
+            <a class="btn" href="?tab=errors&errors_page={{ errors_page.previous_page_number }}">← Назад</a>
         {% else %}
             <span class="btn disabled">← Назад</span>
         {% endif %}
-        <span class="page-info">Стр. {{ all_page.number }} из {{ all_page.paginator.num_pages }}</span>
-        {% if all_page.has_next %}
-            <a class="btn" href="?tab=all&all_page={{ all_page.next_page_number }}">Вперёд →</a>
+        <span class="page-info">Стр. {{ errors_page.number }} из {{ errors_page.paginator.num_pages }}</span>
+        {% if errors_page.has_next %}
+            <a class="btn" href="?tab=errors&errors_page={{ errors_page.next_page_number }}">Вперёд →</a>
         {% else %}
             <span class="btn disabled">Вперёд →</span>
         {% endif %}

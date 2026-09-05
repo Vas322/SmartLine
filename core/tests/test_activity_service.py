@@ -42,10 +42,33 @@ def _process_edit(text: str, chat_id: int = 1, message_id: int = 1, message_thre
 
 @override_settings(ADMIN_TELEGRAM_CHAT_IDS="", TELEGRAM_BOT_TOKEN="")
 class ProcessTelegramMessageTests(TestCase):
-    def test_regular_message_is_ignored(self):
+    def test_regular_message_creates_telegram_message_with_regular_status(self):
         result = _process("Сегодня идём на деф")
         self.assertEqual(result.status, ProcessResultStatus.IGNORED)
-        self.assertEqual(TelegramMessage.objects.count(), 0)
+        tm = TelegramMessage.objects.get()
+        self.assertEqual(tm.status, TelegramMessage.Status.REGULAR)
+        self.assertEqual(tm.text, "Сегодня идём на деф")
+        self.assertEqual(Activity.objects.count(), 0)
+        self.assertEqual(result.telegram_message.pk, tm.pk)
+
+    def test_regular_message_does_not_create_activity(self):
+        _process("Обычное сообщение без плюса")
+        self.assertEqual(Activity.objects.count(), 0)
+        self.assertEqual(TelegramMessage.objects.count(), 1)
+        self.assertEqual(
+            TelegramMessage.objects.get().status,
+            TelegramMessage.Status.REGULAR,
+        )
+
+    def test_duplicate_regular_message_returns_duplicate(self):
+        first = _process("Сегодня идём на деф")
+        self.assertEqual(first.status, ProcessResultStatus.IGNORED)
+        self.assertEqual(TelegramMessage.objects.count(), 1)
+
+        second = _process("Сегодня идём на деф")
+        self.assertEqual(second.status, ProcessResultStatus.DUPLICATE)
+        self.assertEqual(TelegramMessage.objects.count(), 1)
+        self.assertEqual(second.telegram_message.pk, first.telegram_message.pk)
         self.assertEqual(Activity.objects.count(), 0)
 
     def test_valid_message_creates_activity(self):

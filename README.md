@@ -72,17 +72,30 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-### Веб-интерфейс (Django)
+### Одна команда для локальной разработки
 
 ```bash
-python manage.py runserver
+python manage.py dev
 ```
 
-Откройте http://localhost:8000/ и войдите под суперпользователем.
+`dev` запускает в одном процессе Django-сервер (http://localhost:8000/),
+Telegram-бота (long polling) и проверку расписаний (scheduler, каждые 60 секунд) —
+всё, что нужно для локальной разработки, одной командой.
 
-### Telegram Bot
+Войдите под суперпользователем и откройте http://localhost:8000/.
+
+### Отдельные фоновые команды (только прод)
+
+На проде фоновые задачи выполняются docker-сервисами (`smartline-scheduler`,
+`smartline-cleanup`), поэтому локально их вручную запускать не нужно:
+
+- `send_scheduled_messages` — отправка сообщений по расписанию.
+- `cleanup_old_messages` — очистка старых сообщений.
+
+### Telegram Bot (вручную)
 
 Бот работает в режиме long polling (отдельный процесс), публичный URL не нужен.
+В локальной разработке он запускается командой `dev`; отдельно можно запустить:
 
 ```bash
 python manage.py poll

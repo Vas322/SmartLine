@@ -1,0 +1,50 @@
+/* CSS для админки ScheduledMessage (только отображение).
+   Селекторы ограничены контейнером .scheduled-message-change-form,
+   чтобы не затрагивать другие админки. */
+
+.scheduled-message-change-form .compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 2em;
+  row-gap: 0.9em;
+}
+
+.scheduled-message-change-form .compact > h2 {
+  grid-column: 1 / -1;
+}
+
+.scheduled-message-change-form .compact .form-row {
+  margin: 0;
+  padding: 0;
+}
+
+/* Поля, растягивающиеся на всю ширину */
+.scheduled-message-change-form .compact .form-row.field-text,
+.scheduled-message-change-form .compact .form-row.field-weekdays,
+.scheduled-message-change-form .compact .form-row.field-custom_dates {
+  grid-column: 1 / -1;
+}
+
+/* Чекбоксы дней недели — горизонтальный ряд */
+.scheduled-message-change-form .weekday-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em 1.5em;
+  padding: 0.4em 0;
+}
+.scheduled-message-change-form .weekday-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0;
+  font-weight: normal;
+}
+.scheduled-message-change-form .weekday-checkbox input {
+  margin: 0;
+}
+
+/* «Дата начала» и «Дата окончания» — жирным */
+.scheduled-message-change-form .form-row.field-start_date label,
+.scheduled-message-change-form .form-row.field-end_date label {
+  font-weight: bold;
+}

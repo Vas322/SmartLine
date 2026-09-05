@@ -128,7 +128,9 @@ class DevCommandTests(TestCase):
         from telegram_bot.management.commands.dev import Command
 
         Command().handle()
-        mock_thread.assert_not_called()
+        # Без токена бот не запускается, но scheduler-поток запускается всегда.
+        self.assertEqual(mock_thread.call_count, 1)
+        self.assertEqual(mock_thread.call_args.kwargs["name"], "scheduler")
         mock_srv.assert_called_once()
 
     @override_settings(TELEGRAM_BOT_TOKEN="123:abc")
@@ -136,9 +138,13 @@ class DevCommandTests(TestCase):
     @mock.patch(
         "django.contrib.staticfiles.management.commands.runserver.Command.handle"
     )
-    def test_dev_starts_bot_with_token(self, mock_srv, mock_thread):
+    def test_dev_starts_bot_and_scheduler_threads(self, mock_srv, mock_thread):
         from telegram_bot.management.commands.dev import Command
 
         Command().handle()
-        mock_thread.assert_called_once()
+        # Two threads: telegram-bot + scheduler
+        self.assertEqual(mock_thread.call_count, 2)
+        # First call: bot, second: scheduler
+        self.assertEqual(mock_thread.call_args_list[0].kwargs["name"], "telegram-bot")
+        self.assertEqual(mock_thread.call_args_list[1].kwargs["name"], "scheduler")
         mock_srv.assert_called_once()

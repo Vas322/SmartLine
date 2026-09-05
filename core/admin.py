@@ -1,8 +1,91 @@
 """Django admin registration for the core models."""
 from django.contrib import admin, messages
 
-from core.models import Activity, CastRate, OutgoingMessage, Player, ProcessingError, Registration, RegistrationRate, ScheduleMirror, TelegramMessage, TelegramSettings, TelegramTopic
-from core.services import schedule_mirror_service
+from core.forms import ScheduledMessageAdminForm
+from core.models import (
+    Activity,
+    CastRate,
+    OutgoingMessage,
+    Player,
+    ProcessingError,
+    Registration,
+    RegistrationRate,
+    ScheduleMirror,
+    ScheduledMessage,
+    TelegramMessage,
+    TelegramSettings,
+    TelegramTopic,
+)
+from core.services import schedule_mirror_service, scheduling_service
+
+
+@admin.register(ScheduledMessage)
+class ScheduledMessageAdmin(admin.ModelAdmin):
+    """Сообщения по расписанию."""
+
+    form = ScheduledMessageAdminForm
+    change_form_template = "admin/core/scheduledmessage/change_form.html"
+
+    list_display = (
+        "name",
+        "topic",
+        "weekdays_display",
+        "time",
+        "frequency",
+        "is_active",
+        "updated_by",
+        "next_run_display",
+        "last_sent_at",
+    )
+    list_filter = ("is_active", "frequency")
+    search_fields = ("name", "text")
+    readonly_fields = ("last_sent_at", "created_by", "updated_by")
+
+    fieldsets = (
+        (
+            None,
+            {
+                "classes": ("compact",),
+                "fields": ("name", "is_active", "text", "topic"),
+            },
+        ),
+        (
+            "Расписание",
+            {
+                "classes": ("compact",),
+                "fields": ("frequency", "time", "weekdays", "start_date", "end_date"),
+            },
+        ),
+        (
+            "Произвольные даты",
+            {
+                "classes": ("compact",),
+                "fields": ("custom_dates",),
+            },
+        ),
+    )
+
+    class Media:
+        css = {
+            "all": ("core/css/admin_scheduled_message.css",),
+        }
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def weekdays_display(self, obj):
+        return scheduling_service.weekdays_display(obj.weekdays)
+    weekdays_display.short_description = "Дни недели"
+
+    def next_run_display(self, obj):
+        next_dt = scheduling_service.computed_next_run(obj)
+        if next_dt is None:
+            return "—"
+        return next_dt.strftime("%Y-%m-%d %H:%M MSK")
+    next_run_display.short_description = "Следующее срабатывание"
 
 
 @admin.register(Player)
@@ -31,9 +114,11 @@ class OutgoingMessageAdmin(admin.ModelAdmin):
         "text_snippet",
         "topic_name",
         "status",
+        "source",
+        "scheduled_message",
     )
     search_fields = ("text", "reply_to_text")
-    list_filter = ("status",)
+    list_filter = ("status", "source")
 
     def text_snippet(self, obj):
         return (obj.text or "")[:60]

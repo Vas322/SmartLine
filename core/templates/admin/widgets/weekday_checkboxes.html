@@ -1,0 +1,16 @@
+{% load i18n %}
+<div class="weekday-checkboxes">
+  {% for group, options, index in widget.optgroups %}
+    {% for option in options %}
+      <label class="weekday-checkbox"{% if option.attrs.id %} for="{{ option.attrs.id }}"{% endif %}>
+        <input
+          type="{{ option.type }}"
+          name="{{ option.name }}"
+          value="{{ option.value }}"
+          {% if option.selected %}checked{% endif %}
+          {% include "django/forms/widgets/attrs.html" %}>
+        <span>{{ option.label }}</span>
+      </label>
+    {% endfor %}
+  {% endfor %}
+</div>

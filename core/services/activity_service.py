@@ -153,13 +153,6 @@ def process_telegram_message(
 ) -> ProcessResult:
     """Process a single Telegram message into an Activity or an error record."""
     stripped = text.strip()
-    if not stripped.startswith("+"):
-        logger.info(
-            "Ignoring non-activity message chat_id=%s message_id=%s",
-            chat_id,
-            message_id,
-        )
-        return ProcessResult(status=ProcessResultStatus.IGNORED)
 
     defaults = {
         "telegram_user_id": user_id,
@@ -186,6 +179,17 @@ def process_telegram_message(
                 status=ProcessResultStatus.DUPLICATE,
                 telegram_message=telegram_message,
             )
+
+        # Non-"+" messages are stored as REGULAR, no Activity is created.
+        if not stripped.startswith("+"):
+            telegram_message.status = TelegramMessage.Status.REGULAR
+            telegram_message.save(update_fields=["status"])
+            logger.info(
+                "Regular message (no '+') chat_id=%s message_id=%s, status=REGULAR",
+                chat_id,
+                message_id,
+            )
+            return ProcessResult(status=ProcessResultStatus.IGNORED, telegram_message=telegram_message)
 
         try:
             parsed = parse_activity_message(stripped)

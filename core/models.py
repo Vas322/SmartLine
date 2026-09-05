@@ -1,6 +1,8 @@
 """Data models for the Smartline core module."""
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class Player(models.Model):
@@ -28,6 +30,7 @@ class TelegramMessage(models.Model):
         PROCESSED = "PROCESSED", "Processed"
         ERROR = "ERROR", "Error"
         IGNORED = "IGNORED", "Ignored"
+        REGULAR = "REGULAR", "Обычное"
 
     telegram_chat_id = models.BigIntegerField()
     telegram_message_id = models.BigIntegerField()
@@ -71,6 +74,11 @@ class OutgoingMessage(models.Model):
         ERROR = "ERROR", "Ошибка"
         PENDING = "PENDING", "В очереди"
 
+    class Source(models.TextChoices):
+        MANUAL_REPLY = "manual_reply", "Ручной ответ"
+        MANUAL_NEW = "manual_new", "Ручное сообщение"
+        SCHEDULED = "scheduled", "Автоматическое"
+
     telegram_chat_id = models.BigIntegerField(
         verbose_name="ID чата",
     )
@@ -83,7 +91,9 @@ class OutgoingMessage(models.Model):
     )
     sent_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="outgoing_messages",
         verbose_name="Отправил",
     )
@@ -119,6 +129,19 @@ class OutgoingMessage(models.Model):
         blank=True,
         default="",
         verbose_name="Текст ошибки",
+    )
+    source = models.CharField(
+        max_length=16,
+        choices=Source.choices,
+        default=Source.MANUAL_NEW,
+        verbose_name="Тип",
+    )
+    scheduled_message = models.ForeignKey(
+        "ScheduledMessage",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Расписание",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -223,6 +246,116 @@ class TelegramSettings(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class ScheduledMessage(models.Model):
+    """Сообщение по расписанию, отправляемое автоматически."""
+
+    class Frequency(models.TextChoices):
+        WEEKLY = "weekly", "Каждую неделю"
+        BIWEEKLY = "biweekly", "Раз в 2 недели"
+        MONTHLY = "monthly", "Ежемесячно"
+        CUSTOM_DATES = "custom_dates", "Произвольные даты"
+
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название",
+    )
+    text = models.TextField(
+        verbose_name="Текст сообщения",
+    )
+    topic = models.ForeignKey(
+        "TelegramTopic",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Тема в Telegram",
+    )
+    weekdays = models.JSONField(
+        default=list,
+        verbose_name="Дни недели",
+        help_text="Номера дней недели, 0=Пн ... 6=Вс",
+    )
+    time = models.TimeField(
+        verbose_name="Время (MSK)",
+    )
+    frequency = models.CharField(
+        max_length=16,
+        choices=Frequency.choices,
+        default=Frequency.WEEKLY,
+        verbose_name="Частота",
+    )
+    start_date = models.DateField(
+        verbose_name="Дата начала",
+        help_text="Первое срабатывание; для 'раз в 2 недели' от неё отсчёт +14 дней",
+    )
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Дата окончания",
+    )
+    custom_dates = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Конкретные даты",
+        help_text="Список дат в формате YYYY-MM-DD",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Активно",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Создал",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_scheduled_messages",
+        verbose_name="Изменено пользователем",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Создано",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Обновлено",
+    )
+    last_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Последняя отправка",
+    )
+
+    class Meta:
+        verbose_name = "Сообщение по расписанию"
+        verbose_name_plural = "Сообщения по расписанию"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        """Validate weekdays: list of unique integers in range 0..6."""
+        weekdays = self.weekdays or []
+        if not isinstance(weekdays, list):
+            raise ValidationError({"weekdays": "Дни недели должны быть списком."})
+        if not all(isinstance(d, int) and not isinstance(d, bool) and 0 <= d <= 6 for d in weekdays):
+            raise ValidationError(
+                {"weekdays": "Дни недели должны быть целыми числами от 0 (Пн) до 6 (Вс)."}
+            )
+        if len(weekdays) != len(set(weekdays)):
+            raise ValidationError({"weekdays": "Дни недели не должны повторяться."})
+        if self.frequency in (self.Frequency.WEEKLY, self.Frequency.BIWEEKLY) and not weekdays:
+            raise ValidationError(
+                {"weekdays": "Для периодического расписания укажите хотя бы один день недели."}
+            )
 
 
 class Rate(models.Model):

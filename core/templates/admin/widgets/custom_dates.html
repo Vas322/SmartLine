@@ -1,0 +1,56 @@
+{% load i18n %}
+<div class="custom-dates-widget" data-name="{{ widget.name }}">
+  <div class="custom-dates-list">
+    {% for date in widget.dates %}
+      <div class="custom-dates-row">
+        <input
+          type="date"
+          name="{{ widget.name }}_{{ forloop.counter0 }}"
+          value="{{ date }}"
+          class="{{ widget.attrs.class }}">
+        <button type="button" class="custom-dates-remove" title="Удалить дату">&times;</button>
+      </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="custom-dates-add button">+ Добавить дату</button>
+  <script>
+    (function () {
+      var container = document.currentScript && document.currentScript.parentNode;
+      if (!container) return;
+      var list = container.querySelector(".custom-dates-list");
+      var addBtn = container.querySelector(".custom-dates-add");
+      var name = container.getAttribute("data-name");
+
+      function makeRow(index, value) {
+        var row = document.createElement("div");
+        row.className = "custom-dates-row";
+        var input = document.createElement("input");
+        input.type = "date";
+        input.name = name + "_" + index;
+        if (value) input.value = value;
+        input.className = "vDateField";
+        var removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "custom-dates-remove";
+        removeBtn.title = "Удалить дату";
+        removeBtn.textContent = "\u00d7";
+        removeBtn.addEventListener("click", function () {
+          row.remove();
+        });
+        row.appendChild(input);
+        row.appendChild(removeBtn);
+        return row;
+      }
+
+      addBtn.addEventListener("click", function () {
+        list.appendChild(makeRow(list.children.length, ""));
+      });
+
+      list.querySelectorAll(".custom-dates-remove").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          btn.closest(".custom-dates-row").remove();
+        });
+      });
+    })();
+  </script>
+</div>

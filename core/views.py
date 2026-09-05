@@ -335,68 +335,54 @@ def _active_group_topics():
 
 @staff_or_404
 def telegram_messages(request):
-    """Telegram messages page with Incoming / Outgoing / All tabs.
+    """Telegram messages page with 3 tabs: Incoming / Outgoing / Errors.
 
-    All three tables are rendered on the page (each with its own pagination,
+    Each table is rendered on the page (each with its own pagination,
     20 records per page) and switched via JS without reload. The active tab is
     restored from ?tab= on initial load.
+
+    Incoming shows TelegramMessage with status PROCESSED + REGULAR (not ERROR);
+    Errors shows ERROR messages together with their ProcessingError reason.
     """
     per_page = 20
 
-    incoming_count = TelegramMessage.objects.count()
-    outgoing_count = OutgoingMessage.objects.count()
+    incoming_qs = TelegramMessage.objects.filter(
+        status__in=[
+            TelegramMessage.Status.PROCESSED,
+            TelegramMessage.Status.REGULAR,
+        ]
+    ).order_by("-created_at")
+    errors_qs = ProcessingError.objects.select_related(
+        "telegram_message"
+    ).order_by("-created_at")
+    outgoing_qs = OutgoingMessage.objects.select_related(
+        "sent_by"
+    ).order_by("-created_at")
 
-    incoming_qs = TelegramMessage.objects.order_by("-created_at")
-    outgoing_qs = OutgoingMessage.objects.select_related("sent_by").order_by("-created_at")
+    incoming_count = incoming_qs.count()
+    errors_count = errors_qs.count()
+    outgoing_count = outgoing_qs.count()
 
     incoming_paginator = Paginator(incoming_qs, per_page)
+    errors_paginator = Paginator(errors_qs, per_page)
     outgoing_paginator = Paginator(outgoing_qs, per_page)
 
     incoming_page = incoming_paginator.get_page(request.GET.get("incoming_page"))
+    errors_page = errors_paginator.get_page(request.GET.get("errors_page"))
     outgoing_page = outgoing_paginator.get_page(request.GET.get("outgoing_page"))
 
-    # Merged chronological list for the "All" tab.
-    combined = []
-    for tm in TelegramMessage.objects.all().values(
-        "id", "created_at", "message_date", "text", "telegram_chat_id",
-        "telegram_message_id", "telegram_username", "status",
-    ):
-        combined.append(
-            {
-                "kind": "incoming",
-                "sort_key": tm["created_at"],
-                "tm": tm,
-            }
-        )
-    for om in OutgoingMessage.objects.all().values(
-        "id", "created_at", "sent_at", "text", "telegram_chat_id",
-        "telegram_message_id", "sent_by__username", "topic_name",
-        "reply_to_message_id", "reply_to_text", "status",
-    ):
-        combined.append(
-            {
-                "kind": "outgoing",
-                "sort_key": om["sent_at"] or om["created_at"],
-                "om": om,
-            }
-        )
-    combined.sort(key=lambda item: item["sort_key"], reverse=True)
-
-    all_paginator = Paginator(combined, per_page)
-    all_page = all_paginator.get_page(request.GET.get("all_page"))
-
     tab = request.GET.get("tab", "incoming")
-    if tab not in ("incoming", "outgoing", "all"):
+    if tab not in ("incoming", "outgoing", "errors"):
         tab = "incoming"
 
     context = {
         "tab": tab,
         "incoming_page": incoming_page,
+        "errors_page": errors_page,
         "outgoing_page": outgoing_page,
-        "all_page": all_page,
         "incoming_count": incoming_count,
+        "errors_count": errors_count,
         "outgoing_count": outgoing_count,
-        "total_count": incoming_count + outgoing_count,
         "telegram_topics": _active_group_topics(),
     }
     return render(request, "core/telegram_messages.html", context)
@@ -471,15 +457,6 @@ def send_message(request):
         return JsonResponse({"ok": False, "error": "Не удалось отправить сообщение."}, status=500)
 
     return JsonResponse({"ok": True, "message_id": outgoing.telegram_message_id})
-
-
-@staff_or_404
-def processing_errors(request):
-    errors = (
-        ProcessingError.objects.select_related("telegram_message")
-        .order_by("-created_at")
-    )
-    return render(request, "core/processing_errors.html", {"errors": errors})
 
 
 @staff_or_404
