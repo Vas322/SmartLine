@@ -1251,6 +1251,22 @@ class StaffAccessTests(TestCase):
             slug="how-to", title="Инструкция", content="Текст"
         )
         self.player = Player.objects.create(nickname="Swettka")
+        self.message = TelegramMessage.objects.create(
+            telegram_chat_id=11,
+            telegram_message_id=21,
+            telegram_user_id=101,
+            telegram_username="swettka",
+            text="+1 | деф | Swettka | Первая волна",
+            message_date=timezone.now(),
+            status=TelegramMessage.Status.PROCESSED,
+        )
+        self.activity = Activity.objects.create(
+            player=self.player,
+            telegram_message=self.message,
+            amount=Decimal("1"),
+            activity_type=Activity.ActivityType.DEF,
+            description="Первая волна",
+        )
 
     def _login_member(self):
         self.client.login(username="member", password="test-password-123")
