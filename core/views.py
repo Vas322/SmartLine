@@ -141,6 +141,9 @@ def dashboard(request):
         reg_data = reg_by_player.get(player.pk, {"payment": Decimal("0"), "clans": 0})
         reg_payment = reg_data["payment"]
         reg_clans = reg_data["clans"]
+        cast_count = totals.get("cast_count", 0)
+        if total_hours == 0 and cast_count == 0 and reg_clans == 0:
+            continue
         rows.append(
             {
                 "pk": player.pk,
@@ -148,7 +151,7 @@ def dashboard(request):
                 "total_hours": total_hours,
                 "def_hours": def_hours,
                 "farm_hours": farm_hours,
-                "cast_count": totals.get("cast_count", 0),
+                "cast_count": cast_count,
                 "adena": (totals.get("payment") or Decimal("0")) + reg_payment,
                 "registration": reg_clans,
                 "percent": _percent(total_hours, days_in_period),
