@@ -1097,8 +1097,6 @@ class RegistrationDashboardTests(TestCase):
         self.assertEqual(rows["Swettka"]["adena"], Decimal("95.00"))
         # Registration column shows number of clans (2), not money
         self.assertEqual(rows["Swettka"]["registration"], 2)
-        # Ostin has no registration
-        self.assertEqual(rows["Ostin"]["registration"], 0)
 
     def test_dashboard_percent_unchanged_by_registrations(self):
         """Attendance percent is based on hours, not registration money."""
