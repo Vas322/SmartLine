@@ -7,6 +7,9 @@ from django.db.models.functions import Coalesce
 from core.models import Activity, Registration
 
 
+DECIMAL_ZERO = Decimal("0")
+
+
 def _activity_annotations() -> dict:
     """Shared Activity aggregation fields used by dashboard and player_detail."""
     return {
@@ -14,7 +17,7 @@ def _activity_annotations() -> dict:
         "farm_hours": Sum("amount", filter=Q(activity_type=Activity.ActivityType.FARM)),
         "cast_hours": Sum("amount", filter=Q(activity_type=Activity.ActivityType.CAST)),
         "cast_count": Count("pk", filter=Q(has_cast=True)),
-        "payment": Coalesce(Sum("payment_kk"), Decimal("0")),
+        "payment": Coalesce(Sum("payment_kk"), DECIMAL_ZERO),
     }
 
 
@@ -38,7 +41,7 @@ def registration_totals_for_players(date_from, date_to):
         Registration.objects.filter(registered_at__range=(date_from, date_to))
         .values("player_id")
         .annotate(
-            reg_payment=Coalesce(Sum("payment_kk"), Decimal("0")),
+            reg_payment=Coalesce(Sum("payment_kk"), DECIMAL_ZERO),
             reg_clans=Coalesce(Sum("clans_count"), 0),
         )
     )

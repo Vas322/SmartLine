@@ -7,9 +7,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from core.decorators import staff_or_404
-from core.forms import ActivityFilterForm, PeriodForm, PlayerEditForm, PlayerForm
+from core.forms import PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
 from core.services import stats
+from core.views.common import _percent
 
 
 logger = logging.getLogger(__name__)
@@ -44,8 +45,6 @@ def player_detail(request, pk: int):
     farm_hours = totals["farm_hours"] or Decimal("0")
     cast_hours = totals["cast_hours"] or Decimal("0")
     total_hours = def_hours + farm_hours + cast_hours
-
-    from core.views.common import _percent
 
     summary = {
         "total_hours": total_hours,
