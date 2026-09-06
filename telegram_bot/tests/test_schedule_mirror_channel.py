@@ -1,5 +1,4 @@
 """Tests for schedule mirror handling of channel_post / edited_channel_post updates."""
-from datetime import datetime
 from unittest import mock
 
 from django.test import SimpleTestCase, override_settings

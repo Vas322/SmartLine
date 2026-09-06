@@ -1,11 +1,8 @@
 """Tests for the schedule mirror service."""
-from datetime import datetime
-from decimal import Decimal
 from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
-from django.utils import timezone
 
 from core.models import ScheduleMirror, TelegramMessage
 from core.services import schedule_mirror_service

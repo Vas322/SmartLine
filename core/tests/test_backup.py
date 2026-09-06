@@ -1,8 +1,6 @@
 """Tests for the backup management command."""
-import gzip
 import logging
 import subprocess
-from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
