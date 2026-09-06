@@ -3,14 +3,13 @@ import logging
 from decimal import Decimal
 
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from core.decorators import staff_or_404
 from core.forms import ActivityFilterForm, PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
+from core.services import stats
 
 
 logger = logging.getLogger(__name__)
@@ -40,26 +39,7 @@ def player_detail(request, pk: int):
         applied_date_from = ""
         applied_date_to = ""
 
-    totals = Activity.objects.filter(
-        player=player, created_at__range=(date_from, date_to)
-    ).aggregate(
-        def_hours=Sum(
-            "amount",
-            filter=Q(activity_type=Activity.ActivityType.DEF),
-        ),
-        farm_hours=Sum(
-            "amount",
-            filter=Q(activity_type=Activity.ActivityType.FARM),
-        ),
-        cast_hours=Sum(
-            "amount",
-            filter=Q(activity_type=Activity.ActivityType.CAST),
-        ),
-        payment=Coalesce(
-            Sum("payment_kk"),
-            Decimal("0"),
-        ),
-    )
+    totals = stats.activity_totals_for_player(player, date_from, date_to)
     def_hours = totals["def_hours"] or Decimal("0")
     farm_hours = totals["farm_hours"] or Decimal("0")
     cast_hours = totals["cast_hours"] or Decimal("0")
@@ -88,9 +68,7 @@ def player_detail(request, pk: int):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    cast_count = Activity.objects.filter(
-        player=player, created_at__range=(date_from, date_to), has_cast=True
-    ).count()
+    cast_count = totals["cast_count"] or 0
 
     context = {
         "form": form,
