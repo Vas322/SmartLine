@@ -1,6 +1,4 @@
 """Tests for the Smartline web interface - RegistrationDashboardTests class."""
-
-"""Tests for the Smartline web interface."""
 import re
 from datetime import time, timedelta
 from decimal import Decimal

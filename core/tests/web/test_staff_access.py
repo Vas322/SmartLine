@@ -1,6 +1,4 @@
 """Tests for the Smartline web interface - StaffAccessTests class."""
-
-"""Tests for the Smartline web interface."""
 import re
 from datetime import time, timedelta
 from decimal import Decimal
