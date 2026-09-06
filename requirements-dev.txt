@@ -1,0 +1,2 @@
+# Dev-only dependencies (not used in production image)
+ruff==0.16.6

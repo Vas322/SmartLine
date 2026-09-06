@@ -1,0 +1,19 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 119
+
+[tool.ruff.lint]
+select = ["F", "E", "W"]
+ignore = []
+
+# E501: long lines in string literals (error messages, help_text) and
+# auto-generated migration files (long options/dict values). No behavior change.
+[tool.ruff.lint.per-file-ignores]
+"core/error_messages.py" = ["E501"]
+"core/forms/players.py" = ["E501"]
+"core/models/telegram.py" = ["E501"]
+"core/services/activity_service.py" = ["E501"]
+"core/services/scheduling_service.py" = ["E501"]
+"core/tests/test_activity_service.py" = ["E501"]
+"core/tests/test_scheduled_messages.py" = ["E501"]
+"core/migrations/*.py" = ["E501"]
