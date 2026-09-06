@@ -218,7 +218,7 @@ class ProcessTelegramMessageTests(TestCase):
 
     def test_resolve_by_user_id_takes_precedence(self):
         """Player with telegram_user_id=100 is resolved by user_id even if nick differs.
-        
+
         Now: mismatch -> NICK_MISMATCH, nick NOT changed, no activity created.
         """
         Player.objects.create(nickname="OldNick", telegram_user_id=100)

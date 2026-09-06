@@ -1,8 +1,5 @@
 """Tests for the Smartline web interface - StaffAccessTests class."""
-import re
-from datetime import time, timedelta
 from decimal import Decimal
-from unittest import mock
 
 from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
@@ -11,13 +8,8 @@ from django.utils import timezone
 
 from core.models import (
     Activity,
-    CastRate,
     Instruction,
     Player,
-    Rate,
-    Registration,
-    RegistrationRate,
-    ScheduleMirror,
     TelegramMessage,
 )
 

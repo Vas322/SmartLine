@@ -37,6 +37,9 @@ __all__ = [
     "MEMBERS_GROUP",
     "_percent",
     "logger",
+    # services (for test mocking)
+    "messaging_service",
+    "schedule_mirror_service",
     # dashboard
     "dashboard",
     # players

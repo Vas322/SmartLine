@@ -2,7 +2,7 @@
 import logging
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.core.management import call_command
@@ -29,7 +29,7 @@ def _backup_subprocess_side_effect(cmd, **kwargs):
         except (ValueError, IndexError):
             pass
         return _make_completed_process()
-    
+
     # gpg: creates .gpg file via -o argument
     if cmd and cmd[0] == "gpg":
         try:
@@ -39,7 +39,7 @@ def _backup_subprocess_side_effect(cmd, **kwargs):
         except (ValueError, IndexError):
             pass
         return _make_completed_process()
-    
+
     # git bundle: creates .bundle file
     if cmd and cmd[0] == "git" and "bundle" in cmd and "create" in cmd:
         try:
@@ -49,7 +49,7 @@ def _backup_subprocess_side_effect(cmd, **kwargs):
         except (ValueError, IndexError):
             pass
         return _make_completed_process()
-    
+
     return _make_completed_process()
 
 

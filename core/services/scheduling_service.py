@@ -124,7 +124,6 @@ def _next_custom_dt(after: datetime, custom_dates: list[str], run_time: time) ->
         return None
 
     after = _aware_dt(after)
-    after_date = after.date()
 
     # Parse and sort custom dates
     parsed_dates = []

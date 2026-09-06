@@ -2,8 +2,6 @@
 import logging
 from decimal import Decimal
 
-from django.db.models import Q, Sum
-from django.db.models.functions import Coalesce
 
 
 logger = logging.getLogger(__name__)

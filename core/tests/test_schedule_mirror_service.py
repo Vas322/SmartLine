@@ -114,7 +114,7 @@ class ScheduleMirrorServiceTests(TestCase):
             is_active=True,
         )
 
-        result = schedule_mirror_service._apply_to_target(
+        schedule_mirror_service._apply_to_target(
             source_chat_id=-5329088669,
             source_message_id=100,
             text="Текст расписания",
@@ -359,7 +359,7 @@ class ScheduleMirrorServiceTests(TestCase):
         mock_mirror.save = mock.Mock()
         mock_get.return_value = mock_mirror
 
-        result = schedule_mirror_service.publish_current_text(mirror_id=1)
+        schedule_mirror_service.publish_current_text(mirror_id=1)
 
         # Verify fallback to CLAN_CHAT_ID was used
         mock_bot.send_message.assert_called_once_with(

@@ -2,10 +2,9 @@
 import re
 from datetime import time, timedelta
 from decimal import Decimal
-from unittest import mock
 
-from django.contrib.auth.models import Group, User
-from django.test import TestCase, override_settings
+from django.contrib.auth.models import User
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -15,9 +14,6 @@ from core.models import (
     Instruction,
     Player,
     Rate,
-    Registration,
-    RegistrationRate,
-    ScheduleMirror,
     TelegramMessage,
 )
 
@@ -685,7 +681,7 @@ class WebInterfaceTests(TestCase):
         self.assertIn("/login/", response.url)
 
     def test_player_edit_requires_staff(self):
-        non_staff = User.objects.create_user("nostaff", "ns@test.com", "pass12345!")
+        _non_staff = User.objects.create_user("nostaff", "ns@test.com", "pass12345!")
         self.client.login(username="nostaff", password="pass12345!")
         response = self.client.get(reverse("player_edit", args=[self.player.pk]))
         self.assertEqual(response.status_code, 404)

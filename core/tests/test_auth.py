@@ -87,7 +87,7 @@ class SignUpTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_signup_redirects_authenticated(self):
-        user = User.objects.create_user("logged", "logged@example.com", "pass12345!")
+        User.objects.create_user("logged", "logged@example.com", "pass12345!")
         self.client.login(username="logged", password="pass12345!")
         response = self.client.get("/register/")
         self.assertEqual(response.status_code, 302)
@@ -191,7 +191,7 @@ class AccessControlTest(TestCase):
             self.assertEqual(response.status_code, 200, f"Staff denied access to {url}")
 
     def test_user_without_group_cannot_access_member_pages(self):
-        user = User.objects.create_user("nogroup", "n@test.com", "pass12345!")
+        User.objects.create_user("nogroup", "n@test.com", "pass12345!")
         self.member.login(username="nogroup", password="pass12345!")
         response = self.member.get("/")
         self.assertEqual(response.status_code, 302)

@@ -1,24 +1,12 @@
 """Tests for the Smartline web interface - ScheduleMirrorViewTests class."""
-import re
-from datetime import time, timedelta
-from decimal import Decimal
 from unittest import mock
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.utils import timezone
 
 from core.models import (
-    Activity,
-    CastRate,
-    Instruction,
-    Player,
-    Rate,
-    Registration,
-    RegistrationRate,
     ScheduleMirror,
-    TelegramMessage,
 )
 
 _XLSX_CONTENT_TYPE = (
@@ -87,7 +75,7 @@ class ScheduleMirrorViewTests(TestCase):
 
     def test_admin_change_form_shows_schedule_source_info(self):
         from django.contrib.auth.models import User as AuthUser
-        admin_user = AuthUser.objects.create_superuser(username="admin", password="admin-pass", email="a@example.com")
+        _admin_user = AuthUser.objects.create_superuser(username="admin", password="admin-pass", email="a@example.com")
         self.client.login(username="admin", password="admin-pass")
         from core.models import ScheduleMirror
         mirror = ScheduleMirror.objects.create(

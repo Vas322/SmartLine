@@ -285,7 +285,7 @@ class OutgoingMessagesViewTests(TestCase):
     def test_send_new_message_uses_active_group(self):
         """Отправка нового сообщения уходит в активную группу, а не в неактивную."""
         self._login("kl")
-        inactive = TelegramSettings.objects.create(
+        _inactive = TelegramSettings.objects.create(
             name="Неактивная группа",
             group_chat_id=-1005556667777,
             is_active=False,

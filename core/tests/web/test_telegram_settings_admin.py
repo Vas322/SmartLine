@@ -1,25 +1,9 @@
 """Tests for the Smartline web interface - TelegramSettingsAdminTests class."""
-import re
-from datetime import time, timedelta
-from decimal import Decimal
-from unittest import mock
 
-from django.contrib.auth.models import Group, User
-from django.test import TestCase, override_settings
+from django.contrib.auth.models import User
+from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
-from core.models import (
-    Activity,
-    CastRate,
-    Instruction,
-    Player,
-    Rate,
-    Registration,
-    RegistrationRate,
-    ScheduleMirror,
-    TelegramMessage,
-)
 
 _XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -137,7 +121,7 @@ class TelegramSettingsAdminTests(TestCase):
         from core.models import TelegramSettings
 
         self.client.login(username="kl", password="test-password-123")
-        response = self.client.post(
+        self.client.post(
             reverse("admin:core_telegramsettings_add"),
             {
                 "name": "Конфликтная группа",
