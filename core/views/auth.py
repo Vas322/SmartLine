@@ -1,7 +1,6 @@
 """Authentication and user profile views."""
 import logging
 
-from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.tokens import default_token_generator

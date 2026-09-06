@@ -12,7 +12,6 @@ from django.utils import timezone
 from core.models import Activity, Player, ProcessingError, Registration, TelegramMessage
 from core.parsers import (
     ParsedActivity,
-    ParsedRegistration,
     ParserError,
     parse_activity_message,
     parse_registration_message,
