@@ -11,6 +11,52 @@ from core.models import CastRate, Rate, RegistrationRate
 logger = logging.getLogger(__name__)
 
 
+def _delete_rate(request, post_key: str, model) -> bool:
+    """Handle a delete POST for a rate model. Returns True if redirect needed."""
+    pk = request.POST.get(post_key)
+    if not pk:
+        return False
+    try:
+        model.objects.filter(pk=pk).delete()
+    except (TypeError, ValueError):
+        pass
+    return True
+
+
+def _process_rate_form(request, prefix: str, form_class, model):
+    """Handle add/edit POST for one rate kind.
+
+    Returns (handled, open_flag, form):
+    - handled: True when this kind's add/edit was submitted in POST.
+    - open_flag: useful only when handled; True means the add/edit form is open.
+    - form: None when a redirect already happened (successful save); otherwise
+      the bound form (possibly invalid) or an empty form when the edit target
+      was not found.
+    """
+    add_key = f"add_{prefix}rate"
+    edit_key = f"edit_{prefix}rate"
+
+    if not (request.POST.get(add_key) or request.POST.get(edit_key)):
+        return False, False, None
+
+    if request.POST.get(edit_key):
+        instance = model.objects.filter(pk=request.POST[edit_key]).first()
+        if instance:
+            form = form_class(request.POST, instance=instance)
+            if form.is_valid():
+                form.save()
+                return True, True, None
+        else:
+            form = form_class()
+    else:
+        form = form_class(request.POST)
+        if form.is_valid():
+            form.save()
+            return True, True, None
+
+    return True, True, form
+
+
 @staff_or_404
 def settings_view(request):
     edit_rate_pk = request.GET.get("edit") or request.POST.get("edit_rate")
@@ -26,78 +72,29 @@ def settings_view(request):
     reg_rate_form = None
 
     if request.method == "POST":
-        rate_pk = request.POST.get("delete_rate")
-        if rate_pk:
-            try:
-                Rate.objects.filter(pk=rate_pk).delete()
-            except (TypeError, ValueError):
-                pass
+        if _delete_rate(request, "delete_rate", Rate):
+            return redirect("settings")
+        if _delete_rate(request, "delete_cast_rate", CastRate):
+            return redirect("settings")
+        if _delete_rate(request, "delete_reg_rate", RegistrationRate):
             return redirect("settings")
 
-        cast_rate_pk = request.POST.get("delete_cast_rate")
-        if cast_rate_pk:
-            try:
-                CastRate.objects.filter(pk=cast_rate_pk).delete()
-            except (TypeError, ValueError):
-                pass
-            return redirect("settings")
+        handled, def_add_open, rate_form = _process_rate_form(request, "", RateForm, Rate)
+        if not handled:
+            handled, cast_add_open, cast_rate_form = _process_rate_form(
+                request, "cast_", CastRateForm, CastRate
+            )
+        if not handled:
+            handled, reg_add_open, reg_rate_form = _process_rate_form(
+                request, "reg_", RegistrationRateForm, RegistrationRate
+            )
 
-        reg_rate_pk = request.POST.get("delete_reg_rate")
-        if reg_rate_pk:
-            try:
-                RegistrationRate.objects.filter(pk=reg_rate_pk).delete()
-            except (TypeError, ValueError):
-                pass
+        if rate_form is None and def_add_open:
             return redirect("settings")
-
-        if request.POST.get("add_rate") or request.POST.get("edit_rate"):
-            def_add_open = True
-            if request.POST.get("edit_rate"):
-                rate = Rate.objects.filter(pk=request.POST["edit_rate"]).first()
-                if rate:
-                    rate_form = RateForm(request.POST, instance=rate)
-                    if rate_form.is_valid():
-                        rate_form.save()
-                        return redirect("settings")
-                else:
-                    rate_form = RateForm()
-            else:
-                rate_form = RateForm(request.POST)
-                if rate_form.is_valid():
-                    rate_form.save()
-                    return redirect("settings")
-        elif request.POST.get("add_cast_rate") or request.POST.get("edit_cast_rate"):
-            cast_add_open = True
-            if request.POST.get("edit_cast_rate"):
-                cast_rate = CastRate.objects.filter(pk=request.POST["edit_cast_rate"]).first()
-                if cast_rate:
-                    cast_rate_form = CastRateForm(request.POST, instance=cast_rate)
-                    if cast_rate_form.is_valid():
-                        cast_rate_form.save()
-                        return redirect("settings")
-                else:
-                    cast_rate_form = CastRateForm()
-            else:
-                cast_rate_form = CastRateForm(request.POST)
-                if cast_rate_form.is_valid():
-                    cast_rate_form.save()
-                    return redirect("settings")
-        elif request.POST.get("add_reg_rate") or request.POST.get("edit_reg_rate"):
-            reg_add_open = True
-            if request.POST.get("edit_reg_rate"):
-                reg_rate = RegistrationRate.objects.filter(pk=request.POST["edit_reg_rate"]).first()
-                if reg_rate:
-                    reg_rate_form = RegistrationRateForm(request.POST, instance=reg_rate)
-                    if reg_rate_form.is_valid():
-                        reg_rate_form.save()
-                        return redirect("settings")
-                else:
-                    reg_rate_form = RegistrationRateForm()
-            else:
-                reg_rate_form = RegistrationRateForm(request.POST)
-                if reg_rate_form.is_valid():
-                    reg_rate_form.save()
-                    return redirect("settings")
+        if cast_rate_form is None and cast_add_open:
+            return redirect("settings")
+        if reg_rate_form is None and reg_add_open:
+            return redirect("settings")
 
     if rate_form is None:
         rate = Rate.objects.filter(pk=edit_rate_pk).first() if edit_rate_pk else None
