@@ -16,6 +16,7 @@ from core.services.notification_service import (
     notify_edit_accepted,
 )
 from core.services import schedule_mirror_service
+from core.services import welcome_service
 
 logger = logging.getLogger(__name__)
 MSK = timezone.get_fixed_timezone(180)  # UTC+3, фиксированный пояс Москвы
@@ -127,6 +128,21 @@ def handle_update(update: dict) -> None:
             update.get("update_id"),
         )
         return None
+
+    # Welcome: new_chat_members / left_chat_member events carry no text.
+    new_members = message.get("new_chat_members")
+    if isinstance(new_members, list) and new_members:
+        welcome_service.handle_new_chat_members(
+            chat_id=message["chat"]["id"],
+            message_id=message["message_id"],
+            new_members=new_members,
+            message_thread_id=message.get("message_thread_id"),
+        )
+        return
+    left_member = message.get("left_chat_member")
+    if isinstance(left_member, dict):
+        welcome_service.handle_left_chat_member(user_id=left_member.get("id"))
+        return
 
     text = message.get("text") or message.get("caption")
     if text is None:
