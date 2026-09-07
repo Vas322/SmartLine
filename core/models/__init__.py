@@ -4,6 +4,7 @@ from core.models.base import CastRate, Player, Rate, RegistrationRate, TelegramM
 from core.models.instructions import Instruction, ScheduleMirror
 from core.models.registration import Registration
 from core.models.telegram import OutgoingMessage, ScheduledMessage, TelegramSettings, TelegramTopic
+from core.models.welcome import WelcomeSettings
 
 __all__ = [
     "Player",
@@ -20,4 +21,5 @@ __all__ = [
     "Instruction",
     "Registration",
     "ScheduleMirror",
+    "WelcomeSettings",
 ]

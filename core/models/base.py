@@ -3,8 +3,9 @@ from django.db import models
 
 
 class Player(models.Model):
-    nickname = models.CharField(max_length=64, unique=True)
+    nickname = models.CharField(max_length=64, null=True, blank=True)
     telegram_user_id = models.BigIntegerField(null=True, blank=True)
+    telegram_username = models.CharField(max_length=64, blank=True, default="")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -15,11 +16,16 @@ class Player(models.Model):
                 fields=["telegram_user_id"],
                 condition=models.Q(telegram_user_id__isnull=False),
                 name="uniq_player_telegram_user_id",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["nickname"],
+                condition=models.Q(nickname__isnull=False),
+                name="uniq_player_nickname_nonnull",
+            ),
         ]
 
     def __str__(self) -> str:
-        return self.nickname
+        return self.nickname or "—"
 
 
 class TelegramMessage(models.Model):
