@@ -1,5 +1,6 @@
 """Player forms."""
 import re
+from typing import Optional
 
 from django import forms
 
@@ -30,24 +31,33 @@ class PlayerForm(forms.ModelForm):
 class PlayerEditForm(forms.ModelForm):
     class Meta:
         model = Player
-        fields = ["nickname", "telegram_user_id"]
+        fields = ["nickname", "telegram_username", "telegram_user_id"]
         widgets = {
             "nickname": forms.TextInput(attrs={"placeholder": "Игровой ник"}),
+            "telegram_username": forms.TextInput(
+                attrs={"placeholder": "Ник в Telegram (необязательно)"}
+            ),
             "telegram_user_id": forms.NumberInput(
                 attrs={"placeholder": "Telegram user ID (необязательно)"}
             ),
         }
         labels = {
             "nickname": "Ник",
+            "telegram_username": "Ник в Telegram",
             "telegram_user_id": "Telegram user ID",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["nickname"].required = False
+        self.fields["telegram_username"].required = False
         self.fields["telegram_user_id"].required = False
 
-    def clean_nickname(self) -> str:
-        nickname = self.cleaned_data["nickname"].strip()
+    def clean_nickname(self) -> Optional[str]:
+        nickname = (self.cleaned_data["nickname"] or "").strip()
+        if not nickname:
+            # Автосозданные при приветствии игроки могут иметь пустой ник (прочерк).
+            return None
         if not re.fullmatch(r"^[A-Za-zА-Яа-яЁё0-9]+$", nickname):
             raise forms.ValidationError(
                 "Ник может содержать только буквы русского/английского алфавита и цифры. Пожалуйста, исправьте игровой ник на корректный."

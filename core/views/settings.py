@@ -2,10 +2,17 @@
 import logging
 
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from core.decorators import staff_or_404
-from core.forms import CastRateForm, RateForm, RegistrationRateForm
+from core.forms import (
+    CastRateForm,
+    RateForm,
+    RegistrationRateForm,
+    WelcomeSettingsForm,
+)
 from core.models import CastRate, Rate, RegistrationRate
+from core.services import welcome_service
 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +78,22 @@ def settings_view(request):
     cast_rate_form = None
     reg_rate_form = None
 
+    welcome_settings = welcome_service.get_welcome_settings()
+    welcome_form = WelcomeSettingsForm(instance=welcome_settings)
+
     if request.method == "POST":
+        # Welcome section actions (independent of rate forms).
+        if request.POST.get("save_welcome"):
+            welcome_form = WelcomeSettingsForm(
+                request.POST, instance=welcome_settings
+            )
+            if welcome_form.is_valid():
+                welcome_form.save()
+                return redirect("settings")
+        elif request.POST.get("reset_welcome_block"):
+            welcome_service.reset_block_until()
+            return redirect("settings")
+
         if _delete_rate(request, "delete_rate", Rate):
             return redirect("settings")
         if _delete_rate(request, "delete_cast_rate", CastRate):
@@ -117,6 +139,11 @@ def settings_view(request):
     rates = Rate.objects.all()
     cast_rates = CastRate.objects.all()
     reg_rates = RegistrationRate.objects.all()
+    now = timezone.now()
+    welcome_blocked = (
+        welcome_settings.block_until is not None
+        and welcome_settings.block_until > now
+    )
     return render(
         request,
         "core/settings.html",
@@ -133,5 +160,8 @@ def settings_view(request):
             "reg_rates": reg_rates,
             "edit_reg_rate_pk": edit_reg_rate_pk,
             "reg_add_open": reg_add_open,
+            "welcome_form": welcome_form,
+            "welcome_settings": welcome_settings,
+            "welcome_blocked": welcome_blocked,
         },
     )

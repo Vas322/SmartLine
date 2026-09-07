@@ -10,13 +10,15 @@
 <table>
     <tr>
         <th>Ник</th>
+        <th>Ник в Telegram</th>
         <th>Активен</th>
-        <th>Создан</th>
+        <th>Принят в клан</th>
         <th>Действие</th>
     </tr>
     {% for player in players %}
     <tr>
-        <td>{{ player.nickname }}</td>
+        <td>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</td>
+        <td>{% if player.telegram_username %}{{ player.telegram_username }}{% else %}—{% endif %}</td>
         <td>{{ player.is_active|yesno:"Да,Нет" }}</td>
         <td>{{ player.created_at|date:"d.m.Y H:i" }}</td>
         <td>
@@ -31,12 +33,12 @@
             </form>
             <form action="{% url 'player_delete' player.pk %}" method="post" class="inline-form">
                 {% csrf_token %}
-                <button type="button" class="btn delete-btn" data-player-name="{{ player.nickname }}">Удалить</button>
+                <button type="button" class="btn delete-btn" data-player-name="{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}">Удалить</button>
             </form>
         </td>
     </tr>
     {% empty %}
-    <tr><td colspan="4" class="muted">Игроков пока нет.</td></tr>
+    <tr><td colspan="5" class="muted">Игроков пока нет.</td></tr>
     {% endfor %}
 </table>
 {% endblock %}

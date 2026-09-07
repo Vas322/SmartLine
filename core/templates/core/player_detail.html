@@ -1,7 +1,8 @@
 {% extends "core/base.html" %}
-{% block title %}{{ player.nickname }}{% endblock %}
+{% block title %}{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}{% endblock %}
 {% block content %}
-<h1>{{ player.nickname }}</h1>
+<h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1>
+{% if player.telegram_username %}<p class="muted">Ник в Telegram: {{ player.telegram_username }}</p>{% endif %}
 <form method="get" action="{% url 'player_detail' player.pk %}">
     {{ form.period.label_tag }} {{ form.period }}
     <div class="period-date-group">

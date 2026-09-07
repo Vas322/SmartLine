@@ -10,6 +10,7 @@ from core.forms.scheduled_messages import (
     ScheduledMessageAdminForm,
     WeekdayCheckboxSelectMultiple,
 )
+from core.forms.settings import WelcomeSettingsForm
 
 __all__ = [
     "PlayerForm",
@@ -25,4 +26,5 @@ __all__ = [
     "CustomDatesWidget",
     "WeekdayCheckboxSelectMultiple",
     "ScheduledMessageAdminForm",
+    "WelcomeSettingsForm",
 ]

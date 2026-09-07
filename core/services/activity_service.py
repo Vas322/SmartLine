@@ -92,7 +92,8 @@ def _resolve_player(nick: str, user_id: Optional[int]) -> Tuple[Player, bool, Op
     if user_id is not None:
         p = Player.objects.filter(telegram_user_id=user_id).first()
         if p is not None:
-            mismatch = p.nickname.casefold() != nick.casefold()
+            # Автосозданные при приветствии игроки могут иметь nickname=None.
+            mismatch = (p.nickname or "").casefold() != nick.casefold()
             return p, False, None, False, mismatch
 
     p = Player.objects.filter(nickname__iexact=nick).order_by("id").first()
