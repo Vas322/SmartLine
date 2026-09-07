@@ -166,8 +166,11 @@ def handle_new_chat_members(
         welcome_text = settings_obj.welcome_text.strip()
         blocked = settings_obj.block_until is not None and settings_obj.block_until > now
 
+        # Приветствуем ТОЛЬКО новых участников (в событии есть вновь созданный
+        # Player). Повторно вошедшие (реактивация) приветствие не получают.
         send_welcome = (
-            bool(welcome_text)
+            new_count_this_call > 0
+            and bool(welcome_text)
             and not blocked
             and not mass_join
         )
