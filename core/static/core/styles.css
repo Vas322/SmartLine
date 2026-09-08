@@ -22,6 +22,10 @@
     padding: 0;
     margin: 0;
 }
+.welcome-preview {
+    white-space: normal;
+    margin: 8px 0;
+}
 .period-date-group {
     display: none;
 }

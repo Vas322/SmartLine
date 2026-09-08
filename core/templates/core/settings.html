@@ -166,19 +166,28 @@
 </form>
 
 <h2>Приветствие</h2>
+{% if welcome_edit_open or not welcome_settings.welcome_text|length %}
 <form method="post">
     {% csrf_token %}
     <p>
         {{ welcome_form.welcome_text.label_tag }}<br>
         {{ welcome_form.welcome_text }}
     </p>
-    <button type="submit" name="save_welcome" class="btn">Сохранить приветствие</button>
+    <button type="submit" name="save_welcome" value="1" class="btn">Сохранить приветствие</button>
+    {% if welcome_settings.welcome_text|length %}
+    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    {% endif %}
 </form>
+{% else %}
+<h3>Текущее приветствие</h3>
+<div class="welcome-preview">{{ welcome_settings.welcome_text|linebreaksbr }}</div>
+<a href="?edit_welcome=1" class="btn">Изменить приветствие</a>
+{% endif %}
 {% if welcome_blocked %}
 <p class="muted">Приветствия временно отключены из-за массового захода (до {{ welcome_settings.block_until|date:"H:i" }}).</p>
 <form method="post" class="inline-form">
     {% csrf_token %}
-    <button type="submit" name="reset_welcome_block" class="btn">Сбросить блокировку</button>
+    <button type="submit" name="reset_welcome_block" value="1" class="btn">Сбросить блокировку</button>
 </form>
 {% endif %}
 {% if not welcome_settings.welcome_text|length %}

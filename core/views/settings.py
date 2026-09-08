@@ -163,5 +163,6 @@ def settings_view(request):
             "welcome_form": welcome_form,
             "welcome_settings": welcome_settings,
             "welcome_blocked": welcome_blocked,
+            "welcome_edit_open": bool(request.GET.get("edit_welcome")),
         },
     )

@@ -32,12 +32,38 @@ class WelcomeSettingsWebTests(TestCase):
         self.assertIn("Приветствие", content)
         self.assertIn('name="welcome_text"', content)
         self.assertIn('name="save_welcome"', content)
+        self.assertIn('name="save_welcome" value="1"', content)
 
     def test_settings_page_shows_disabled_hint_when_text_empty(self):
         self._login(self.staff)
         response = self.client.get(reverse("settings"))
         content = response.content.decode()
         self.assertIn("Приветствия выключены (текст пуст)", content)
+
+    def test_settings_page_shows_welcome_preview_when_text_saved(self):
+        settings = welcome_service.get_welcome_settings()
+        settings.welcome_text = "Добро пожаловать в клан!"
+        settings.save()
+
+        self._login(self.staff)
+        response = self.client.get(reverse("settings"))
+        content = response.content.decode()
+        self.assertIn("Текущее приветствие", content)
+        self.assertIn("Добро пожаловать в клан!", content)
+        self.assertIn("?edit_welcome=1", content)
+        self.assertNotIn('name="welcome_text"', content)
+
+    def test_settings_page_opens_welcome_edit_with_edit_welcome_param(self):
+        settings = welcome_service.get_welcome_settings()
+        settings.welcome_text = "Добро пожаловать в клан!"
+        settings.save()
+
+        self._login(self.staff)
+        response = self.client.get(reverse("settings") + "?edit_welcome=1")
+        content = response.content.decode()
+        self.assertIn('name="welcome_text"', content)
+        self.assertIn('name="save_welcome" value="1"', content)
+        self.assertIn("Отмена", content)
 
     def test_settings_save_welcome_text(self):
         self._login(self.staff)
@@ -74,6 +100,7 @@ class WelcomeSettingsWebTests(TestCase):
         content = response.content.decode()
         self.assertIn("Приветствия временно отключены из-за массового захода", content)
         self.assertIn('name="reset_welcome_block"', content)
+        self.assertIn('name="reset_welcome_block" value="1"', content)
 
     def test_non_staff_cannot_access_settings(self):
         self._login(self.non_staff)
