@@ -65,7 +65,7 @@ def _adopt_nick(p: Player, nick: str) -> Tuple[Player, bool, Optional[str], bool
 
     Returns (player, nick_changed, old_nickname_or_none, is_new_player, mismatch).
     """
-    if p.nickname.casefold() != nick.casefold():
+    if (p.nickname or "").casefold() != nick.casefold():
         old = p.nickname
         p.nickname = nick
         p.save(update_fields=["nickname"])
