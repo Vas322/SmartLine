@@ -1,10 +1,11 @@
 {% extends "core/base.html" %}
 {% load static %}
+{% load instruction_tags %}
 {% block title %}{{ instruction.title }}{% endblock %}
 {% block content %}
 <h1>{{ instruction.title }}</h1>
-<div class="instruction-detail">
-    {{ instruction.content|linebreaks }}
+<div class="instruction-content">
+    {{ instruction.content|render_instruction }}
 </div>
 <p class="instruction-meta">Слаг: {{ instruction.slug }} · Обновлено: {{ instruction.updated_at|date:"d.m.Y H:i" }}</p>
 {% if user.is_staff %}
