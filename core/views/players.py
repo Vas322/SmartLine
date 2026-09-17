@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from core.decorators import staff_or_404
+from core.decorators import member_required, staff_or_404
 from core.forms import PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
 from core.services import stats
@@ -16,7 +16,7 @@ from core.views.common import _percent
 logger = logging.getLogger(__name__)
 
 
-@staff_or_404
+@member_required
 def player_detail(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
     form = PeriodForm(request.GET or None, initial={"period": "month"})

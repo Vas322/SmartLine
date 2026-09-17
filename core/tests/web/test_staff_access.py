@@ -95,7 +95,6 @@ class StaffAccessTests(TestCase):
             ("telegram_messages", {}),
             ("settings", {}),
             ("instruction_edit", {"pk": self.instruction.pk}),
-            ("player_detail", {"pk": self.player.pk}),
             ("player_edit", {"pk": self.player.pk}),
         ]:
             response = self.client.get(reverse(url_name, kwargs=kwargs))
@@ -171,12 +170,26 @@ class StaffAccessTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Instruction.objects.count(), count_before + 1)
 
-    def test_member_dashboard_nick_not_linked(self):
-        """Member dashboard nick is plain text (no player profile link)."""
+    def test_member_dashboard_nick_linked(self):
+        """Member dashboard nick links to the player profile."""
         self._login_member()
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("/player/", response.content.decode())
+        self.assertIn(
+            reverse("player_detail", args=[self.player.pk]),
+            response.content.decode(),
+        )
+
+    def test_member_player_detail_returns_200(self):
+        """Members can view player activity detail page."""
+        self._login_member()
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Активности", content)
+        self.assertIn("DEF", content)
 
     def test_staff_dashboard_nick_linked(self):
         """Staff dashboard nick links to the player profile."""
