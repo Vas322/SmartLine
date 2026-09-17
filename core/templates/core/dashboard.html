@@ -34,8 +34,8 @@
         <td>{{ row.farm_hours }}</td>
         <td>{{ row.cast_count }}</td>
         <td>
-            <div style="background: #ecf0f1; border-radius: 4px; width: 120px; display: inline-block; vertical-align: middle;">
-                <div style="width: {{ row.percent|floatformat:0 }}%; background: #2980b9; height: 14px; border-radius: 4px;"></div>
+            <div title="{{ row.percent }}%" style="background: #ecf0f1; border-radius: 4px; width: 120px; display: inline-block; vertical-align: middle;">
+                <div style="width: {{ row.percent|floatformat:0 }}%; background: #1f618d; height: 14px; border-radius: 4px;"></div>
             </div>
             {{ row.percent }}
         </td>

@@ -1,3 +1,33 @@
+/* ===== Inter (локальные шрифты) ===== */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/inter/Inter-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('fonts/inter/Inter-SemiBold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('fonts/inter/Inter-Bold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url('fonts/inter/Inter-ExtraBold.woff2') format('woff2');
+}
+
 .btn {
     display: inline-block;
     padding: 6px 12px;
@@ -8,6 +38,7 @@
     color: #2c3e50;
     cursor: pointer;
     font-size: 14px;
+    transition: all 0.2s;
 }
 .btn:hover {
     background: #dde4e6;
@@ -65,34 +96,65 @@
     justify-content: flex-end;
 }
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', Arial, sans-serif;
     margin: 0;
-    background: #f5f6f7;
+    background: #f5f5f5;
     color: #222;
 }
 header {
-    background: #2c3e50;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
     color: #fff;
-    padding: 12px 24px;
+    padding: 0 24px;
+    min-height: 60px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
 }
 header .brand {
+    display: inline-flex;
+    align-items: center;
     color: #fff;
     text-decoration: none;
-    font-weight: bold;
-    font-size: 18px;
-    margin-right: 16px;
+    gap: 0;
+    margin-right: 20px;
+    flex-shrink: 0;
+    padding-left: 12px;
+}
+.brand-name {
+    font-family: 'Inter', Arial, sans-serif;
+    font-weight: 800;
+    font-size: 24px;
+    line-height: 1;
+    color: #D50000;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.brand:hover .brand-name {
+    color: #E50000;
+    transition: color 0.15s ease;
+}
+a:focus-visible {
+    outline: 2px solid #CC0000;
+    outline-offset: 3px;
+    border-radius: 3px;
 }
 header a {
-    color: #d5dce4;
+    color: #b0bec5;
     text-decoration: none;
     margin-right: 14px;
+    transition: color 0.2s;
 }
 header a:hover {
-    color: #fff;
+    color: #ffffff;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+}
+header a.nav-link.active {
+    color: #ffffff;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.7);
 }
 .header-right {
     margin-left: auto;
@@ -100,28 +162,59 @@ header a:hover {
     align-items: center;
     gap: 12px;
 }
+.header-right .btn {
+    padding: 6px 16px;
+}
+.header-right .btn-danger {
+    background: #c0392b;
+}
+.header-right .btn-danger:hover {
+    background: #E50000;
+}
 main {
     max-width: 1200px;
     margin: 24px auto;
     padding: 0 24px;
 }
 h1 {
-    font-size: 22px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a2e;
 }
 table {
     border-collapse: collapse;
     width: 100%;
     background: #fff;
+    border: 1px solid #e0e0e0;
 }
 th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+    border: 1px solid #e0e0e0;
+    padding: 12px;
     text-align: left;
     font-size: 14px;
     vertical-align: top;
 }
 th {
-    background: #ecf0f1;
+    background: #f5f5f5;
+    font-weight: 600;
+    border-bottom: 1px solid #e0e0e0;
+}
+tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+tr:nth-child(even) {
+    background: #fafafa;
+}
+tr:hover {
+    background: #f5f5f5;
+}
+/* Специфичные строки (входящие/исходящие сообщения) сохраняют свой фон
+   и не перекрашиваются полосатостью/hover. */
+table tr.incoming-row {
+    background: #fbfeff;
+}
+table tr.outgoing-row.all-outgoing {
+    background: #f4f9f4;
 }
 form {
     background: #fff;
@@ -202,12 +295,12 @@ textarea.field-content {
     padding-top: 40px;
 }
 .auth-card {
-    background: #fff;
+    background: #ffffff;
     width: 100%;
     max-width: 400px;
     padding: 32px;
-    border-radius: 10px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     border: 1px solid #eef0f2;
     box-sizing: border-box;
 }
@@ -216,7 +309,7 @@ textarea.field-content {
     margin: 0 0 24px;
     font-size: 24px;
     font-weight: 600;
-    color: #2c3e50;
+    color: #1a1a2e;
 }
 .auth-card form {
     background: transparent;
@@ -236,28 +329,40 @@ textarea.field-content {
 }
 .form-field input {
     width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d5dbe0;
-    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
     font-size: 15px;
     box-sizing: border-box;
 }
 .form-field input:focus {
     outline: none;
-    border-color: #2980b9;
-    box-shadow: 0 0 0 3px rgba(41, 128, 185, 0.15);
+    border-color: #D50000;
+    box-shadow: 0 0 0 2px rgba(213, 0, 0, 0.1);
 }
 .auth-card .btn {
     width: 100%;
     padding: 12px;
     font-size: 15px;
     margin-top: 4px;
+    border: none;
+    background: linear-gradient(135deg, #1976D2, #1565C0);
+}
+.auth-card .btn:hover {
+    background: linear-gradient(135deg, #1976D2, #1565C0);
+    filter: brightness(1.1);
 }
 .auth-links {
     text-align: center;
     margin-top: 20px;
     font-size: 14px;
     line-height: 1.9;
+}
+.auth-links a {
+    color: #1976D2;
+}
+.auth-links a:hover {
+    color: #1565C0;
 }
 .auth-card .error {
     background: #fdecea;
@@ -414,14 +519,6 @@ textarea.field-content {
     background: #ecf0f1;
 }
 
-/* ===== Входящие/исходящие в табе «Все» ===== */
-tr.incoming-row {
-    background: #fbfeff;
-}
-tr.outgoing-row.all-outgoing {
-    background: #f4f9f4;
-}
-
 /* ===== Toast (уведомление об отправке) ===== */
 .toast {
     position: fixed;
@@ -435,4 +532,42 @@ tr.outgoing-row.all-outgoing {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     z-index: 1100;
     font-size: 14px;
+}
+
+/* ===== Пустые состояния ===== */
+.empty-state {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 32px;
+    color: #555;
+}
+.empty-state-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    color: #90a4ae;
+}
+.empty-state-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    line-height: 1.4;
+}
+.empty-state-text strong {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+/* ===== Бренд (mobile) ===== */
+@media (max-width: 767px) {
+    .brand-name {
+        font-size: 20px;
+    }
+    .brand {
+        margin-right: 12px;
+    }
 }

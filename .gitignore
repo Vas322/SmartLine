@@ -29,3 +29,6 @@ CONTEXT.md
 
 # Internal rules (не выгружать на GitHub)
 PROJECT_RULES.md
+
+# Design references (локальные референсы, не выгружать на GitHub)
+docs/design/refs/
