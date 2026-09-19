@@ -1,6 +1,13 @@
 """Models package — re-exports all models and constants from submodules."""
 from core.models.activity import Activity, ProcessingError
 from core.models.base import CastRate, Player, Rate, RegistrationRate, TelegramMessage
+from core.models.boss_respawn import (
+    DEFAULT_BOSS_TEMPLATE,
+    BossRespawn,
+    BossRespawnSyncStatus,
+    EpicBossNotificationLog,
+    EpicBossNotificationSettings,
+)
 from core.models.instructions import Instruction, ScheduleMirror
 from core.models.registration import Registration
 from core.models.telegram import OutgoingMessage, ScheduledMessage, TelegramSettings, TelegramTopic
@@ -22,4 +29,9 @@ __all__ = [
     "Registration",
     "ScheduleMirror",
     "WelcomeSettings",
+    "BossRespawn",
+    "BossRespawnSyncStatus",
+    "EpicBossNotificationSettings",
+    "EpicBossNotificationLog",
+    "DEFAULT_BOSS_TEMPLATE",
 ]

@@ -82,4 +82,5 @@ urlpatterns = [
     ),
     path("settings/", views.settings_view, name="settings"),
     path("schedule/", views.schedule_mirror, name="schedule_mirror"),
+    path("rb/", views.boss_respawn_view, name="boss_respawn"),
 ]

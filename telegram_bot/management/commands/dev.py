@@ -12,6 +12,8 @@ from telegram_bot.polling import run_poll_loop
 logger = logging.getLogger(__name__)
 
 SCHEDULER_INTERVAL_SECONDS = 60
+RB_PARSER_INTERVAL_SECONDS = 1800
+EPIC_NOTIFY_INTERVAL_SECONDS = 300
 
 
 def _scheduler_loop() -> None:
@@ -25,6 +27,38 @@ def _scheduler_loop() -> None:
         except Exception:
             logger.exception("Unexpected error in scheduler loop")
         time.sleep(SCHEDULER_INTERVAL_SECONDS)
+
+
+def _rb_parser_loop() -> None:
+    """Background loop that syncs boss respawns every 30 minutes."""
+    from core.services.boss_respawn_service import fetch_and_sync
+
+    logger.info(
+        "Boss respawn parser thread started (every %ds).",
+        RB_PARSER_INTERVAL_SECONDS,
+    )
+    while True:
+        try:
+            fetch_and_sync()
+        except Exception:
+            logger.exception("Unexpected error in boss respawn parser loop")
+        time.sleep(RB_PARSER_INTERVAL_SECONDS)
+
+
+def _epic_notify_loop() -> None:
+    """Background loop that sends Epic RB notifications every 5 minutes."""
+    from core.services.boss_notification_service import send_epic_boss_notification
+
+    logger.info(
+        "Epic boss notification thread started (every %ds).",
+        EPIC_NOTIFY_INTERVAL_SECONDS,
+    )
+    while True:
+        try:
+            send_epic_boss_notification()
+        except Exception:
+            logger.exception("Unexpected error in epic boss notification loop")
+        time.sleep(EPIC_NOTIFY_INTERVAL_SECONDS)
 
 
 class Command(StaticRunserverCommand):
@@ -57,5 +91,19 @@ class Command(StaticRunserverCommand):
         )
         scheduler_thread.start()
         logger.info("Scheduler thread '%s' started.", scheduler_thread.name)
+
+        # Boss respawn parser thread: syncs respawn data every 30 minutes.
+        rb_thread = threading.Thread(
+            target=_rb_parser_loop, name="rb-parser", daemon=True
+        )
+        rb_thread.start()
+        logger.info("Boss respawn parser thread '%s' started.", rb_thread.name)
+
+        # Epic boss notification thread: sends notifications every 5 minutes.
+        epic_thread = threading.Thread(
+            target=_epic_notify_loop, name="epic-notify", daemon=True
+        )
+        epic_thread.start()
+        logger.info("Epic boss notification thread '%s' started.", epic_thread.name)
 
         super().handle(*args, **options)

@@ -225,6 +225,7 @@ class OutgoingMessage(models.Model):
         MANUAL_NEW = "manual_new", "Ручное сообщение"
         SCHEDULED = "scheduled", "Автоматическое"
         WELCOME = "welcome", "Приветствие"
+        EPIC_BOSS = "epic_boss", "Эпик РБ"
 
     telegram_chat_id = models.BigIntegerField(
         verbose_name="ID чата",

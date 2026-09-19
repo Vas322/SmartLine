@@ -1,0 +1,77 @@
+{% extends "core/base.html" %}
+{% block title %}Респ РБ{% endblock %}
+{% block content %}
+<h1>Респ РБ — Asterios x5</h1>
+
+<ul class="tabs">
+    <li>
+        <a class="tab-btn{% if filter == 'all' %} active{% endif %}" href="{% url 'boss_respawn' %}">Все</a>
+    </li>
+    <li>
+        <a class="tab-btn{% if filter == 'epic' %} active{% endif %}" href="{% url 'boss_respawn' %}?filter=epic">Эпик</a>
+    </li>
+    <li>
+        <a class="tab-btn{% if filter == 'subclass' %} active{% endif %}" href="{% url 'boss_respawn' %}?filter=subclass">Сабкласс</a>
+    </li>
+</ul>
+
+{% if stale %}
+<p class="warn">Данные могут быть устаревшими.</p>
+{% endif %}
+
+{% if has_data %}
+<div class="boss-grid">
+    {% for card in cards %}
+    <div class="boss-card">
+        <h2 class="boss-name">
+            {{ card.boss_name }}
+            {% if card.boss_type == "EPIC" %}
+            <span class="badge badge-epic">Эпик</span>
+            {% else %}
+            <span class="badge badge-subclass">Сабкласс</span>
+            {% endif %}
+        </h2>
+        <p class="boss-location">{{ card.location }}</p>
+        <p class="boss-status{% if card.started %} status-live{% else %} status-wait{% endif %}">
+            {% if card.started %}Респ идёт{% else %}Респ не начался{% endif %}
+        </p>
+        <p class="boss-window">
+            Начало: {{ card.start_msk|date:"d.m.Y H:i" }} МСК<br>
+            Конец: {{ card.end_msk|date:"d.m.Y H:i" }} МСК
+        </p>
+        <p class="boss-countdown" data-target="{{ card.countdown_msk|date:'c' }}">
+            {% if card.started %}До макс респа: <span class="countdown-value">—</span>{% else %}До начала респа: <span class="countdown-value">—</span>{% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="muted">Расписание временно недоступно.</p>
+{% endif %}
+
+<script>
+(function () {
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function fmt(ms) {
+        if (ms <= 0) return 'завершено';
+        var total = Math.floor(ms / 1000);
+        var d = Math.floor(total / 86400);
+        var h = Math.floor((total % 86400) / 3600);
+        var m = Math.floor((total % 3600) / 60);
+        var s = total % 60;
+        return (d > 0 ? d + 'д ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s);
+    }
+    function update() {
+        var now = Date.now();
+        document.querySelectorAll('.boss-countdown').forEach(function (el) {
+            var target = Date.parse(el.getAttribute('data-target'));
+            if (isNaN(target)) return;
+            var val = el.querySelector('.countdown-value');
+            if (val) val.textContent = fmt(target - now);
+        });
+    }
+    update();
+    setInterval(update, 1000);
+})();
+</script>
+{% endblock %}

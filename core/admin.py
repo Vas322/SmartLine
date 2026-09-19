@@ -4,7 +4,11 @@ from django.contrib import admin, messages
 from core.forms import ScheduledMessageAdminForm
 from core.models import (
     Activity,
+    BossRespawn,
+    BossRespawnSyncStatus,
     CastRate,
+    EpicBossNotificationLog,
+    EpicBossNotificationSettings,
     OutgoingMessage,
     Player,
     ProcessingError,
@@ -16,7 +20,7 @@ from core.models import (
     TelegramSettings,
     TelegramTopic,
 )
-from core.services import schedule_mirror_service, scheduling_service
+from core.services import boss_respawn_service, schedule_mirror_service, scheduling_service
 
 
 @admin.register(ScheduledMessage)
@@ -243,3 +247,79 @@ class ScheduleMirrorAdmin(admin.ModelAdmin):
                     f"Зеркало #{mirror.id}: ошибка отправки — {exc}",
                     level=messages.ERROR,
                 )
+
+
+@admin.register(BossRespawn)
+class BossRespawnAdmin(admin.ModelAdmin):
+    """Данные о респе РБ."""
+
+    list_display = (
+        "boss_name",
+        "boss_type",
+        "respawn_start",
+        "respawn_end",
+        "location",
+        "is_parsed_successfully",
+    )
+    list_filter = ("boss_type", "is_parsed_successfully")
+    search_fields = ("boss_name", "location")
+    readonly_fields = ("raw_data",)
+
+
+@admin.register(BossRespawnSyncStatus)
+class BossRespawnSyncStatusAdmin(admin.ModelAdmin):
+    """Статус синхронизации респов РБ + ручной перезапуск."""
+
+    list_display = (
+        "pk",
+        "last_success_at",
+        "last_error_at",
+        "last_attempt_at",
+        "last_error",
+    )
+    readonly_fields = (
+        "last_success_at",
+        "last_error_at",
+        "last_attempt_at",
+        "last_error",
+    )
+    actions = ["action_reparse_now"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description="Перепарсить сейчас")
+    def action_reparse_now(self, request, queryset):
+        ok = boss_respawn_service.fetch_and_sync()
+        self.message_user(
+            request,
+            "Респы РБ пересинхронизированы."
+            if ok
+            else "Не удалось пересинхронизировать респы РБ (см. last_error).",
+            level=messages.SUCCESS if ok else messages.ERROR,
+        )
+
+
+@admin.register(EpicBossNotificationSettings)
+class EpicBossNotificationSettingsAdmin(admin.ModelAdmin):
+    """Настройки уведомлений об Эпик РБ."""
+
+    list_display = ("pk", "is_enabled", "notification_time", "topic")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EpicBossNotificationLog)
+class EpicBossNotificationLogAdmin(admin.ModelAdmin):
+    """Журнал уведомлений об Эпик РБ."""
+
+    list_display = ("notify_date", "sent_at", "success", "text")
+    list_filter = ("success",)
+    search_fields = ("notify_date", "text")

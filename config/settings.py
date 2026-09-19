@@ -146,6 +146,12 @@ SCHEDULE_MIRROR_TARGET_THREAD_ID = os.getenv("SCHEDULE_MIRROR_TARGET_THREAD_ID")
 if SCHEDULE_MIRROR_TARGET_THREAD_ID:
     SCHEDULE_MIRROR_TARGET_THREAD_ID = int(SCHEDULE_MIRROR_TARGET_THREAD_ID)
 
+# Boss respawn (craft-calc.ru)
+BOSS_RESPAWN_SOURCE_URL = os.getenv("BOSS_RESPAWN_SOURCE_URL", "https://craft-calc.ru/bosses-respawn")
+BOSS_RESPAWN_PARSE_INTERVAL_MINUTES = int(os.getenv("BOSS_RESPAWN_PARSE_INTERVAL_MINUTES", "30"))
+# Public base URL used to build the {url} placeholder in boss notifications.
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").rstrip("/")
+
 # Yandex Disk backup
 YANDEX_DISK_TOKEN = os.getenv("YANDEX_DISK_TOKEN", "")
 YANDEX_DISK_BACKUP_DIR = os.getenv("YANDEX_DISK_BACKUP_DIR", "/Smartline/backups")

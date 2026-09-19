@@ -56,7 +56,7 @@ services:
   smartline-scheduler:
     build: .
     env_file: .env
-    command: sh -c "while true; do python manage.py send_scheduled_messages; sleep 300; done"
+    command: sh -c "while true; do python manage.py send_scheduled_messages; python manage.py send_epic_boss_notifications; sleep 300; done"
     depends_on:
       smartline-db:
         condition: service_healthy
@@ -68,6 +68,17 @@ services:
     build: .
     env_file: .env
     command: sh -c "while true; do python manage.py cleanup_old_messages; sleep 86400; done"
+    depends_on:
+      smartline-db:
+        condition: service_healthy
+    networks:
+      - smartline_net
+    restart: unless-stopped
+
+  smartline-boss-respawn:
+    build: .
+    env_file: .env
+    command: sh -c "while true; do python manage.py parse_boss_respawns; sleep 1800; done"
     depends_on:
       smartline-db:
         condition: service_healthy

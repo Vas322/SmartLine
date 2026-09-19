@@ -2,7 +2,14 @@
 import logging
 from typing import Optional
 
-from core.models import OutgoingMessage, TelegramMessage, TelegramSettings, TelegramTopic, ScheduledMessage
+from core.models import (
+    EpicBossNotificationSettings,
+    OutgoingMessage,
+    TelegramMessage,
+    TelegramSettings,
+    TelegramTopic,
+    ScheduledMessage,
+)
 from django.db import transaction
 from django.utils import timezone
 
@@ -333,6 +340,84 @@ def send_scheduled_message(schedule: ScheduledMessage) -> OutgoingMessage:
     logger.info(
         "Sent scheduled message schedule_id=%s chat_id=%s thread_id=%s new_message_id=%s",
         schedule.pk,
+        chat_id,
+        thread_id,
+        telegram_message_id,
+    )
+    return outgoing
+
+
+def send_epic_boss_notification(
+    settings: EpicBossNotificationSettings, text: str
+) -> OutgoingMessage:
+    """Send an automatic Epic RB notification.
+
+    Analogous to send_scheduled_message but:
+    - source=EPIC_BOSS
+    - user=None (automatic)
+    - thread_id from settings.topic.thread_id
+    """
+    normalized = _normalize_text(text)
+
+    telegram_settings = TelegramSettings.objects.filter(is_active=True).first()
+    chat_id = telegram_settings.group_chat_id if telegram_settings else None
+    if chat_id is None:
+        logger.error("No active Telegram group configured; cannot send epic boss notification")
+        raise MessagingError(
+            "Не настроена активная группа Telegram для отправки сообщений (Группы). "
+            "Автоматическая отправка недоступна."
+        )
+
+    from telegram_bot.bot import TelegramBot
+
+    thread_id = settings.topic.thread_id if settings.topic else None
+    topic_name = _topic_name_by_thread_id(thread_id)
+
+    # Шаг 1: аудит-запись в PENDING до обращения к Telegram.
+    outgoing = _create_outgoing(
+        user=None,
+        chat_id=chat_id,
+        text=normalized,
+        reply_to_message_id=None,
+        reply_to_text="",
+        topic_name=topic_name,
+        source=OutgoingMessage.Source.EPIC_BOSS,
+    )
+
+    # Шаг 2: вызов Telegram API.
+    try:
+        sent = TelegramBot().send_message(
+            chat_id=chat_id,
+            text=normalized,
+            message_thread_id=thread_id,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to send epic boss notification chat_id=%s thread_id=%s: %s",
+            chat_id,
+            thread_id,
+            type(exc).__name__,
+        )
+        _update_outgoing(
+            outgoing,
+            status=OutgoingMessage.Status.ERROR,
+            message_id=0,
+            error_text=str(exc),
+        )
+        raise MessagingError(str(exc)) from exc
+
+    result = (sent or {}).get("result") or {}
+    telegram_message_id = result.get("message_id") or 0
+
+    # Шаг 3: успех — фиксируем message_id и SENT в той же записи.
+    _update_outgoing(
+        outgoing,
+        status=OutgoingMessage.Status.SENT,
+        message_id=telegram_message_id,
+    )
+
+    logger.info(
+        "Sent epic boss notification chat_id=%s thread_id=%s new_message_id=%s",
         chat_id,
         thread_id,
         telegram_message_id,

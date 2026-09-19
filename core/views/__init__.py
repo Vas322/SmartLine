@@ -7,6 +7,7 @@ from core.views.auth import (
     profile_view,
     signup_view,
 )
+from core.views.boss_respawn import boss_respawn_view
 from core.views.common import MEMBERS_GROUP, _percent, logger
 from core.views.dashboard import dashboard
 from core.views.instructions import (
@@ -69,4 +70,6 @@ __all__ = [
     "activate_view",
     "activation_sent_view",
     "profile_view",
+    # boss respawn
+    "boss_respawn_view",
 ]

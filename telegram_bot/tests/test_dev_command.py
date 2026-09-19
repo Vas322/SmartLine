@@ -128,9 +128,10 @@ class DevCommandTests(TestCase):
         from telegram_bot.management.commands.dev import Command
 
         Command().handle()
-        # Без токена бот не запускается, но scheduler-поток запускается всегда.
-        self.assertEqual(mock_thread.call_count, 1)
-        self.assertEqual(mock_thread.call_args.kwargs["name"], "scheduler")
+        # Без токена: scheduler + rb-parser + epic-notify (3 потока).
+        self.assertEqual(mock_thread.call_count, 3)
+        thread_names = {c.kwargs["name"] for c in mock_thread.call_args_list}
+        self.assertEqual(thread_names, {"scheduler", "rb-parser", "epic-notify"})
         mock_srv.assert_called_once()
 
     @override_settings(TELEGRAM_BOT_TOKEN="123:abc")
@@ -142,9 +143,11 @@ class DevCommandTests(TestCase):
         from telegram_bot.management.commands.dev import Command
 
         Command().handle()
-        # Two threads: telegram-bot + scheduler
-        self.assertEqual(mock_thread.call_count, 2)
-        # First call: bot, second: scheduler
+        # Four threads: telegram-bot + scheduler + rb-parser + epic-notify.
+        self.assertEqual(mock_thread.call_count, 4)
+        # Call order: bot, scheduler, rb-parser, epic-notify.
         self.assertEqual(mock_thread.call_args_list[0].kwargs["name"], "telegram-bot")
         self.assertEqual(mock_thread.call_args_list[1].kwargs["name"], "scheduler")
+        self.assertEqual(mock_thread.call_args_list[2].kwargs["name"], "rb-parser")
+        self.assertEqual(mock_thread.call_args_list[3].kwargs["name"], "epic-notify")
         mock_srv.assert_called_once()

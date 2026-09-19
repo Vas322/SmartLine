@@ -7,12 +7,13 @@ from django.utils import timezone
 from core.decorators import staff_or_404
 from core.forms import (
     CastRateForm,
+    EpicBossNotificationSettingsForm,
     RateForm,
     RegistrationRateForm,
     WelcomeSettingsForm,
 )
 from core.models import CastRate, Rate, RegistrationRate
-from core.services import welcome_service
+from core.services import boss_notification_service, welcome_service
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,22 @@ def settings_view(request):
     welcome_settings = welcome_service.get_welcome_settings()
     welcome_form = WelcomeSettingsForm(instance=welcome_settings)
 
+    epic_settings = boss_notification_service.get_settings()
+    epic_form = EpicBossNotificationSettingsForm(instance=epic_settings)
+    epic_edit_open = bool(request.GET.get("edit_epic_boss"))
+
     if request.method == "POST":
+        # Epic boss notification section (independent of rate forms).
+        if request.POST.get("save_epic_boss"):
+            epic_form = EpicBossNotificationSettingsForm(
+                request.POST, instance=epic_settings
+            )
+            if epic_form.is_valid():
+                epic_form.save()
+                return redirect("settings")
+            # Форма невалидна — оставляем её открытой для исправления.
+            epic_edit_open = True
+
         # Welcome section actions (independent of rate forms).
         if request.POST.get("save_welcome"):
             welcome_form = WelcomeSettingsForm(
@@ -164,5 +180,9 @@ def settings_view(request):
             "welcome_settings": welcome_settings,
             "welcome_blocked": welcome_blocked,
             "welcome_edit_open": bool(request.GET.get("edit_welcome")),
+            "epic_form": epic_form,
+            "epic_settings": epic_settings,
+            "epic_preview": boss_notification_service.get_notification_preview(),
+            "epic_edit_open": epic_edit_open,
         },
     )
