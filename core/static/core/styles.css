@@ -149,7 +149,7 @@ main {
     letter-spacing: 0.5px;
     white-space: nowrap;
 }
-.brand:hover .brand-name { color: #E50000; }
+.brand:hover .brand-name { color: var(--color-brand-hover); }
 .site-header a {
     color: var(--color-header-text);
     text-decoration: none;
@@ -395,8 +395,8 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-br
 /* ===== TABS ===== */
 .tabs { list-style: none; display: flex; gap: 4px; margin: 0 0 16px; padding: 0; border-bottom: 2px solid #e0e0e0; }
 .tab-btn { padding: 8px 16px; border: none; background: transparent; cursor: pointer; font-size: 14px; color: #555; border-bottom: 3px solid transparent; margin-bottom: -2px; }
-.tab-btn:hover { color: #2980b9; }
-.tab-btn.active { color: #2980b9; font-weight: bold; border-bottom-color: #2980b9; }
+.tab-btn:hover { color: var(--color-brand); }
+.tab-btn.active { color: var(--color-brand); font-weight: bold; border-bottom-color: var(--color-brand); }
 .tab-panel { display: block; }
 .tab-panel.hidden { display: none; }
 .hidden { display: none !important; }
@@ -451,7 +451,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-br
 .instruction-content .instruction-fields li { padding: 4px 0; }
 .instruction-content .instruction-list { font-size: 14px; margin: 0 0 16px; padding-left: 20px; line-height: 1.5; }
 .instruction-content .instruction-divider { border: none; border-top: 1px solid #e0e0e0; margin: 24px 0; }
-.instruction-content .instruction-note { background: #f0f7ff; border-left: 3px solid #2980b9; border-radius: 0 4px 4px 0; padding: 10px 14px; margin: 12px 0; font-size: 14px; line-height: 1.5; color: #2c3e50; }
+.instruction-content .instruction-note { background: #f0f7ff; border-left: 3px solid var(--color-brand); border-radius: 0 4px 4px 0; padding: 10px 14px; margin: 12px 0; font-size: 14px; line-height: 1.5; color: #2c3e50; }
 .instruction-content .instruction-note.warning { background: #fff8e1; border-left-color: #f39c12; }
 .instruction-content .instruction-note.critical { background: #fdecea; border-left-color: #c0392b; }
 .instruction-content .instruction-highlight { font-family: Consolas, Monaco, "Courier New", monospace; background: #eef1f4; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
