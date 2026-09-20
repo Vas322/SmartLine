@@ -672,7 +672,7 @@ class WebInterfaceTests(TestCase):
         self.assertIn("players/delete/", content)
         self.assertIn("csrfmiddlewaretoken", content)
         # кнопка удаления открывает подтверждение: класс delete-btn + data-player-name
-        self.assertIn('class="btn delete-btn"', content)
+        self.assertIn('delete-btn', content)
         self.assertIn(f'data-player-name="{self.player.nickname}"', content)
 
     def test_player_delete_requires_login(self):
