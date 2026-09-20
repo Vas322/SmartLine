@@ -63,7 +63,7 @@ class LoginPageNavTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         # The header region contains only the brand.
-        header_start = content.index("<header>")
+        header_start = content.index("<header")
         header_end = content.index("</header>")
         header = content[header_start:header_end]
         self.assertIn('class="brand"', header)
@@ -78,7 +78,7 @@ class LoginPageNavTests(TestCase):
         self.client.login(username="kl", password="test-password-123")
         response = self.client.get(reverse("dashboard"))
         content = response.content.decode()
-        header_start = content.index("<header>")
+        header_start = content.index("<header")
         header_end = content.index("</header>")
         header = content[header_start:header_end]
         self.assertIn("Дашборд", header)

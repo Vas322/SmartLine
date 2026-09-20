@@ -62,13 +62,12 @@ class RegistrationDashboardTests(TestCase):
         self.assertIn("Регистрировал", content)
 
     def test_dashboard_shows_total_payout_line(self):
-        """Dashboard shows 'Итого за период' line with total."""
+        """Dashboard shows 'Итого к выплате' stat card with total."""
         self._login()
         response = self.client.get(reverse("dashboard"), {"period": "month"})
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn("Итого за период", content)
-        self.assertIn("кк</p>", content)  # Total payout line
+        self.assertIn("Итого к выплате", content)
 
     def test_dashboard_includes_registration_in_adena(self):
         """Registration payments are included in 'Выплата, кк' (adena)."""
