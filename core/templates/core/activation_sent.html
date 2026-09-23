@@ -1,8 +1,10 @@
 {% extends "core/base.html" %}
 {% block title %}Проверьте почту{% endblock %}
 {% block content %}
+<div class="auth-container"><div class="auth-card">
 <h1>Проверьте почту</h1>
 <p>Мы отправили письмо с ссылкой для подтверждения регистрации.</p>
 <p>Перейдите по ссылке в письме для завершения регистрации.</p>
 <p><a href="{% url 'login' %}">Вернуться ко входу</a></p>
+</div></div>
 {% endblock %}

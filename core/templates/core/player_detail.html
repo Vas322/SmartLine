@@ -1,8 +1,9 @@
 {% extends "core/base.html" %}
 {% block title %}{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1>
+<div class="page-head"><h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1></div>
 {% if player.telegram_username %}<p class="muted">Ник в Telegram: {{ player.telegram_username }}</p>{% endif %}
+<div class="card">
 <form method="get" action="{% url 'player_detail' player.pk %}">
     {{ form.period.label_tag }} {{ form.period }}
     <div class="period-date-group">
@@ -11,6 +12,7 @@
     </div>
     <button type="submit" class="btn">Применить</button>
 </form>
+</div>
 <div class="stats">
     <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
     <div class="stat-card"><h3>Выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
@@ -20,6 +22,7 @@
     <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
 <h2>Активности</h2>
+<div class="card"><div class="table-wrap">
 <table>
     <tr>
         <th>#</th>
@@ -44,6 +47,7 @@
     <tr><td colspan="7" class="muted">Записей за период нет.</td></tr>
     {% endfor %}
 </table>
+</div></div>
 {% if page_obj.has_other_pages %}
 <div class="pagination">
     {% if page_obj.has_previous %}

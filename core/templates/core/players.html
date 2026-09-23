@@ -1,12 +1,15 @@
 {% extends "core/base.html" %}
 {% block title %}Игроки{% endblock %}
 {% block content %}
-<h1>Игроки</h1>
+<div class="page-head"><h1>Игроки</h1></div>
+<div class="card">
 <form method="post" action="{% url 'players' %}">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit" class="btn">Добавить игрока</button>
 </form>
+</div>
+<div class="card"><div class="table-wrap">
 <table>
     <tr>
         <th>Ник</th>
@@ -41,4 +44,5 @@
     <tr><td colspan="5" class="muted">Игроков пока нет.</td></tr>
     {% endfor %}
 </table>
+</div></div>
 {% endblock %}

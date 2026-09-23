@@ -3,7 +3,7 @@
 {% load instruction_tags %}
 {% block title %}{{ instruction.title }}{% endblock %}
 {% block content %}
-<h1>{{ instruction.title }}</h1>
+<div class="page-head"><h1>{{ instruction.title }}</h1></div>
 <div class="instruction-content">
     {{ instruction.content|render_instruction }}
 </div>

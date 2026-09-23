@@ -1,8 +1,9 @@
 {% extends "core/base.html" %}
 {% block title %}Настройки{% endblock %}
 {% block content %}
-<h1>Настройки</h1>
+<div class="page-head"><h1>Настройки</h1></div>
 
+<div class="card">
 <h2>Тарифы за DEF</h2>
 <table>
     <tr>
@@ -56,7 +57,9 @@
     <button type="submit" name="add_rate" class="btn">Добавить тариф</button>
     {% endif %}
 </form>
+</div>
 
+<div class="card">
 <h2>Тарифы за каст</h2>
 <table>
     <tr>
@@ -110,7 +113,9 @@
     <button type="submit" name="add_cast_rate" class="btn">Добавить тариф</button>
     {% endif %}
 </form>
+</div>
 
+<div class="card">
 <h2>Тарифы за регистрацию</h2>
 <table>
     <tr>
@@ -164,7 +169,9 @@
     <button type="submit" name="add_reg_rate" class="btn">Добавить тариф</button>
     {% endif %}
 </form>
+</div>
 
+<div class="card">
 <h2>Приветствие</h2>
 {% if welcome_edit_open or not welcome_settings.welcome_text|length %}
 <form method="post">
@@ -193,7 +200,9 @@
 {% if not welcome_settings.welcome_text|length %}
 <p class="muted">Приветствия выключены (текст пуст).</p>
 {% endif %}
+</div>
 
+<div class="card">
 <h2>Уведомления Эпик РБ</h2>
 {% if epic_edit_open %}
 <form method="post">
@@ -240,4 +249,5 @@
 <div class="welcome-preview">{{ epic_preview|linebreaksbr }}</div>
 <a href="?edit_epic_boss=1" class="btn btn-secondary">Изменить настройку</a>
 {% endif %}
+</div>
 {% endblock %}

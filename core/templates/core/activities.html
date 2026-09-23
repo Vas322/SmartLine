@@ -1,12 +1,15 @@
 {% extends "core/base.html" %}
 {% block title %}Активности{% endblock %}
 {% block content %}
-<h1>Активности</h1>
+<div class="page-head"><h1>Активности</h1></div>
+<div class="card">
 <form method="get" action="{% url 'activities' %}">
     {{ form.as_p }}
     <button type="submit" class="btn">Фильтровать</button>
     <a class="btn" href="{% url 'export_excel' %}?{{ request.GET.urlencode }}">Экспорт Excel</a>
 </form>
+</div>
+<div class="card"><div class="table-wrap">
 <table>
     <tr>
         <th>Дата</th>
@@ -33,4 +36,5 @@
     <tr><td colspan="8" class="muted">Активностей нет.</td></tr>
     {% endfor %}
 </table>
+</div></div>
 {% endblock %}
