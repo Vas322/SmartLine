@@ -21,7 +21,7 @@
         <td>{{ rate.active|yesno:"Да,Нет" }}</td>
         <td>{{ rate.order }}</td>
         <td>
-            <a href="?edit={{ rate.pk }}" class="btn">Редактировать</a>
+            <a href="?edit={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
             <form method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" name="delete_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
@@ -51,7 +51,7 @@
     </table>
     {% if edit_rate_pk %}
     <button type="submit" class="btn">Сохранить</button>
-    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
     {% else %}
     <button type="submit" name="add_rate" class="btn">Добавить тариф</button>
     {% endif %}
@@ -75,7 +75,7 @@
         <td>{{ rate.active|yesno:"Да,Нет" }}</td>
         <td>{{ rate.order }}</td>
         <td>
-            <a href="?edit_cast={{ rate.pk }}" class="btn">Редактировать</a>
+            <a href="?edit_cast={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
             <form method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" name="delete_cast_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
@@ -105,7 +105,7 @@
     </table>
     {% if edit_cast_rate_pk %}
     <button type="submit" class="btn">Сохранить</button>
-    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
     {% else %}
     <button type="submit" name="add_cast_rate" class="btn">Добавить тариф</button>
     {% endif %}
@@ -129,7 +129,7 @@
         <td>{{ rate.active|yesno:"Да,Нет" }}</td>
         <td>{{ rate.order }}</td>
         <td>
-            <a href="?edit_reg={{ rate.pk }}" class="btn">Редактировать</a>
+            <a href="?edit_reg={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
             <form method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" name="delete_reg_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
@@ -159,7 +159,7 @@
     </table>
     {% if edit_reg_rate_pk %}
     <button type="submit" class="btn">Сохранить</button>
-    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
     {% else %}
     <button type="submit" name="add_reg_rate" class="btn">Добавить тариф</button>
     {% endif %}
@@ -175,13 +175,13 @@
     </p>
     <button type="submit" name="save_welcome" value="1" class="btn">Сохранить приветствие</button>
     {% if welcome_settings.welcome_text|length %}
-    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
     {% endif %}
 </form>
 {% else %}
 <h3>Текущее приветствие</h3>
 <div class="welcome-preview">{{ welcome_settings.welcome_text|linebreaksbr }}</div>
-<a href="?edit_welcome=1" class="btn">Изменить приветствие</a>
+<a href="?edit_welcome=1" class="btn btn-secondary">Изменить приветствие</a>
 {% endif %}
 {% if welcome_blocked %}
 <p class="muted">Приветствия временно отключены из-за массового захода (до {{ welcome_settings.block_until|date:"H:i" }}).</p>
@@ -227,7 +227,7 @@
     <p class="error">{{ epic_form.non_field_errors }}</p>
     {% endif %}
     <button type="submit" name="save_epic_boss" value="1" class="btn">Сохранить уведомления</button>
-    <a href="{% url 'settings' %}" class="btn">Отмена</a>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
 </form>
 {% else %}
 <h3>Текущие настройки</h3>
@@ -238,6 +238,6 @@
 <div class="welcome-preview">{{ epic_settings.text_template|linebreaksbr }}</div>
 <h4>Пример сообщения:</h4>
 <div class="welcome-preview">{{ epic_preview|linebreaksbr }}</div>
-<a href="?edit_epic_boss=1" class="btn">Изменить настройку</a>
+<a href="?edit_epic_boss=1" class="btn btn-secondary">Изменить настройку</a>
 {% endif %}
 {% endblock %}

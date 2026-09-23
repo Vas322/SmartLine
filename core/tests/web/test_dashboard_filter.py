@@ -142,10 +142,10 @@ class DashboardFilterZeroActivityTests(TestCase):
         content = response.content.decode()
         self.assertIn("АктивныйИгрок", content)
         self.assertNotIn("ПассивныйИгрок", content)
-        self.assertIn("Итого за период", content)
+        self.assertIn("Итого к выплате", content)
         # Filter (hiding zero-activity players) must not affect total payout:
         # 75 from the active player; passive player contributes 0.
         # Note: Django renders Decimal("75.00") as "75" (no decimal part).
-        self.assertRegex(content, r"Итого за период:\s*75\s*кк")
+        self.assertRegex(content, r'Итого к выплате\s*</h3>\s*<div class="value">75</div>')
 
 

@@ -107,8 +107,8 @@ class WebInterfaceTests(TestCase):
         content = response.content.decode()
         self.assertIn("Swettka", content)
         # only today's activity counted: def hours column shows 1, not 2
-        self.assertIn("<td>1</td>", content)
-        self.assertNotIn("<td>2</td>", content)
+        self.assertIn('<td class="num">1</td>', content)
+        self.assertNotIn('<td class="num">2</td>', content)
 
     def test_player_detail_page_available_after_login(self):
         self._login()
@@ -672,7 +672,7 @@ class WebInterfaceTests(TestCase):
         self.assertIn("players/delete/", content)
         self.assertIn("csrfmiddlewaretoken", content)
         # кнопка удаления открывает подтверждение: класс delete-btn + data-player-name
-        self.assertIn('class="btn delete-btn"', content)
+        self.assertIn('delete-btn', content)
         self.assertIn(f'data-player-name="{self.player.nickname}"', content)
 
     def test_player_delete_requires_login(self):
