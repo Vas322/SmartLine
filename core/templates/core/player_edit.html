@@ -3,6 +3,18 @@
 {% block content %}
 <div class="page-head"><h1>Редактирование игрока: {{ player.nickname }}</h1></div>
 <div class="card">
+{% if form.non_field_errors %}
+<div class="error-summary">
+{% for error in form.non_field_errors %}
+<p>{{ error }}</p>
+{% endfor %}
+</div>
+{% endif %}
+{% if form.errors %}
+<div class="error-summary">
+{{ form.errors }}
+</div>
+{% endif %}
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}

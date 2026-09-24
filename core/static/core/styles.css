@@ -237,6 +237,17 @@ input:disabled, select:disabled, textarea:disabled {
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-brand); }
 .field-error { color: var(--color-error); font-size: 12px; margin-top: 4px; display: block; }
 .error { color: var(--color-error); }
+.error-summary {
+    background: var(--color-error-soft);
+    border: 1px solid var(--color-error);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 16px;
+    color: var(--color-error);
+}
+.error-summary p, .error-summary ul {
+    margin: 4px 0;
+}
 
 /* ===== NAV (header/footer) ===== */
 .site-nav {

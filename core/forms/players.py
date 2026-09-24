@@ -86,6 +86,9 @@ class PlayerEditForm(forms.ModelForm):
         user_id = self.cleaned_data.get("telegram_user_id")
         if user_id is None:
             return None
+        # Пропускаем unchanged (то же значение, что было у этого игрока)
+        if self.instance and self.instance.telegram_user_id == user_id:
+            return user_id
         existing = (
             Player.objects.filter(telegram_user_id=user_id)
             .exclude(pk=self.instance.pk)

@@ -16,6 +16,7 @@
         <th>Ник в Telegram</th>
         <th>Активен</th>
         <th>Принят в клан</th>
+        <th>Суммонеры</th>
         <th>Действие</th>
     </tr>
     {% for player in players %}
@@ -24,6 +25,7 @@
         <td>{% if player.telegram_username %}{{ player.telegram_username }}{% else %}—{% endif %}</td>
         <td>{{ player.is_active|yesno:"Да,Нет" }}</td>
         <td>{{ player.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{{ player.summoner_count|default:"0" }}</td>
         <td>
             {% if user.is_staff %}
             <a href="{% url 'player_edit' player.pk %}" class="btn btn-secondary">Редактировать</a>
@@ -41,7 +43,7 @@
         </td>
     </tr>
     {% empty %}
-    <tr><td colspan="5" class="muted">Игроков пока нет.</td></tr>
+    <tr><td colspan="6" class="muted">Игроков пока нет.</td></tr>
     {% endfor %}
 </table>
 </div></div>
