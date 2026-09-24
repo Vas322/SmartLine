@@ -18,6 +18,10 @@ def _activity_annotations() -> dict:
         "cast_hours": Sum("amount", filter=Q(activity_type=Activity.ActivityType.CAST)),
         "cast_count": Count("pk", filter=Q(has_cast=True)),
         "payment": Coalesce(Sum("payment_kk"), DECIMAL_ZERO),
+        "def_payment": Coalesce(
+            Sum("payment_kk", filter=Q(activity_type=Activity.ActivityType.DEF)),
+            DECIMAL_ZERO,
+        ),
     }
 
 

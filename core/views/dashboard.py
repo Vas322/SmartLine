@@ -7,7 +7,7 @@ from django.shortcuts import render
 from core.decorators import member_required
 from core.forms import PeriodForm
 from core.models import Player
-from core.services import stats
+from core.services import stats, summoner_bonus_service
 from core.views.common import _percent
 
 
@@ -27,9 +27,12 @@ def dashboard(request):
             "cast_hours": row["cast_hours"] or Decimal("0"),
             "cast_count": row["cast_count"] or 0,
             "payment": row["payment"] or Decimal("0"),
+            "def_payment": row["def_payment"] or Decimal("0"),
         }
         for pid, row in stats.activity_totals_for_players(date_from, date_to).items()
     }
+
+    bonus_settings = summoner_bonus_service.get_settings()
 
     # Registrations aggregation (registered_at__range for the period)
     reg_by_player = stats.registration_totals_for_players(date_from, date_to)
@@ -50,6 +53,12 @@ def dashboard(request):
         cast_count = totals.get("cast_count", 0)
         if total_hours == 0 and cast_count == 0 and reg_clans == 0:
             continue
+        adena = (totals.get("payment") or Decimal("0")) + reg_payment
+        if bonus_settings.is_enabled:
+            def_payment = totals.get("def_payment") or Decimal("0")
+            adena += summoner_bonus_service.calculate_bonus(
+                def_payment, player.summoner_count or 0, bonus_settings.percent
+            )
         rows.append(
             {
                 "pk": player.pk,
@@ -58,7 +67,7 @@ def dashboard(request):
                 "def_hours": def_hours,
                 "farm_hours": farm_hours,
                 "cast_count": cast_count,
-                "adena": (totals.get("payment") or Decimal("0")) + reg_payment,
+                "adena": adena,
                 "registration": reg_clans,
                 "percent": _percent(total_hours, days_in_period),
             }
@@ -75,6 +84,19 @@ def dashboard(request):
     )
     total_payout = total_activity_payment + total_registration_payment
 
+    if bonus_settings.is_enabled:
+        players_counts = dict(
+            Player.objects.filter(id__in=totals_by_player.keys()).values_list("id", "summoner_count")
+        )
+        total_bonus = Decimal("0")
+        for pid, totals in totals_by_player.items():
+            total_bonus += summoner_bonus_service.calculate_bonus(
+                totals.get("def_payment") or Decimal("0"),
+                players_counts.get(pid, 0),
+                bonus_settings.percent,
+            )
+        total_payout += total_bonus
+
     context = {
         "form": form,
         "date_from": date_from,
@@ -82,5 +104,6 @@ def dashboard(request):
         "days_in_period": days_in_period,
         "rows": rows,
         "total_payout": total_payout,
+        "bonus_settings": bonus_settings,
     }
     return render(request, "core/dashboard.html", context)

@@ -31,6 +31,9 @@
         <div class="value">{{ total_payout }}</div>
     </div>
 </div>
+{% if bonus_settings.is_enabled %}
+<p class="bonus-note">* Включая надбавки за суммонеров</p>
+{% endif %}
 
 <div class="card">
     {% if not rows %}

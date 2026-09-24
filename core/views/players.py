@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from core.decorators import member_required, staff_or_404
 from core.forms import PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
-from core.services import stats
+from core.services import stats, summoner_bonus_service
 from core.views.common import _percent
 
 
@@ -69,6 +69,20 @@ def player_detail(request, pk: int):
 
     cast_count = totals["cast_count"] or 0
 
+    bonus_settings = summoner_bonus_service.get_settings()
+    summoner_bonus_block = None
+    if bonus_settings.is_enabled:
+        count = player.summoner_count or 0
+        def_payment = totals.get("def_payment") or Decimal("0")
+        bonus = summoner_bonus_service.calculate_bonus(def_payment, count, bonus_settings.percent)
+        summoner_bonus_block = {
+            "count": count,
+            "percent": bonus_settings.percent,
+            "base_def_payment": def_payment,
+            "bonus": bonus,
+            "total": def_payment + bonus,
+        }
+
     context = {
         "form": form,
         "player": player,
@@ -78,6 +92,7 @@ def player_detail(request, pk: int):
         "page_obj": page_obj,
         "sort": sort,
         "cast_count": cast_count,
+        "summoner_bonus_block": summoner_bonus_block,
         "applied_period": applied_period,
         "applied_date_from": applied_date_from,
         "applied_date_to": applied_date_to,

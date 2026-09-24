@@ -439,3 +439,7 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
     .boss-grid { grid-template-columns: 1fr; }
 }
 
+.bonus-info { font-size: 0.95em; color: var(--color-text); }
+.bonus-info strong { color: var(--color-gold, #d4af37); }
+.bonus-note { font-size: 0.85em; margin-top: -8px; margin-bottom: 16px; color: var(--color-text-muted, #8a8a8a); }
+

@@ -16,6 +16,7 @@ from core.models import (
     Rate,
     TelegramMessage,
 )
+from core.services import summoner_bonus_service
 
 _XLSX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -697,6 +698,36 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(self.player.nickname, "Ostin")
         self.assertEqual(self.player.telegram_user_id, 999)
 
+    def test_player_edit_redirects_to_players_after_save(self):
+        self._login()
+        response = self.client.post(
+            reverse("player_edit", args=[self.player.pk]),
+            {"nickname": "Swettka", "telegram_user_id": ""},
+        )
+        self.assertRedirects(response, reverse("players"))
+
+    def test_player_edit_saves_summoner_count(self):
+        self._login()
+        response = self.client.post(
+            reverse("player_edit", args=[self.player.pk]),
+            {"nickname": "Swettka", "telegram_user_id": "", "summoner_count": "7"},
+        )
+        self.assertRedirects(response, reverse("players"))
+        self.player.refresh_from_db()
+        self.assertEqual(self.player.summoner_count, 7)
+
+    def test_player_edit_saves_empty_summoner_count_as_zero(self):
+        self._login()
+        self.player.summoner_count = 5
+        self.player.save(update_fields=["summoner_count", "updated_at"])
+        response = self.client.post(
+            reverse("player_edit", args=[self.player.pk]),
+            {"nickname": "Swettka", "telegram_user_id": "", "summoner_count": ""},
+        )
+        self.assertRedirects(response, reverse("players"))
+        self.player.refresh_from_db()
+        self.assertEqual(self.player.summoner_count, 0)
+
     def test_player_edit_rejects_duplicate_nickname(self):
         self.user.is_staff = True
         self.user.save()
@@ -935,3 +966,50 @@ class WebInterfaceTests(TestCase):
             reverse("instruction_edit", args=[999999])
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_player_detail_summoner_bonus_block(self):
+        self._login()
+        self.player.summoner_count = 10
+        self.player.save(update_fields=["summoner_count", "updated_at"])
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.save()
+        self.activity.payment_kk = Decimal("50.00")
+        self.activity.save(update_fields=["payment_kk"])
+
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        content = response.content.decode()
+        self.assertIn("Надбавка за суммонеров", content)
+        self.assertIn("Суммонеров: <strong>10</strong>", content)
+        self.assertIn("2,50", content)
+
+    def test_player_detail_no_bonus_when_disabled(self):
+        self._login()
+        self.player.summoner_count = 10
+        self.player.save(update_fields=["summoner_count", "updated_at"])
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = False
+        settings.save()
+
+        response = self.client.get(
+            reverse("player_detail", args=[self.player.pk])
+        )
+        self.assertNotContains(response, "Надбавка за суммонеров")
+
+    def test_dashboard_total_with_bonus(self):
+        self._login()
+        self.player.summoner_count = 10
+        self.player.save(update_fields=["summoner_count", "updated_at"])
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.save()
+        self.activity.payment_kk = Decimal("50.00")
+        self.activity.save(update_fields=["payment_kk"])
+
+        response = self.client.get(reverse("dashboard"), {"period": "month"})
+        content = response.content.decode()
+        self.assertIn("52,50", content)

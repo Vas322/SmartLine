@@ -21,6 +21,18 @@
     <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
     <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
+{% if summoner_bonus_block %}
+<div class="card">
+    <h2>Надбавка за суммонеров</h2>
+    <div class="bonus-info">
+        <div>Суммонеров: <strong>{{ summoner_bonus_block.count }}</strong> · Ставка: <strong>{{ summoner_bonus_block.percent }}%</strong></div>
+        <div>Надбавка: <strong>{{ summoner_bonus_block.bonus }} кк</strong></div>
+        {% if summoner_bonus_block.count > 0 %}
+        <div>DEF (база): {{ summoner_bonus_block.base_def_payment }} кк → Итого: <strong>{{ summoner_bonus_block.total }} кк</strong></div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 <h2>Активности</h2>
 <div class="card"><div class="table-wrap">
 <table>
