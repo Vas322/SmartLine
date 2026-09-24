@@ -1,5 +1,6 @@
 """Settings-related forms (welcome + epic boss notifications)."""
 from django import forms
+from django.utils import timezone
 
 from core.models import (
     BossRespawn,
@@ -11,6 +12,14 @@ from core.models import (
 
 
 class SummonerBonusForm(forms.ModelForm):
+    enabled_at_display = forms.CharField(
+        label="Дата включения надбавки",
+        required=False,
+        disabled=True,
+        help_text="Надбавка применяется только к активностям с этой даты. "
+                  "Устанавливается автоматически при первом включении.",
+    )
+
     class Meta:
         model = SummonerBonusSettings
         fields = ["is_enabled", "percent"]
@@ -22,6 +31,24 @@ class SummonerBonusForm(forms.ModelForm):
             "is_enabled": "Включить надбавку за суммонеров",
             "percent": "% за 1 суммонера",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = self.instance
+        self.fields["enabled_at_display"].initial = (
+            instance.enabled_at.strftime("%d.%m.%Y %H:%M")
+            if instance and instance.enabled_at
+            else "—"
+        )
+
+    def save(self, commit=True) -> SummonerBonusSettings:
+        instance = super().save(commit=False)
+        # Устанавливаем дату включения при первом включении надбавки.
+        if instance.is_enabled and instance.enabled_at is None:
+            instance.enabled_at = timezone.now()
+        if commit:
+            instance.save()
+        return instance
 
 
 class WelcomeSettingsForm(forms.ModelForm):

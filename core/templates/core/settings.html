@@ -186,6 +186,13 @@
     {% if summoner_form.percent.errors %}
     <p class="error">{{ summoner_form.percent.errors }}</p>
     {% endif %}
+    <p>
+        {{ summoner_form.enabled_at_display.label_tag }}<br>
+        {{ summoner_form.enabled_at_display }}
+    </p>
+    {% if summoner_form.enabled_at_display.help_text %}
+    <small class="help">{{ summoner_form.enabled_at_display.help_text }}</small>
+    {% endif %}
     {% if summoner_form.non_field_errors %}
     <p class="error">{{ summoner_form.non_field_errors }}</p>
     {% endif %}
@@ -196,6 +203,9 @@
 <h3>Текущие настройки</h3>
 <p>Надбавка за суммонеров: {% if summoner_settings.is_enabled %}Включена{% else %}Выключена{% endif %}</p>
 <p>% за 1 суммонера: {{ summoner_settings.percent }}%</p>
+<p>Дата включения надбавки:
+    {% if summoner_settings.enabled_at %}{{ summoner_settings.enabled_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}
+</p>
 <a href="?edit_summoner_bonus=1" class="btn btn-secondary">Изменить</a>
 {% endif %}
 </div>
