@@ -2,11 +2,12 @@
 import logging
 from decimal import Decimal
 
+from django.db.models import DecimalField, F, Sum, Value
 from django.shortcuts import render
 
 from core.decorators import member_required
 from core.forms import PeriodForm
-from core.models import Player
+from core.models import Activity, Player
 from core.services import stats, summoner_bonus_service
 from core.views.common import _percent
 
@@ -85,15 +86,46 @@ def dashboard(request):
     total_payout = total_activity_payment + total_registration_payment
 
     if bonus_settings.is_enabled:
-        players_counts = dict(
-            Player.objects.filter(id__in=totals_by_player.keys()).values_list("id", "summoner_count")
-        )
-        total_bonus = Decimal("0")
-        for pid, totals in totals_by_player.items():
-            total_bonus += summoner_bonus_service.calculate_bonus(
-                totals.get("def_payment") or Decimal("0"),
-                players_counts.get(pid, 0),
-                bonus_settings.percent,
+        if bonus_settings.enabled_at:
+            bonus_qs = (
+                Activity.objects.filter(
+                    player_id__in=totals_by_player.keys(),
+                    created_at__gte=bonus_settings.enabled_at,
+                    activity_type=Activity.ActivityType.DEF,
+                )
+                .values("player_id")
+                .annotate(
+                    bonus_sum=Sum(
+                        F("payment_kk")
+                        * F("player__summoner_count")
+                        * Value(bonus_settings.percent)
+                        / Value(100),
+                        output_field=DecimalField(max_digits=20, decimal_places=4),
+                    )
+                )
+            )
+            bonus_by_player = {
+                row["player_id"]: row["bonus_sum"] or Decimal("0")
+                for row in bonus_qs
+            }
+            total_bonus = sum(bonus_by_player.values(), Decimal("0"))
+        else:
+            # Нет даты включения — считаем по всему периоду как раньше.
+            players_counts = dict(
+                Player.objects.filter(id__in=totals_by_player.keys()).values_list(
+                    "id", "summoner_count"
+                )
+            )
+            total_bonus = sum(
+                (
+                    summoner_bonus_service.calculate_bonus(
+                        t.get("def_payment") or Decimal("0"),
+                        players_counts.get(pid, 0),
+                        bonus_settings.percent,
+                    )
+                    for pid, t in totals_by_player.items()
+                ),
+                Decimal("0"),
             )
         total_payout += total_bonus
 

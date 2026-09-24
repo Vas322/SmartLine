@@ -3,7 +3,7 @@ import logging
 from decimal import Decimal
 
 from django.core.paginator import Paginator
-from django.db.models import Case, DecimalField, F, Value, When
+from django.db.models import Case, DecimalField, F, Sum, Value, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -51,6 +51,17 @@ def player_detail(request, pk: int):
     base_payment = totals["payment"] or Decimal("0")
     if bonus_settings.is_enabled:
         def_payment = totals.get("def_payment") or Decimal("0")
+        if bonus_settings.enabled_at is not None:
+            # Надбавка только для DEF-активностей с даты включения (без ретроактивности).
+            def_payment = (
+                Activity.objects.filter(
+                    player=player,
+                    created_at__gte=bonus_settings.enabled_at,
+                    created_at__range=(date_from, date_to),
+                    activity_type=Activity.ActivityType.DEF,
+                ).aggregate(total=Sum("payment_kk"))["total"]
+                or Decimal("0")
+            )
         bonus_total = summoner_bonus_service.calculate_bonus(
             def_payment, player.summoner_count or 0, bonus_settings.percent
         )
@@ -71,6 +82,10 @@ def player_detail(request, pk: int):
     order = "created_at" if sort == "asc" else "-created_at"
     summoner_count = player.summoner_count or 0
     bonus_active = bonus_settings.is_enabled and summoner_count > 0
+    # Условие DEF для надбавки; если задана дата включения — только активности с неё.
+    bonus_when = {"activity_type": Activity.ActivityType.DEF}
+    if bonus_settings.enabled_at is not None:
+        bonus_when["created_at__gte"] = bonus_settings.enabled_at
     activities_qs = (
         Activity.objects.filter(
             player=player, created_at__range=(date_from, date_to)
@@ -79,7 +94,7 @@ def player_detail(request, pk: int):
         .annotate(
             row_bonus=Case(
                 When(
-                    activity_type=Activity.ActivityType.DEF,
+                    **bonus_when,
                     then=(
                         F("payment_kk")
                         * Value(summoner_count)
@@ -94,7 +109,7 @@ def player_detail(request, pk: int):
             ),
             row_total=Case(
                 When(
-                    activity_type=Activity.ActivityType.DEF,
+                    **bonus_when,
                     then=(
                         F("payment_kk")
                         * Value(summoner_count)
