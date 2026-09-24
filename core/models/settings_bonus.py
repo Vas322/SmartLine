@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 class SummonerBonusSettings(models.Model):
@@ -23,6 +24,13 @@ class SummonerBonusSettings(models.Model):
         default=Decimal("0.5"),
         verbose_name="Процент за 1 суммонера",
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+    )
+    enabled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Дата включения",
+        help_text="Надбавка применяется только к активностям с датой >= этой дате. "
+                   "Не меняйте вручную без необходимости.",
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
