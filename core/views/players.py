@@ -3,6 +3,7 @@ import logging
 from decimal import Decimal
 
 from django.core.paginator import Paginator
+from django.db.models import Case, DecimalField, F, Value, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -46,9 +47,21 @@ def player_detail(request, pk: int):
     cast_hours = totals["cast_hours"] or Decimal("0")
     total_hours = def_hours + farm_hours + cast_hours
 
+    bonus_settings = summoner_bonus_service.get_settings()
+    base_payment = totals["payment"] or Decimal("0")
+    if bonus_settings.is_enabled:
+        def_payment = totals.get("def_payment") or Decimal("0")
+        bonus_total = summoner_bonus_service.calculate_bonus(
+            def_payment, player.summoner_count or 0, bonus_settings.percent
+        )
+        total_with_bonus = base_payment + bonus_total
+    else:
+        total_with_bonus = base_payment
+
     summary = {
         "total_hours": total_hours,
-        "adena": totals["payment"] or Decimal("0"),
+        "adena": total_with_bonus,  # Итого выплата (с надбавками)
+        "base_payment": base_payment,  # для справки в шаблоне
         "def_hours": def_hours,
         "farm_hours": farm_hours,
         "percent": _percent(total_hours, days_in_period),
@@ -56,11 +69,46 @@ def player_detail(request, pk: int):
 
     sort = request.GET.get("sort", "desc")
     order = "created_at" if sort == "asc" else "-created_at"
+    summoner_count = player.summoner_count or 0
+    bonus_active = bonus_settings.is_enabled and summoner_count > 0
     activities_qs = (
         Activity.objects.filter(
             player=player, created_at__range=(date_from, date_to)
         )
         .select_related("telegram_message")
+        .annotate(
+            row_bonus=Case(
+                When(
+                    activity_type=Activity.ActivityType.DEF,
+                    then=(
+                        F("payment_kk")
+                        * Value(summoner_count)
+                        * Value(bonus_settings.percent)
+                        / Value(Decimal("100"))
+                        if bonus_active
+                        else Value(Decimal("0"))
+                    ),
+                ),
+                default=Value(Decimal("0")),
+                output_field=DecimalField(),
+            ),
+            row_total=Case(
+                When(
+                    activity_type=Activity.ActivityType.DEF,
+                    then=(
+                        F("payment_kk")
+                        * Value(summoner_count)
+                        * Value(bonus_settings.percent)
+                        / Value(Decimal("100"))
+                        + F("payment_kk")
+                        if bonus_active
+                        else F("payment_kk")
+                    ),
+                ),
+                default=F("payment_kk"),
+                output_field=DecimalField(),
+            ),
+        )
         .order_by(order)
     )
     paginator = Paginator(activities_qs, 50)
@@ -68,20 +116,6 @@ def player_detail(request, pk: int):
     page_obj = paginator.get_page(page_number)
 
     cast_count = totals["cast_count"] or 0
-
-    bonus_settings = summoner_bonus_service.get_settings()
-    summoner_bonus_block = None
-    if bonus_settings.is_enabled:
-        count = player.summoner_count or 0
-        def_payment = totals.get("def_payment") or Decimal("0")
-        bonus = summoner_bonus_service.calculate_bonus(def_payment, count, bonus_settings.percent)
-        summoner_bonus_block = {
-            "count": count,
-            "percent": bonus_settings.percent,
-            "base_def_payment": def_payment,
-            "bonus": bonus,
-            "total": def_payment + bonus,
-        }
 
     context = {
         "form": form,
@@ -92,7 +126,8 @@ def player_detail(request, pk: int):
         "page_obj": page_obj,
         "sort": sort,
         "cast_count": cast_count,
-        "summoner_bonus_block": summoner_bonus_block,
+        "bonus_settings": bonus_settings,
+        "player_summoner_count": summoner_count,
         "applied_period": applied_period,
         "applied_date_from": applied_date_from,
         "applied_date_to": applied_date_to,

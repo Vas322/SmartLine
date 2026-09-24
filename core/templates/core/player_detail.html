@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load math_tags %}
 {% block title %}{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}{% endblock %}
 {% block content %}
 <div class="page-head"><h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1></div>
@@ -15,23 +16,16 @@
 </div>
 <div class="stats">
     <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
-    <div class="stat-card"><h3>Выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
+    <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
     <div class="stat-card"><h3>DEF</h3><div class="value">{{ summary.def_hours }}</div></div>
     <div class="stat-card"><h3>FARM</h3><div class="value">{{ summary.farm_hours }}</div></div>
     <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
     <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
-{% if summoner_bonus_block %}
-<div class="card">
-    <h2>Надбавка за суммонеров</h2>
-    <div class="bonus-info">
-        <div>Суммонеров: <strong>{{ summoner_bonus_block.count }}</strong> · Ставка: <strong>{{ summoner_bonus_block.percent }}%</strong></div>
-        <div>Надбавка: <strong>{{ summoner_bonus_block.bonus }} кк</strong></div>
-        {% if summoner_bonus_block.count > 0 %}
-        <div>DEF (база): {{ summoner_bonus_block.base_def_payment }} кк → Итого: <strong>{{ summoner_bonus_block.total }} кк</strong></div>
-        {% endif %}
-    </div>
-</div>
+{% if bonus_settings.is_enabled and summary.base_payment %}
+<p class="muted" style="font-size:0.8em; margin-top:2px; margin-bottom:0;">
+    (база {{ summary.base_payment }} + надбавки {{ summary.adena|sub:summary.base_payment|floatformat:2 }})
+</p>
 {% endif %}
 <h2>Активности</h2>
 <div class="card"><div class="table-wrap">
@@ -41,8 +35,11 @@
         <th><a href="?period={{ applied_period }}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}&sort={% if sort == 'asc' %}desc{% else %}asc{% endif %}&page=1">Дата{% if sort == 'asc' %} ▲{% else %} ▼{% endif %}</a></th>
         <th>Тип</th>
         <th>Начало волны</th>
-        <th>Часов</th>
-        <th>Оплата, кк</th>
+        <th class="num">Часов</th>
+        <th class="num">Оплата, кк</th>
+        <th class="num">Суммоны</th>
+        <th class="num">Надбавка, кк</th>
+        <th class="num">Итого, кк</th>
         <th>Сообщение</th>
     </tr>
     {% for activity in page_obj %}
@@ -51,12 +48,15 @@
         <td>{{ activity.created_at|date:"d.m.Y" }}</td>
         <td>{{ activity.activity_type }}{% if activity.has_cast and activity.activity_type != "CAST" %}+CAST{% endif %}</td>
         <td>{% if activity.wave_start_time %}{{ activity.wave_start_time|time:"H:i" }}{% else %}—{% endif %}</td>
-        <td>{{ activity.amount }}</td>
-        <td>{% if activity.activity_type == "FARM" %}—{% else %}{{ activity.payment_kk }}{% endif %}</td>
+        <td class="num">{{ activity.amount }}</td>
+        <td class="num">{% if activity.activity_type == "FARM" %}—{% else %}{{ activity.payment_kk }}{% endif %}</td>
+        <td class="num">{{ player.summoner_count|default:"0" }}</td>
+        <td class="num">{% if activity.activity_type == "DEF" and bonus_settings.is_enabled and player_summoner_count %}{{ activity.row_bonus|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="num">{% if activity.activity_type == "DEF" and bonus_settings.is_enabled and player_summoner_count %}{{ activity.row_total|floatformat:2 }}{% else %}{{ activity.payment_kk|default:"—" }}{% endif %}</td>
         <td title="{{ activity.telegram_message.original_text }}">{{ activity.telegram_message.original_text|truncatechars:60 }}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="7" class="muted">Записей за период нет.</td></tr>
+    <tr><td colspan="10" class="muted">Записей за период нет.</td></tr>
     {% endfor %}
 </table>
 </div></div>

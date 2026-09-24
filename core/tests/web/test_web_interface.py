@@ -967,37 +967,86 @@ class WebInterfaceTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_player_detail_summoner_bonus_block(self):
+    def test_player_detail_bonus_columns_in_table(self):
         self._login()
-        self.player.summoner_count = 10
-        self.player.save(update_fields=["summoner_count", "updated_at"])
+        player = Player.objects.create(nickname="BCol", is_active=True, summoner_count=10)
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=501,
+            telegram_message_id=501,
+            original_text="+1|деф|BCol|t",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=msg,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("50.00"),
+        )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
         settings.percent = Decimal("0.50")
         settings.save()
-        self.activity.payment_kk = Decimal("50.00")
-        self.activity.save(update_fields=["payment_kk"])
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Суммоны")
+        self.assertContains(resp, "Надбавка, кк")
+        self.assertContains(resp, "Итого, кк")
+        # Для DEF: надбавка = 50 × 10 × 0.5/100 = 2.50, итого = 52.50
+        self.assertContains(resp, "2,50")  # надбавка за строку
+        self.assertContains(resp, "52,50")  # итого за строку
 
-        response = self.client.get(
-            reverse("player_detail", args=[self.player.pk])
-        )
-        content = response.content.decode()
-        self.assertIn("Надбавка за суммонеров", content)
-        self.assertIn("Суммонеров: <strong>10</strong>", content)
-        self.assertIn("2,50", content)
-
-    def test_player_detail_no_bonus_when_disabled(self):
+    def test_player_detail_bonus_columns_hidden_when_disabled(self):
         self._login()
-        self.player.summoner_count = 10
-        self.player.save(update_fields=["summoner_count", "updated_at"])
+        player = Player.objects.create(nickname="BCol2", is_active=True, summoner_count=5)
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=502,
+            telegram_message_id=502,
+            original_text="+1|деф|BCol2|t",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=msg,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("20.00"),
+        )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = False
         settings.save()
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        # Столбцы есть, но надбавка = «—» для каждой строки
+        self.assertContains(resp, "Суммоны")
+        self.assertContains(resp, "Надбавка, кк")
+        self.assertContains(resp, "Итого, кк")
+        self.assertContains(resp, "—")  # надбавка = «—» когда выключено
 
-        response = self.client.get(
-            reverse("player_detail", args=[self.player.pk])
+    def test_player_detail_summary_shows_total_with_bonus(self):
+        self._login()
+        player = Player.objects.create(nickname="BCol3", is_active=True, summoner_count=10)
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=503,
+            telegram_message_id=503,
+            original_text="+1|деф|BCol3|t",
+            message_date=timezone.now(),
         )
-        self.assertNotContains(response, "Надбавка за суммонеров")
+        Activity.objects.create(
+            player=player,
+            telegram_message=msg,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("50.00"),
+        )
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.save()
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Итого выплата")
+        self.assertContains(resp, "52,50")  # 50 + 2.50
 
     def test_dashboard_total_with_bonus(self):
         self._login()
