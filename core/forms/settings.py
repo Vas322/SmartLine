@@ -15,9 +15,10 @@ class SummonerBonusForm(forms.ModelForm):
     enabled_at_display = forms.CharField(
         label="Дата включения надбавки",
         required=False,
-        disabled=True,
-        help_text="Надбавка применяется только к активностям с этой даты. "
-                  "Устанавливается автоматически при первом включении.",
+        widget=forms.TextInput(
+            attrs={"type": "datetime-local", "class": "form-control"}
+        ),
+        help_text="Надбавка применяется только к активностям с этой даты.",
     )
 
     class Meta:
@@ -38,14 +39,36 @@ class SummonerBonusForm(forms.ModelForm):
         self.fields["enabled_at_display"].initial = (
             instance.enabled_at.strftime("%d.%m.%Y %H:%M")
             if instance and instance.enabled_at
-            else "—"
+            else ""
+        )
+
+    def clean_enabled_at_display(self):
+        value = self.cleaned_data.get("enabled_at_display", "")
+        value = (value or "").strip()
+        if not value:
+            return None
+        for fmt in ("%d.%m.%Y %H:%M", "%Y-%m-%dT%H:%M"):
+            try:
+                return timezone.datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+        raise forms.ValidationError(
+            "Некорректный формат даты. Используй ДД.ММ.ГГГГ ЧЧ:ММ."
         )
 
     def save(self, commit=True) -> SummonerBonusSettings:
         instance = super().save(commit=False)
-        # Устанавливаем дату включения при первом включении надбавки.
-        if instance.is_enabled and instance.enabled_at is None:
-            instance.enabled_at = timezone.now()
+        # Дата включения надбавки: из формы, если указана и надбавка включена,
+        # иначе — время включения (при первом включении).
+        enabled_at = self.cleaned_data.get("enabled_at_display")
+        if instance.is_enabled:
+            if enabled_at is not None:
+                instance.enabled_at = timezone.make_aware(
+                    enabled_at,
+                    timezone.get_current_timezone(),
+                )
+            elif instance.enabled_at is None:
+                instance.enabled_at = timezone.now()
         if commit:
             instance.save()
         return instance

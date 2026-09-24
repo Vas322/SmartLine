@@ -190,6 +190,9 @@
         {{ summoner_form.enabled_at_display.label_tag }}<br>
         {{ summoner_form.enabled_at_display }}
     </p>
+    {% if summoner_form.enabled_at_display.errors %}
+    <p class="error">{{ summoner_form.enabled_at_display.errors }}</p>
+    {% endif %}
     {% if summoner_form.enabled_at_display.help_text %}
     <small class="help">{{ summoner_form.enabled_at_display.help_text }}</small>
     {% endif %}

@@ -145,3 +145,90 @@ class SummonerBonusSettingsWebTests(TestCase):
             {"save_summoner_bonus": "1", "is_enabled": "on", "percent": "5"},
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_edit_mode_has_active_enabled_at_input(self):
+        self._reset()
+        self._login(self.staff)
+        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        content = response.content.decode()
+        # Поле даты включения — активный input типа datetime-local (не disabled).
+        self.assertIn('name="enabled_at_display"', content)
+        self.assertIn('type="datetime-local"', content)
+        self.assertNotIn('name="enabled_at_display" disabled', content)
+
+    def test_save_with_explicit_enabled_at(self):
+        from datetime import datetime, timedelta
+
+        from django.utils import timezone
+
+        self._reset()
+        self._login(self.staff)
+        custom = timezone.localtime() + timedelta(days=1)
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "save_summoner_bonus": "1",
+                "is_enabled": "on",
+                "percent": "3.5",
+                "enabled_at_display": custom.strftime("%d.%m.%Y %H:%M"),
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+        settings = summoner_bonus_service.get_settings()
+        settings.refresh_from_db()
+        self.assertTrue(settings.is_enabled)
+        self.assertIsNotNone(settings.enabled_at)
+        expected = timezone.make_aware(
+            datetime(
+                custom.year,
+                custom.month,
+                custom.day,
+                custom.hour,
+                custom.minute,
+            ),
+            timezone.get_current_timezone(),
+        )
+        self.assertEqual(settings.enabled_at, expected)
+
+    def test_save_with_empty_enabled_at_sets_now(self):
+        from django.utils import timezone
+
+        self._reset()
+        settings = summoner_bonus_service.get_settings()
+        settings.enabled_at = None
+        settings.save()
+
+        before = timezone.now()
+        self._login(self.staff)
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "save_summoner_bonus": "1",
+                "is_enabled": "on",
+                "percent": "3.5",
+                "enabled_at_display": "",
+            },
+        )
+        self.assertRedirects(response, reverse("settings"))
+        settings.refresh_from_db()
+        self.assertTrue(settings.is_enabled)
+        self.assertIsNotNone(settings.enabled_at)
+        self.assertGreaterEqual(settings.enabled_at, before)
+
+    def test_save_with_invalid_enabled_at_keeps_form_open(self):
+        self._reset()
+        self._login(self.staff)
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "save_summoner_bonus": "1",
+                "is_enabled": "on",
+                "percent": "3.5",
+                "enabled_at_display": "не-дата",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Форма остаётся открытой с ошибкой валидации.
+        self.assertIn('name="save_summoner_bonus" value="1"', content)
+        self.assertIn("error", content)
