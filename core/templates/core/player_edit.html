@@ -10,11 +10,6 @@
 {% endfor %}
 </div>
 {% endif %}
-{% if form.errors %}
-<div class="error-summary">
-{{ form.errors }}
-</div>
-{% endif %}
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
