@@ -1062,3 +1062,42 @@ class WebInterfaceTests(TestCase):
         response = self.client.get(reverse("dashboard"), {"period": "month"})
         content = response.content.decode()
         self.assertIn("52,50", content)
+
+    def test_bonus_only_from_enabled_at(self):
+        """Надбавка применяется только к активностям с даты включения (без ретроактивности)."""
+        self._login()
+        player = Player.objects.create(
+            nickname="BDate", is_active=True, summoner_count=10
+        )
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=504,
+            telegram_message_id=504,
+            original_text="+1|деф|BDate|t",
+            message_date=timezone.now(),
+        )
+        activity = Activity.objects.create(
+            player=player,
+            telegram_message=msg,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("50.00"),
+        )
+        # auto_now_add мешает прямому созданию created_at — обновляем через update.
+        Activity.objects.filter(pk=activity.pk).update(
+            created_at=timezone.now() - timedelta(days=5)
+        )
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.enabled_at = timezone.now()  # активность старше даты включения
+        settings.save()
+
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        # Надбавка за строку = 0.00 (активность старше enabled_at).
+        self.assertIn("0,00", content)
+        # Итого в карточке — без надбавки (50.00, а не 52.50).
+        self.assertIn("Итого выплата, кк", content)
+        self.assertIn("50,00", content)
+        self.assertNotIn("52,50", content)
