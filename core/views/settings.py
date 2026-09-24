@@ -89,6 +89,7 @@ def settings_view(request):
 
     summoner_settings = summoner_bonus_service.get_settings()
     summoner_form = SummonerBonusForm(instance=summoner_settings)
+    summoner_edit_open = bool(request.GET.get("edit_summoner_bonus"))
 
     if request.method == "POST":
         # Summoner bonus section (independent of rate forms).
@@ -99,7 +100,8 @@ def settings_view(request):
             if summoner_form.is_valid():
                 summoner_form.save()
                 return redirect("settings")
-            # Форма невалидна — остаёмся на странице с ошибками.
+            # Форма невалидна — остаёмся на странице с ошибками и держим форму открытой.
+            summoner_edit_open = True
 
         # Epic boss notification section (independent of rate forms).
         if request.POST.get("save_epic_boss"):
@@ -199,5 +201,7 @@ def settings_view(request):
             "epic_preview": boss_notification_service.get_notification_preview(),
             "epic_edit_open": epic_edit_open,
             "summoner_form": summoner_form,
+            "summoner_settings": summoner_settings,
+            "summoner_edit_open": summoner_edit_open,
         },
     )

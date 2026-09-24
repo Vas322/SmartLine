@@ -173,6 +173,7 @@
 
 <div class="card">
 <h2>Надбавка за суммонеров</h2>
+{% if summoner_edit_open %}
 <form method="post">
     {% csrf_token %}
     <p>
@@ -189,7 +190,14 @@
     <p class="error">{{ summoner_form.non_field_errors }}</p>
     {% endif %}
     <button type="submit" name="save_summoner_bonus" value="1" class="btn">Сохранить</button>
+    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
 </form>
+{% else %}
+<h3>Текущие настройки</h3>
+<p>Надбавка за суммонеров: {% if summoner_settings.is_enabled %}Включена{% else %}Выключена{% endif %}</p>
+<p>% за 1 суммонера: {{ summoner_settings.percent }}%</p>
+<a href="?edit_summoner_bonus=1" class="btn btn-secondary">Изменить</a>
+{% endif %}
 </div>
 
 <div class="card">

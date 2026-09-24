@@ -9,7 +9,7 @@ from core.services import summoner_bonus_service
 
 
 class SummonerBonusSettingsWebTests(TestCase):
-    """Settings page: summoner bonus section (save checkbox and percent)."""
+    """Settings page: summoner bonus section (view mode + edit mode)."""
 
     def setUp(self):
         self.staff = User.objects.create_user(
@@ -22,18 +22,26 @@ class SummonerBonusSettingsWebTests(TestCase):
     def _login(self, user):
         self.client.login(username=user.username, password="test-password-123")
 
+    def _reset(self):
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = False
+        settings.percent = Decimal("0.5")
+        settings.save()
+
     def test_settings_page_contains_summoner_bonus_section(self):
+        self._reset()
         self._login(self.staff)
         response = self.client.get(reverse("settings"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Надбавка за суммонеров", content)
-        self.assertIn('name="is_enabled"', content)
-        self.assertIn('name="percent"', content)
-        self.assertIn('name="save_summoner_bonus"', content)
-        self.assertIn('name="save_summoner_bonus" value="1"', content)
+        self.assertIn("Изменить", content)
+        # Режим просмотра по умолчанию: значения видны, форма НЕ видна.
+        self.assertNotIn('name="is_enabled"', content)
+        self.assertNotIn('name="percent"', content)
+        self.assertNotIn('name="save_summoner_bonus"', content)
 
-    def test_settings_page_prefills_current_values(self):
+    def test_view_mode_shows_current_values(self):
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
         settings.percent = Decimal("3.5")
@@ -42,11 +50,43 @@ class SummonerBonusSettingsWebTests(TestCase):
         self._login(self.staff)
         response = self.client.get(reverse("settings"))
         content = response.content.decode()
+        self.assertIn("Надбавка за суммонеров: Включена", content)
+        self.assertIn("% за 1 суммонера: 3,50%", content)
+
+    def test_view_mode_shows_disabled_value(self):
+        self._reset()
+        self._login(self.staff)
+        response = self.client.get(reverse("settings"))
+        content = response.content.decode()
+        self.assertIn("Надбавка за суммонеров: Выключена", content)
+
+    def test_edit_param_opens_form(self):
+        self._reset()
+        self._login(self.staff)
+        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Форма редактирования открыта.
+        self.assertIn('name="is_enabled"', content)
+        self.assertIn('name="percent"', content)
+        self.assertIn('name="save_summoner_bonus" value="1"', content)
+        self.assertIn("Отмена", content)
+
+    def test_edit_mode_prefills_current_values(self):
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("3.5")
+        settings.save()
+
+        self._login(self.staff)
+        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        content = response.content.decode()
         # Чекбокс отмечен при включённой надбавке.
         self.assertRegex(content, r'name="is_enabled"[^>]*checked')
         self.assertIn('name="percent" value="3.50"', content)
 
     def test_save_enabled_and_percent(self):
+        self._reset()
         self._login(self.staff)
         response = self.client.post(
             reverse("settings"),
@@ -61,6 +101,12 @@ class SummonerBonusSettingsWebTests(TestCase):
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("3.5"))
+        # После сохранения — снова режим просмотра с новыми значениями.
+        response = self.client.get(reverse("settings"))
+        content = response.content.decode()
+        self.assertIn("Надбавка за суммонеров: Включена", content)
+        self.assertIn("% за 1 суммонера: 3,50%", content)
+        self.assertNotIn('name="save_summoner_bonus"', content)
 
     def test_save_disabled_and_percent(self):
         # Изначально включаем, потом выключаем чекбокс.
@@ -81,6 +127,11 @@ class SummonerBonusSettingsWebTests(TestCase):
         settings.refresh_from_db()
         self.assertFalse(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("2.0"))
+        # После сохранения — снова режим просмотра с новыми значениями.
+        response = self.client.get(reverse("settings"))
+        content = response.content.decode()
+        self.assertIn("Надбавка за суммонеров: Выключена", content)
+        self.assertIn("% за 1 суммонера: 2,00%", content)
 
     def test_non_staff_cannot_access_settings(self):
         self._login(self.non_staff)
