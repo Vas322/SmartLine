@@ -10,6 +10,7 @@ from core.models.boss_respawn import (
 )
 from core.models.instructions import Instruction, ScheduleMirror
 from core.models.registration import Registration
+from core.models.settings_bonus import SummonerBonusSettings
 from core.models.telegram import OutgoingMessage, ScheduledMessage, TelegramSettings, TelegramTopic
 from core.models.welcome import WelcomeSettings
 
@@ -29,6 +30,7 @@ __all__ = [
     "Registration",
     "ScheduleMirror",
     "WelcomeSettings",
+    "SummonerBonusSettings",
     "BossRespawn",
     "BossRespawnSyncStatus",
     "EpicBossNotificationSettings",

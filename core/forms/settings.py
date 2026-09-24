@@ -4,9 +4,24 @@ from django import forms
 from core.models import (
     BossRespawn,
     EpicBossNotificationSettings,
+    SummonerBonusSettings,
     TelegramTopic,
     WelcomeSettings,
 )
+
+
+class SummonerBonusForm(forms.ModelForm):
+    class Meta:
+        model = SummonerBonusSettings
+        fields = ["is_enabled", "percent"]
+        widgets = {
+            "is_enabled": forms.CheckboxInput(),
+            "percent": forms.NumberInput(attrs={"step": "0.1"}),
+        }
+        labels = {
+            "is_enabled": "Включить надбавку за суммонеров",
+            "percent": "% за 1 суммонера",
+        }
 
 
 class WelcomeSettingsForm(forms.ModelForm):

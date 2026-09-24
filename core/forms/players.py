@@ -29,9 +29,18 @@ class PlayerForm(forms.ModelForm):
 
 
 class PlayerEditForm(forms.ModelForm):
+    summoner_count = forms.IntegerField(
+        min_value=0,
+        max_value=99,
+        required=False,
+        initial=0,
+        label="Количество суммонеров",
+        help_text="0 — надбавки нет",
+    )
+
     class Meta:
         model = Player
-        fields = ["nickname", "telegram_username", "telegram_user_id"]
+        fields = ["nickname", "telegram_username", "telegram_user_id", "summoner_count"]
         widgets = {
             "nickname": forms.TextInput(attrs={"placeholder": "Игровой ник"}),
             "telegram_username": forms.TextInput(
@@ -87,3 +96,9 @@ class PlayerEditForm(forms.ModelForm):
                 "Этот Telegram user ID уже привязан к другому игроку."
             )
         return user_id
+
+    def clean_summoner_count(self) -> int:
+        count = self.cleaned_data.get("summoner_count")
+        if count is None:
+            return 0
+        return count

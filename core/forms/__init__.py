@@ -10,7 +10,11 @@ from core.forms.scheduled_messages import (
     ScheduledMessageAdminForm,
     WeekdayCheckboxSelectMultiple,
 )
-from core.forms.settings import EpicBossNotificationSettingsForm, WelcomeSettingsForm
+from core.forms.settings import (
+    EpicBossNotificationSettingsForm,
+    SummonerBonusForm,
+    WelcomeSettingsForm,
+)
 
 __all__ = [
     "PlayerForm",
@@ -28,4 +32,5 @@ __all__ = [
     "ScheduledMessageAdminForm",
     "WelcomeSettingsForm",
     "EpicBossNotificationSettingsForm",
+    "SummonerBonusForm",
 ]

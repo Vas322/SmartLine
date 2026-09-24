@@ -6,6 +6,9 @@ class Player(models.Model):
     nickname = models.CharField(max_length=64, null=True, blank=True)
     telegram_user_id = models.BigIntegerField(null=True, blank=True)
     telegram_username = models.CharField(max_length=64, blank=True, default="")
+    summoner_count = models.PositiveIntegerField(
+        default=0, verbose_name="Количество суммонеров"
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

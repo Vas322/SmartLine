@@ -10,10 +10,11 @@ from core.forms import (
     EpicBossNotificationSettingsForm,
     RateForm,
     RegistrationRateForm,
+    SummonerBonusForm,
     WelcomeSettingsForm,
 )
 from core.models import CastRate, Rate, RegistrationRate
-from core.services import boss_notification_service, welcome_service
+from core.services import boss_notification_service, summoner_bonus_service, welcome_service
 
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,20 @@ def settings_view(request):
     epic_form = EpicBossNotificationSettingsForm(instance=epic_settings)
     epic_edit_open = bool(request.GET.get("edit_epic_boss"))
 
+    summoner_settings = summoner_bonus_service.get_settings()
+    summoner_form = SummonerBonusForm(instance=summoner_settings)
+
     if request.method == "POST":
+        # Summoner bonus section (independent of rate forms).
+        if request.POST.get("save_summoner_bonus"):
+            summoner_form = SummonerBonusForm(
+                request.POST, instance=summoner_settings
+            )
+            if summoner_form.is_valid():
+                summoner_form.save()
+                return redirect("settings")
+            # Форма невалидна — остаёмся на странице с ошибками.
+
         # Epic boss notification section (independent of rate forms).
         if request.POST.get("save_epic_boss"):
             epic_form = EpicBossNotificationSettingsForm(
@@ -184,5 +198,6 @@ def settings_view(request):
             "epic_settings": epic_settings,
             "epic_preview": boss_notification_service.get_notification_preview(),
             "epic_edit_open": epic_edit_open,
+            "summoner_form": summoner_form,
         },
     )

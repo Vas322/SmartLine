@@ -172,6 +172,27 @@
 </div>
 
 <div class="card">
+<h2>Надбавка за суммонеров</h2>
+<form method="post">
+    {% csrf_token %}
+    <p>
+        {{ summoner_form.is_enabled.label_tag }} {{ summoner_form.is_enabled }}
+    </p>
+    <p>
+        {{ summoner_form.percent.label_tag }}<br>
+        {{ summoner_form.percent }}
+    </p>
+    {% if summoner_form.percent.errors %}
+    <p class="error">{{ summoner_form.percent.errors }}</p>
+    {% endif %}
+    {% if summoner_form.non_field_errors %}
+    <p class="error">{{ summoner_form.non_field_errors }}</p>
+    {% endif %}
+    <button type="submit" name="save_summoner_bonus" value="1" class="btn">Сохранить</button>
+</form>
+</div>
+
+<div class="card">
 <h2>Приветствие</h2>
 {% if welcome_edit_open or not welcome_settings.welcome_text|length %}
 <form method="post">
