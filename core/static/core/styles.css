@@ -397,7 +397,7 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
     right: 0;
     bottom: 0;
     top: 60px;  /* ниже хедера */
-    background: url('images/castle.png') no-repeat center center;
+    background: url('images/castle.png?v=2') no-repeat center center;
     background-size: auto 100%;
     pointer-events: none;
 }
