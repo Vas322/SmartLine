@@ -81,6 +81,7 @@ urlpatterns = [
         name="instruction_edit",
     ),
     path("settings/rates/", views.rates_view, name="rates"),
+    path("settings/welcome/", views.settings_welcome_view, name="settings_welcome"),
     path("settings/", views.settings_view, name="settings"),
     path("schedule/", views.schedule_mirror, name="schedule_mirror"),
     path("rb/", views.boss_respawn_view, name="boss_respawn"),

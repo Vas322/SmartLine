@@ -31,7 +31,7 @@ from core.views.players import (
     players,
     toggle_player,
 )
-from core.views.settings import rates_view, settings_view
+from core.views.settings import rates_view, settings_view, settings_welcome_view
 
 __all__ = [
     # common
@@ -60,6 +60,7 @@ __all__ = [
     # settings
     "settings_view",
     "rates_view",
+    "settings_welcome_view",
     # instructions
     "instructions",
     "instruction_detail",

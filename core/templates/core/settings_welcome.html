@@ -1,0 +1,51 @@
+{% extends "core/base.html" %}
+{% block title %}Приветствие — Настройки{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Приветствие</h1></div>
+
+<div class="welcome-page">
+    <div class="welcome-header">
+        <span class="badge {% if welcome_settings.welcome_text %}badge-success{% else %}badge-error{% endif %}">
+            {% if welcome_settings.welcome_text %}Включено{% else %}Выключено{% endif %}
+        </span>
+    </div>
+
+    {% if welcome_settings.welcome_text and not welcome_edit_open %}
+    <div class="welcome-view">
+        <div class="welcome-preview">{{ welcome_settings.welcome_text|linebreaksbr }}</div>
+        <a href="?edit=1" class="btn btn-secondary">Изменить приветствие</a>
+    </div>
+    {% endif %}
+
+    {% if welcome_edit_open or not welcome_settings.welcome_text %}
+    <form method="post">
+        {% csrf_token %}
+        {% if welcome_form.welcome_text.errors %}
+        <span class="field-error">{{ welcome_form.welcome_text.errors }}</span>
+        {% endif %}
+        <p>
+            {{ welcome_form.welcome_text.label_tag }}<br>
+            {{ welcome_form.welcome_text }}
+        </p>
+        <button type="submit" name="save_welcome" value="1" class="btn">Сохранить приветствие</button>
+        {% if welcome_settings.welcome_text %}
+        <a href="{% url 'settings_welcome' %}" class="btn btn-secondary">Отмена</a>
+        {% endif %}
+    </form>
+    {% endif %}
+
+    {% if welcome_blocked %}
+    <div class="welcome-blocked">
+        <p class="muted">Приветствия временно отключены из-за массового захода (до {{ welcome_settings.block_until|date:"H:i" }}).</p>
+        <form method="post" class="inline-form">
+            {% csrf_token %}
+            <button type="submit" name="reset_welcome_block" value="1" class="btn btn-danger">Сбросить блокировку</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if not welcome_settings.welcome_text and not welcome_edit_open %}
+    <p class="muted">Приветствия выключены (текст пуст).</p>
+    {% endif %}
+</div>
+{% endblock %}

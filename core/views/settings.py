@@ -99,12 +99,17 @@ def settings_view(request):
     if request.method == "GET" and any(request.GET.get(p) for p in edit_params):
         return _rates_redirect_for_get(request)
 
-    welcome_settings = welcome_service.get_welcome_settings()
-    welcome_form = WelcomeSettingsForm(instance=welcome_settings)
+    # Welcome section moved to /settings/welcome/ — redirect old links.
+    if request.GET.get("edit_welcome"):
+        return redirect(
+            reverse("settings_welcome") + "?edit=1", permanent=False
+        )
 
     epic_settings = boss_notification_service.get_settings()
     epic_form = EpicBossNotificationSettingsForm(instance=epic_settings)
     epic_edit_open = bool(request.GET.get("edit_epic_boss"))
+
+    welcome_settings = welcome_service.get_welcome_settings()
 
     summoner_settings = summoner_bonus_service.get_settings()
     summoner_form = SummonerBonusForm(instance=summoner_settings)
@@ -133,26 +138,13 @@ def settings_view(request):
             # Форма невалидна — оставляем её открытой для исправления.
             epic_edit_open = True
 
-        # Welcome section actions.
-        if request.POST.get("save_welcome"):
-            welcome_form = WelcomeSettingsForm(
-                request.POST, instance=welcome_settings
-            )
-            if welcome_form.is_valid():
-                welcome_form.save()
-                return redirect("settings")
-        elif request.POST.get("reset_welcome_block"):
-            welcome_service.reset_block_until()
-            return redirect("settings")
+        # Welcome section moved to /settings/welcome/ — redirect old POSTs.
+        if request.POST.get("save_welcome") or request.POST.get("reset_welcome_block"):
+            return redirect("settings_welcome")
 
     rates = Rate.objects.all()
     cast_rates = CastRate.objects.all()
     reg_rates = RegistrationRate.objects.all()
-    now = timezone.now()
-    welcome_blocked = (
-        welcome_settings.block_until is not None
-        and welcome_settings.block_until > now
-    )
 
     active_def = rates.filter(active=True).count()
     active_cast = cast_rates.filter(active=True).count()
@@ -213,7 +205,7 @@ def settings_view(request):
             "status": welcome_status,
             "anchor": "welcome",
             "on": welcome_on,
-            "href": "settings",
+            "href": "settings_welcome",
         },
         {
             "title": "Уведомления Эпик РБ",
@@ -229,10 +221,6 @@ def settings_view(request):
         request,
         "core/settings.html",
         {
-            "welcome_form": welcome_form,
-            "welcome_settings": welcome_settings,
-            "welcome_blocked": welcome_blocked,
-            "welcome_edit_open": bool(request.GET.get("edit_welcome")),
             "epic_form": epic_form,
             "epic_settings": epic_settings,
             "epic_preview": boss_notification_service.get_notification_preview(),
@@ -241,6 +229,43 @@ def settings_view(request):
             "summoner_settings": summoner_settings,
             "summoner_edit_open": summoner_edit_open,
             "tiles": tiles,
+        },
+    )
+
+
+@staff_or_404
+def settings_welcome_view(request):
+    """Standalone welcome settings page /settings/welcome/."""
+    welcome_settings = welcome_service.get_welcome_settings()
+    welcome_form = WelcomeSettingsForm(instance=welcome_settings)
+    welcome_edit_open = bool(request.GET.get("edit"))
+
+    if request.method == "POST":
+        if request.POST.get("save_welcome"):
+            welcome_form = WelcomeSettingsForm(
+                request.POST, instance=welcome_settings
+            )
+            if welcome_form.is_valid():
+                welcome_form.save()
+                return redirect("settings_welcome")
+            welcome_edit_open = True
+        elif request.POST.get("reset_welcome_block"):
+            welcome_service.reset_block_until()
+            return redirect("settings_welcome")
+
+    now = timezone.now()
+    welcome_blocked = (
+        welcome_settings.block_until is not None
+        and welcome_settings.block_until > now
+    )
+    return render(
+        request,
+        "core/settings_welcome.html",
+        {
+            "welcome_form": welcome_form,
+            "welcome_settings": welcome_settings,
+            "welcome_blocked": welcome_blocked,
+            "welcome_edit_open": welcome_edit_open,
         },
     )
 

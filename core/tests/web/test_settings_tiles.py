@@ -47,12 +47,14 @@ class SettingsTilesWebTests(TestCase):
     def test_tiles_have_correct_links(self):
         self._reset()
         content = self._get()
-        # У карточек-секций summoner/welcome/epic есть свои id.
-        for anchor in ("summoner", "welcome", "epic-boss"):
+        # У карточек-секций summoner/epic есть свои id (welcome вынесен на отдельную страницу).
+        for anchor in ("summoner", "epic-boss"):
             self.assertIn(f'id="{anchor}"', content)
-        # Тарифы за DEF ведут на отдельную страницу тарифов, остальные — на settings.
+        # Тарифы за DEF ведут на отдельную страницу тарифов, welcome — на /settings/welcome/,
+        # остальные — на settings.
         self.assertIn(f'href="{reverse("rates")}"', content)
         self.assertIn(f'href="{reverse("settings")}"', content)
+        self.assertIn(f'href="{reverse("settings_welcome")}"', content)
 
     def test_tile_titles_present(self):
         self._reset()
