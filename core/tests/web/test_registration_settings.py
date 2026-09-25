@@ -41,7 +41,7 @@ class RegistrationSettingsTests(TestCase):
     def test_settings_add_registration_rate(self):
         self._login()
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "add_reg_rate": "1",
                 "start_time": "08:00",
@@ -49,7 +49,7 @@ class RegistrationSettingsTests(TestCase):
                 "rate_kk": "15.00",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         rate = RegistrationRate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("15.00"))
         self.assertTrue(rate.active)
@@ -64,12 +64,12 @@ class RegistrationSettingsTests(TestCase):
             order=1,
         )
 
-        response = self.client.get(reverse("settings") + f"?edit_reg={rate.pk}")
+        response = self.client.get(reverse("rates") + f"?tab=reg&edit_reg={rate.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertIn('name="edit_reg_rate"', response.content.decode())
 
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "edit_reg_rate": str(rate.pk),
                 "start_time": "09:00",
@@ -77,7 +77,7 @@ class RegistrationSettingsTests(TestCase):
                 "rate_kk": "25.00",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
 
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
@@ -93,10 +93,10 @@ class RegistrationSettingsTests(TestCase):
             rate_kk=Decimal("10.00"),
         )
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {"delete_reg_rate": str(rate.pk)},
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         self.assertEqual(RegistrationRate.objects.count(), 0)
 
     def test_settings_registration_rate_form_hidden_by_default(self):

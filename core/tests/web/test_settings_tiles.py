@@ -44,14 +44,15 @@ class SettingsTilesWebTests(TestCase):
         # Шесть плиток-ссылок.
         self.assertEqual(content.count('class="settings-tile stat-card stat-card--gold"'), 6)
 
-    def test_tiles_have_correct_anchors(self):
+    def test_tiles_have_correct_links(self):
         self._reset()
         content = self._get()
-        for anchor in ("rates-def", "rates-cast", "rates-reg", "summoner", "welcome", "epic-boss"):
-            self.assertIn(f'href="#{anchor}"', content)
-        # У каждой карточки-секции есть свой id.
+        # У каждой карточки-секции есть свой id (якорь внутри страницы сохранён).
         for anchor in ("rates-def", "rates-cast", "rates-reg", "summoner", "welcome", "epic-boss"):
             self.assertIn(f'id="{anchor}"', content)
+        # Тарифы за DEF ведут на отдельную страницу тарифов, остальные — на settings.
+        self.assertIn(f'href="{reverse("rates")}"', content)
+        self.assertIn(f'href="{reverse("settings")}"', content)
 
     def test_tile_titles_present(self):
         self._reset()

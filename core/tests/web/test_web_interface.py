@@ -772,7 +772,7 @@ class WebInterfaceTests(TestCase):
     def test_settings_add_rate(self):
         self._login()
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "add_rate": "1",
                 "start_time": "08:00",
@@ -780,7 +780,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         rate = Rate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("75.00"))
         self.assertTrue(rate.active)
@@ -797,12 +797,12 @@ class WebInterfaceTests(TestCase):
             rate_kk=Decimal("100"),
         )
 
-        response = self.client.get(reverse("settings") + f"?edit={rate.pk}")
+        response = self.client.get(reverse("rates") + f"?tab=def&edit={rate.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertIn('name="edit_rate"', response.content.decode())
 
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "edit_rate": str(rate.pk),
                 "start_time": "09:00",
@@ -810,7 +810,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
 
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
@@ -821,7 +821,7 @@ class WebInterfaceTests(TestCase):
     def test_settings_add_cast_rate(self):
         self._login()
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "add_cast_rate": "1",
                 "start_time": "08:00",
@@ -829,7 +829,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         cast_rate = CastRate.objects.get(
             start_time=time(8, 0), end_time=time(16, 0)
         )
@@ -848,12 +848,12 @@ class WebInterfaceTests(TestCase):
             rate_kk=Decimal("100"),
         )
 
-        response = self.client.get(reverse("settings") + f"?edit_cast={cast_rate.pk}")
+        response = self.client.get(reverse("rates") + f"?tab=cast&edit_cast={cast_rate.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertIn('name="edit_cast_rate"', response.content.decode())
 
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "edit_cast_rate": str(cast_rate.pk),
                 "start_time": "09:00",
@@ -861,7 +861,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
 
         cast_rate.refresh_from_db()
         self.assertEqual(cast_rate.start_time, time(9, 0))
@@ -880,10 +880,10 @@ class WebInterfaceTests(TestCase):
             rate_kk=Decimal("100"),
         )
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {"delete_cast_rate": str(cast_rate.pk)},
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         self.assertEqual(CastRate.objects.count(), 0)
 
     def test_settings_delete_rate(self):
@@ -897,10 +897,10 @@ class WebInterfaceTests(TestCase):
             rate_kk=Decimal("100"),
         )
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {"delete_rate": str(rate.pk)},
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         self.assertEqual(Rate.objects.count(), 0)
 
     def test_instructions_list_table(self):

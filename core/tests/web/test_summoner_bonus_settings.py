@@ -63,7 +63,7 @@ class SummonerBonusSettingsWebTests(TestCase):
     def test_edit_param_opens_form(self):
         self._reset()
         self._login(self.staff)
-        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        response = self.client.get(reverse("rates") + "?tab=summoner&edit_summoner_bonus=1")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         # Форма редактирования открыта.
@@ -79,7 +79,7 @@ class SummonerBonusSettingsWebTests(TestCase):
         settings.save()
 
         self._login(self.staff)
-        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        response = self.client.get(reverse("rates") + "?tab=summoner&edit_summoner_bonus=1")
         content = response.content.decode()
         # Чекбокс отмечен при включённой надбавке.
         self.assertRegex(content, r'name="is_enabled"[^>]*checked')
@@ -89,14 +89,14 @@ class SummonerBonusSettingsWebTests(TestCase):
         self._reset()
         self._login(self.staff)
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "save_summoner_bonus": "1",
                 "is_enabled": "on",
                 "percent": "3.5",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         settings = summoner_bonus_service.get_settings()
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
@@ -117,13 +117,13 @@ class SummonerBonusSettingsWebTests(TestCase):
 
         self._login(self.staff)
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "save_summoner_bonus": "1",
                 "percent": "2.0",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         settings.refresh_from_db()
         self.assertFalse(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("2.0"))
@@ -149,7 +149,7 @@ class SummonerBonusSettingsWebTests(TestCase):
     def test_edit_mode_has_active_enabled_at_input(self):
         self._reset()
         self._login(self.staff)
-        response = self.client.get(reverse("settings") + "?edit_summoner_bonus=1")
+        response = self.client.get(reverse("rates") + "?tab=summoner&edit_summoner_bonus=1")
         content = response.content.decode()
         # Поле даты включения — активный input типа datetime-local (не disabled).
         self.assertIn('name="enabled_at_display"', content)
@@ -165,7 +165,7 @@ class SummonerBonusSettingsWebTests(TestCase):
         self._login(self.staff)
         custom = timezone.localtime() + timedelta(days=1)
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "save_summoner_bonus": "1",
                 "is_enabled": "on",
@@ -173,7 +173,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "enabled_at_display": custom.strftime("%d.%m.%Y %H:%M"),
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         settings = summoner_bonus_service.get_settings()
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
@@ -201,7 +201,7 @@ class SummonerBonusSettingsWebTests(TestCase):
         before = timezone.now()
         self._login(self.staff)
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "save_summoner_bonus": "1",
                 "is_enabled": "on",
@@ -209,7 +209,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "enabled_at_display": "",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("rates"))
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
         self.assertIsNotNone(settings.enabled_at)
@@ -219,7 +219,7 @@ class SummonerBonusSettingsWebTests(TestCase):
         self._reset()
         self._login(self.staff)
         response = self.client.post(
-            reverse("settings"),
+            reverse("rates"),
             {
                 "save_summoner_bonus": "1",
                 "is_enabled": "on",

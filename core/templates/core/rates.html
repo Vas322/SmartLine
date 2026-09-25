@@ -1,0 +1,24 @@
+{% extends "core/base.html" %}
+{% block title %}Тарифы и надбавки{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Тарифы и надбавки</h1></div>
+
+<div class="rate-tabs">
+    <button class="tab-btn{% if tab == 'def' or tab is None %} active{% endif %}" data-tab="def">Тарифы за DEF</button>
+    <button class="tab-btn{% if tab == 'cast' %} active{% endif %}" data-tab="cast">Тарифы за каст</button>
+    <button class="tab-btn{% if tab == 'reg' %} active{% endif %}" data-tab="reg">Тарифы за регистрацию</button>
+    <button class="tab-btn{% if tab == 'summoner' %} active{% endif %}" data-tab="summoner">Надбавка за суммонеров</button>
+</div>
+<div data-panel="def" class="tab-panel{% if tab != 'def' and tab is not None %} hidden{% endif %}">
+    {% include "core/settings/_rates_def.html" %}
+</div>
+<div data-panel="cast" class="tab-panel{% if tab != 'cast' %} hidden{% endif %}">
+    {% include "core/settings/_rates_cast.html" %}
+</div>
+<div data-panel="reg" class="tab-panel{% if tab != 'reg' %} hidden{% endif %}">
+    {% include "core/settings/_rates_reg.html" %}
+</div>
+<div data-panel="summoner" class="tab-panel{% if tab != 'summoner' %} hidden{% endif %}">
+    {% include "core/settings/_summoner.html" %}
+</div>
+{% endblock %}

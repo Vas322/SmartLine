@@ -353,6 +353,14 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-br
 .tab-btn.active { background: var(--color-brand); color: #fff; border-color: var(--color-brand); font-weight: bold; }
 .tab-panel { display: block; }
 .tab-panel.hidden { display: none; }
+.rate-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
 .hidden { display: none !important; }
 
 /* ===== PAGINATION ===== */

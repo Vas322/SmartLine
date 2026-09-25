@@ -27,7 +27,7 @@
     <p class="error">{{ summoner_form.non_field_errors }}</p>
     {% endif %}
     <button type="submit" name="save_summoner_bonus" value="1" class="btn">Сохранить</button>
-    <a href="{% url 'settings' %}" class="btn btn-secondary">Отмена</a>
+    <a href="{% url 'rates' %}" class="btn btn-secondary">Отмена</a>
 </form>
 {% else %}
 <h3>Текущие настройки</h3>

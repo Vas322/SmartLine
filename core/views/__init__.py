@@ -31,7 +31,7 @@ from core.views.players import (
     players,
     toggle_player,
 )
-from core.views.settings import settings_view
+from core.views.settings import rates_view, settings_view
 
 __all__ = [
     # common
@@ -59,6 +59,7 @@ __all__ = [
     "_read_json_body",
     # settings
     "settings_view",
+    "rates_view",
     # instructions
     "instructions",
     "instruction_detail",
