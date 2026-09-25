@@ -47,8 +47,8 @@ class SettingsTilesWebTests(TestCase):
     def test_tiles_have_correct_links(self):
         self._reset()
         content = self._get()
-        # У каждой карточки-секции есть свой id (якорь внутри страницы сохранён).
-        for anchor in ("rates-def", "rates-cast", "rates-reg", "summoner", "welcome", "epic-boss"):
+        # У карточек-секций summoner/welcome/epic есть свои id.
+        for anchor in ("summoner", "welcome", "epic-boss"):
             self.assertIn(f'id="{anchor}"', content)
         # Тарифы за DEF ведут на отдельную страницу тарифов, остальные — на settings.
         self.assertIn(f'href="{reverse("rates")}"', content)
@@ -109,3 +109,16 @@ class SettingsTilesWebTests(TestCase):
         settings.save()
         content = self._get()
         self.assertIn("Включено · 18:00 МСК", content)
+
+    def test_settings_page_does_not_contain_rate_forms(self):
+        """Rate forms are only on /settings/rates/, not on /settings/."""
+        content = self._get()
+        # Settings page should NOT have rate table form controls
+        # (no start_time/end_time/rate_kk inputs, no rate action buttons)
+        self.assertNotIn('name="add_rate"', content)
+        self.assertNotIn('name="add_cast_rate"', content)
+        self.assertNotIn('name="add_reg_rate"', content)
+        # But summoner/welcome/epic sections are still there
+        self.assertIn("Надбавка за суммонеров", content)
+        self.assertIn("Приветствие", content)
+        self.assertIn("Уведомления Эпик РБ", content)

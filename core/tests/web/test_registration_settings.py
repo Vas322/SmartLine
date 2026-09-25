@@ -101,7 +101,7 @@ class RegistrationSettingsTests(TestCase):
 
     def test_settings_registration_rate_form_hidden_by_default(self):
         self._login()
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=reg")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn('id="regAddForm"', content)

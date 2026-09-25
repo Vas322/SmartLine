@@ -118,12 +118,12 @@ class RatesPageWebTests(TestCase):
         response = self.client.get(reverse("settings") + "?tab=reg")
         self.assertRedirects(response, reverse("rates") + "?tab=reg")
 
-    def test_post_save_summoner_bonus_from_settings_redirects_to_rates(self):
+    def test_post_save_summoner_bonus_from_settings_stays_on_settings(self):
         response = self.client.post(
             reverse("settings"),
             {"save_summoner_bonus": "1", "is_enabled": "on", "percent": "3.5"},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("settings"))
 
     def test_settings_page_still_shows_tiles(self):
         response = self.client.get(reverse("settings"))
