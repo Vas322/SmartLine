@@ -3,6 +3,7 @@ import logging
 
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.utils.formats import localize
 
 from core.decorators import staff_or_404
 from core.forms import (
@@ -176,6 +177,72 @@ def settings_view(request):
         welcome_settings.block_until is not None
         and welcome_settings.block_until > now
     )
+
+    active_def = rates.filter(active=True).count()
+    active_cast = cast_rates.filter(active=True).count()
+    active_reg = reg_rates.filter(active=True).count()
+
+    if summoner_settings.is_enabled:
+        summoner_status = f"Включено · {localize(summoner_settings.percent)}% за суммонера"
+    else:
+        summoner_status = "Выключено"
+
+    welcome_on = bool(welcome_settings.welcome_text)
+    welcome_status = "Включено" if welcome_on else "Выключено"
+
+    if epic_settings.is_enabled:
+        epic_status = (
+            "Включено · "
+            f"{epic_settings.notification_time.strftime('%H:%M')} МСК"
+        )
+    else:
+        epic_status = "Выключено"
+
+    tiles = [
+        {
+            "title": "Тарифы за DEF",
+            "description": "Ставки оплаты дефенса по времени суток.",
+            "status": f"{active_def} активных тарифов",
+            "anchor": "rates-def",
+            "on": active_def > 0,
+        },
+        {
+            "title": "Тарифы за каст",
+            "description": "Ставки оплаты каста и перекаста форта.",
+            "status": f"{active_cast} активных тарифов",
+            "anchor": "rates-cast",
+            "on": active_cast > 0,
+        },
+        {
+            "title": "Тарифы за регистрацию",
+            "description": "Оплата за регистрацию кланов на атаку форта.",
+            "status": f"{active_reg} активных тарифов",
+            "anchor": "rates-reg",
+            "on": active_reg > 0,
+        },
+        {
+            "title": "Надбавка за суммонеров",
+            "description": "Доплата за использование суммонеров.",
+            "status": summoner_status,
+            "anchor": "summoner",
+            "on": summoner_settings.is_enabled,
+        },
+        {
+            "title": "Приветствие",
+            "description": "Автоприветствие новых участников Telegram-группы.",
+            "status": welcome_status,
+            "anchor": "welcome",
+            "on": welcome_on,
+        },
+        {
+            "title": "Уведомления Эпик РБ",
+            "description": "Уведомления о начале окон эпик-боссов.",
+            "status": epic_status,
+            "anchor": "epic-boss",
+            "on": epic_settings.is_enabled,
+        },
+    ]
+
     return render(
         request,
         "core/settings.html",
@@ -203,5 +270,6 @@ def settings_view(request):
             "summoner_form": summoner_form,
             "summoner_settings": summoner_settings,
             "summoner_edit_open": summoner_edit_open,
+            "tiles": tiles,
         },
     )

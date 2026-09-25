@@ -3,6 +3,16 @@
 {% block content %}
 <div class="page-head"><h1>Настройки</h1></div>
 
+<nav class="settings-tiles" aria-label="Разделы настроек">
+    {% for tile in tiles %}
+    <a class="settings-tile stat-card stat-card--gold" href="#{{ tile.anchor }}">
+        <h2>{{ tile.title }}</h2>
+        <p class="settings-tile__description">{{ tile.description }}</p>
+        <p class="settings-tile__status status--{% if tile.on %}on{% else %}off{% endif %}">{{ tile.status }}</p>
+    </a>
+    {% endfor %}
+</nav>
+
 {% include "core/settings/_rates_def.html" %}
 {% include "core/settings/_rates_cast.html" %}
 {% include "core/settings/_rates_reg.html" %}

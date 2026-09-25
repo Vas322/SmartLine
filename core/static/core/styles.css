@@ -161,6 +161,38 @@ main {
 .stat-card--gold .value { color: var(--color-gold); }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); border-color: rgba(212, 175, 55, 0.4); }
 
+/* ===== SETTINGS TILES (HUB) ===== */
+html { scroll-behavior: smooth; }
+#rates-def, #rates-cast, #rates-reg, #summoner, #welcome, #epic-boss { scroll-margin-top: 90px; }
+.settings-tiles {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.settings-tile {
+    display: block;
+    text-decoration: none;
+    height: 100%;
+    background: var(--color-subtle);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-gold);
+    border-radius: 8px;
+    padding: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.settings-tile h2 { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0 0 6px; }
+.settings-tile__description { font-size: 13px; color: var(--color-text-secondary); margin: 0 0 10px; }
+.settings-tile__status { font-size: 13px; margin: 0; }
+.status--on { color: var(--color-gold); }
+.status--off { color: var(--color-text-secondary); }
+.settings-tile:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
+.settings-tile:active { transform: translateY(0); }
+@media (min-width: 768px) {
+    .settings-tiles { grid-template-columns: repeat(3, 1fr); }
+}
+.settings-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); border-color: rgba(212, 175, 55, 0.4); }
+
 /* ===== TABLE ===== */
 .table-wrap { overflow-x: auto; margin: 0 -24px -20px; border-radius: 8px; border: 1px solid var(--color-border); }
 table { border-collapse: collapse; width: 100%; min-width: 640px; background: var(--color-card); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
