@@ -31,7 +31,7 @@
 </form>
 {% else %}
 <h3>Текущие настройки</h3>
-<p>Надбавка за суммонеров: {% if summoner_settings.is_enabled %}Включена{% else %}Выключена{% endif %}</p>
+<p>Надбавка за суммонеров: <span class="badge {% if summoner_settings.is_enabled %}badge-success{% else %}badge-error{% endif %}">{% if summoner_settings.is_enabled %}Включена{% else %}Выключена{% endif %}</span></p>
 <p>% за 1 суммонера: {{ summoner_settings.percent }}%</p>
 <p>Дата включения надбавки:
     {% if summoner_settings.enabled_at %}{{ summoner_settings.enabled_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}

@@ -147,27 +147,10 @@ def settings_view(request):
 
     tiles = [
         {
-            "title": "Тарифы за DEF",
-            "description": "Ставки оплаты дефенса по времени суток.",
-            "status": f"{active_def} активных тарифов",
-            "anchor": "rates-def",
-            "on": active_def > 0,
-            "href": "rates",
-        },
-        {
-            "title": "Тарифы за каст",
-            "description": "Ставки оплаты каста и перекаста форта.",
-            "status": f"{active_cast} активных тарифов",
-            "anchor": "rates-cast",
-            "on": active_cast > 0,
-            "href": "rates",
-        },
-        {
-            "title": "Тарифы за регистрацию",
-            "description": "Оплата за регистрацию кланов на атаку форта.",
-            "status": f"{active_reg} активных тарифов",
-            "anchor": "rates-reg",
-            "on": active_reg > 0,
+            "title": "Тарифы и надбавки",
+            "description": "Тарифы за DEF/каст/регистрацию, надбавка за суммонеров.",
+            "status": f"{active_def + active_cast + active_reg} активных тарифов",
+            "on": (active_def + active_cast + active_reg) > 0,
             "href": "rates",
         },
         {

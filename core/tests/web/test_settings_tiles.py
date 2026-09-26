@@ -33,12 +33,12 @@ class SettingsTilesWebTests(TestCase):
     def _get(self):
         return self.client.get(reverse("settings")).content.decode()
 
-    def test_settings_page_contains_hub_nav_with_five_tiles(self):
+    def test_settings_page_contains_hub_nav_with_three_tiles(self):
         self._reset()
         content = self._get()
         self.assertIn('class="settings-tiles"', content)
-        # Пять плиток-ссылок.
-        self.assertEqual(content.count('class="settings-tile stat-card stat-card--gold"'), 5)
+        # Три плитки-ссылки: тарифы и надбавки, приветствие, эпик РБ.
+        self.assertEqual(content.count('class="settings-tile stat-card stat-card--gold"'), 3)
 
     def test_tiles_have_correct_links(self):
         self._reset()
@@ -54,9 +54,7 @@ class SettingsTilesWebTests(TestCase):
         self._reset()
         content = self._get()
         for title in (
-            "Тарифы за DEF",
-            "Тарифы за каст",
-            "Тарифы за регистрацию",
+            "Тарифы и надбавки",
             "Приветствие",
             "Уведомления Эпик РБ",
         ):
@@ -79,7 +77,8 @@ class SettingsTilesWebTests(TestCase):
         CastRate.objects.create(start_time="00:00", end_time="08:00", rate_kk=Decimal("50"), active=True)
         RegistrationRate.objects.create(start_time="00:00", end_time="23:59", rate_kk=Decimal("10"), active=True)
         content = self._get()
-        self.assertIn("1 активных тарифов", content)
+        # Статус считается как сумма активных тарифов DEF/CAST/REG.
+        self.assertIn("3 активных тарифов", content)
 
     def test_status_on_for_welcome(self):
         settings = welcome_service.get_welcome_settings()

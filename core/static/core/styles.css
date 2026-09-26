@@ -566,10 +566,10 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 .back-link {
     display: inline-block;
     margin-bottom: 16px;
-    color: var(--color-text-secondary);
     font-size: 14px;
+    font-weight: 500;
+    color: #B91C1C;
     text-decoration: none;
-    transition: color 0.15s;
 }
-.back-link:hover { color: var(--color-gold); }
+.back-link:hover { color: #991B1B; text-decoration: underline; }
 

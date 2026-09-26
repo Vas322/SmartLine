@@ -2,6 +2,7 @@
 {% block title %}Тарифы и надбавки{% endblock %}
 {% block content %}
 <div class="page-head"><h1>Тарифы и надбавки</h1></div>
+<a href="{% url 'settings' %}" class="back-link">← К настройкам</a>
 
 <div class="rate-tabs">
     <button class="tab-btn{% if tab == 'def' or tab is None %} active{% endif %}" data-tab="def">Тарифы за DEF</button>
