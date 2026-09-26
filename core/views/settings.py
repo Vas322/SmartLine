@@ -160,7 +160,7 @@ def settings_view(request):
             "status": f"{active_cast} активных тарифов",
             "anchor": "rates-cast",
             "on": active_cast > 0,
-            "href": "settings",
+            "href": "rates",
         },
         {
             "title": "Тарифы за регистрацию",
@@ -168,7 +168,7 @@ def settings_view(request):
             "status": f"{active_reg} активных тарифов",
             "anchor": "rates-reg",
             "on": active_reg > 0,
-            "href": "settings",
+            "href": "rates",
         },
         {
             "title": "Приветствие",
