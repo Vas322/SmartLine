@@ -1,4 +1,4 @@
-"""Tests for the Epic Boss notifications settings block (view + edit modes)."""
+"""Tests for the Epic Boss notifications settings page (view + edit modes)."""
 from datetime import time, timedelta
 
 from django.contrib.auth.models import User
@@ -11,7 +11,7 @@ from core.services import boss_notification_service
 
 
 class EpicBossNotificationSettingsViewTests(TestCase):
-    """Settings block «Уведомления Эпик РБ» — read-only by default, edit on demand."""
+    """Standalone page /settings/epic-boss/ — read-only by default, edit on demand."""
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -51,7 +51,7 @@ class EpicBossNotificationSettingsViewTests(TestCase):
         s.selected_bosses = ["Antharas", "Valakas"]
         s.save()
 
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("settings_epic_boss"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
 
@@ -59,27 +59,29 @@ class EpicBossNotificationSettingsViewTests(TestCase):
         self.assertNotIn('name="notification_time"', content)
         # Есть кнопка перехода в режим редактирования и текущие значения.
         self.assertIn("Изменить настройку", content)
-        self.assertIn("включены", content)
+        self.assertIn("Включено", content)
         self.assertIn("18:00", content)
         # Перечень выбранных боссов.
         self.assertIn("Antharas, Valakas", content)
 
     def test_view_mode_shows_bosses_as_not_selected_when_empty(self):
         s = self._settings()
+        s.is_enabled = True
         s.selected_bosses = []
         s.save()
 
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("settings_epic_boss"))
         content = response.content.decode()
         self.assertIn("— не выбраны —", content)
 
     def test_view_mode_preview_shows_real_bosses_and_time(self):
         # Antharas респает сегодня и выбран → пример содержит его имя и окно в МСК.
         s = self._settings()
+        s.is_enabled = True
         s.selected_bosses = ["Antharas", "Valakas"]
         s.save()
 
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("settings_epic_boss"))
         content = response.content.decode()
         self.assertIn("Пример сообщения:", content)
         self.assertIn("Antharas", content)
@@ -88,21 +90,23 @@ class EpicBossNotificationSettingsViewTests(TestCase):
     def test_view_mode_preview_shows_demo_when_none_respawn_today(self):
         # Ни один выбранный босс не респает сегодня → пример с демо Antharas.
         s = self._settings()
+        s.is_enabled = True
         s.selected_bosses = ["Valakas"]
+        s.save()
         # Убираем боссов, респающих сегодня: сдвигаем все далеко.
         for boss in (self.antharas, self.valakas, self.kernon):
             boss.respawn_start += timedelta(days=10)
             boss.respawn_end += timedelta(days=10)
             boss.save()
 
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("settings_epic_boss"))
         content = response.content.decode()
         self.assertIn("Пример сообщения:", content)
         self.assertIn("Antharas", content)
         self.assertIn("21:07", content)
 
     def test_edit_mode_shows_form(self):
-        response = self.client.get(reverse("settings"), {"edit_epic_boss": "1"})
+        response = self.client.get(reverse("settings_epic_boss"), {"edit": "1"})
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         # В режиме редактирования присутствует поле времени и чекбоксы боссов.
@@ -111,7 +115,7 @@ class EpicBossNotificationSettingsViewTests(TestCase):
 
     def test_post_saves_selected_bosses_and_returns_to_view_mode(self):
         response = self.client.post(
-            reverse("settings"),
+            reverse("settings_epic_boss"),
             {
                 "save_epic_boss": "1",
                 "is_enabled": "on",
@@ -121,7 +125,7 @@ class EpicBossNotificationSettingsViewTests(TestCase):
                 "text_template": "🎮 Сегодня респ Эпик РБ\n\nБоссы:\n{bosses}\n\nОкно респа: ~24 часа.",
             },
         )
-        self.assertRedirects(response, reverse("settings"))
+        self.assertRedirects(response, reverse("settings_epic_boss"))
 
         s = self._settings()
         self.assertTrue(s.is_enabled)
@@ -129,14 +133,14 @@ class EpicBossNotificationSettingsViewTests(TestCase):
         self.assertEqual(sorted(s.selected_bosses), ["Antharas", "Kernon"])
 
         # После успешного POST (редирект без edit-параметра) — режим просмотра.
-        follow = self.client.get(reverse("settings"))
+        follow = self.client.get(reverse("settings_epic_boss"))
         self.assertEqual(follow.status_code, 200)
         self.assertNotIn('name="notification_time"', follow.content.decode())
         self.assertIn("Antharas, Kernon", follow.content.decode())
 
     def test_post_enabled_without_bosses_is_invalid(self):
         response = self.client.post(
-            reverse("settings"),
+            reverse("settings_epic_boss"),
             {
                 "save_epic_boss": "1",
                 "is_enabled": "on",

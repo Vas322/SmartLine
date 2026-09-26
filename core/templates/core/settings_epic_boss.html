@@ -1,0 +1,48 @@
+{% extends "core/base.html" %}
+{% block title %}Уведомления Эпик РБ — Настройки{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Уведомления Эпик РБ</h1></div>
+
+<div class="epic-page">
+    <div class="epic-header">
+        <span class="badge {% if epic_settings.is_enabled %}badge-success{% else %}badge-error{% endif %}">
+            {% if epic_settings.is_enabled %}Включено{% else %}Выключено{% endif %}
+        </span>
+    </div>
+
+    {% if not epic_edit_open %}
+    <div class="epic-view">
+        {% if epic_settings.is_enabled %}
+        <div class="epic-meta">
+            <p>Время отправки: <strong>{{ epic_settings.notification_time|date:"H:i" }} МСК</strong></p>
+            <p>Тема в Telegram: {% if epic_settings.topic %}{{ epic_settings.topic.name }}{% else %}<span class="muted">— не выбрана —</span>{% endif %}</p>
+            <p>Боссы: {% if epic_settings.selected_bosses %}{{ epic_settings.selected_bosses|join:", " }}{% else %}<span class="muted">— не выбраны —</span>{% endif %}</p>
+        </div>
+        <p class="epic-preview-label">Текст уведомления:</p>
+        <div class="epic-preview">{{ epic_settings.text_template|linebreaksbr }}</div>
+        <p class="epic-preview-label">Пример сообщения:</p>
+        <div class="epic-preview epic-preview--demo">{{ epic_preview|linebreaksbr }}</div>
+        {% else %}
+        <p class="muted">Уведомления выключены.</p>
+        {% endif %}
+        <a href="?edit=1" class="btn btn-secondary">Изменить настройку</a>
+    </div>
+    {% endif %}
+
+    {% if epic_edit_open or not epic_settings.is_enabled %}
+    <form method="post" class="epic-form">
+        {% csrf_token %}
+        <p>{{ epic_form.is_enabled }} {{ epic_form.is_enabled.label_tag }}</p>
+        <p>{{ epic_form.notification_time.label_tag }}<br>{{ epic_form.notification_time }}</p>
+        <p>{{ epic_form.topic.label_tag }}<br>{{ epic_form.topic }}</p>
+        <p>{{ epic_form.bosses.label_tag }}<br>{{ epic_form.bosses }}</p>
+        {% if epic_form.bosses.errors %}<span class="field-error">{{ epic_form.bosses.errors }}</span>{% endif %}
+        <p>{{ epic_form.text_template.label_tag }}<br>{{ epic_form.text_template }}</p>
+        {% if epic_form.text_template.help_text %}<p class="muted">{{ epic_form.text_template.help_text }}</p>{% endif %}
+        {% if epic_form.non_field_errors %}<p class="error">{{ epic_form.non_field_errors }}</p>{% endif %}
+        <button type="submit" name="save_epic_boss" value="1" class="btn">Сохранить</button>
+        <a href="{% url 'settings_epic_boss' %}" class="btn btn-secondary">Отмена</a>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

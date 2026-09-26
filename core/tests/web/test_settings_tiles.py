@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.models import CastRate, Rate, RegistrationRate
-from core.services import boss_notification_service, summoner_bonus_service, welcome_service
+from core.services import boss_notification_service, welcome_service
 
 
 class SettingsTilesWebTests(TestCase):
@@ -19,10 +19,6 @@ class SettingsTilesWebTests(TestCase):
         self.client.login(username="kl", password="test-password-123")
 
     def _reset(self):
-        summoner = summoner_bonus_service.get_settings()
-        summoner.is_enabled = False
-        summoner.percent = Decimal("0.5")
-        summoner.save()
         welcome_settings = welcome_service.get_welcome_settings()
         welcome_settings.welcome_text = ""
         welcome_settings.save()
@@ -37,24 +33,22 @@ class SettingsTilesWebTests(TestCase):
     def _get(self):
         return self.client.get(reverse("settings")).content.decode()
 
-    def test_settings_page_contains_hub_nav_with_six_tiles(self):
+    def test_settings_page_contains_hub_nav_with_five_tiles(self):
         self._reset()
         content = self._get()
         self.assertIn('class="settings-tiles"', content)
-        # Шесть плиток-ссылок.
-        self.assertEqual(content.count('class="settings-tile stat-card stat-card--gold"'), 6)
+        # Пять плиток-ссылок.
+        self.assertEqual(content.count('class="settings-tile stat-card stat-card--gold"'), 5)
 
     def test_tiles_have_correct_links(self):
         self._reset()
         content = self._get()
-        # У карточек-секций summoner/epic есть свои id (welcome вынесен на отдельную страницу).
-        for anchor in ("summoner", "epic-boss"):
-            self.assertIn(f'id="{anchor}"', content)
         # Тарифы за DEF ведут на отдельную страницу тарифов, welcome — на /settings/welcome/,
-        # остальные — на settings.
+        # epic — на /settings/epic-boss/, остальные — на settings.
         self.assertIn(f'href="{reverse("rates")}"', content)
         self.assertIn(f'href="{reverse("settings")}"', content)
         self.assertIn(f'href="{reverse("settings_welcome")}"', content)
+        self.assertIn(f'href="{reverse("settings_epic_boss")}"', content)
 
     def test_tile_titles_present(self):
         self._reset()
@@ -63,7 +57,6 @@ class SettingsTilesWebTests(TestCase):
             "Тарифы за DEF",
             "Тарифы за каст",
             "Тарифы за регистрацию",
-            "Надбавка за суммонеров",
             "Приветствие",
             "Уведомления Эпик РБ",
         ):
@@ -88,15 +81,6 @@ class SettingsTilesWebTests(TestCase):
         content = self._get()
         self.assertIn("1 активных тарифов", content)
 
-    def test_status_on_for_summoner(self):
-        settings = summoner_bonus_service.get_settings()
-        settings.is_enabled = True
-        settings.percent = Decimal("3.5")
-        settings.save()
-        content = self._get()
-        self.assertIn("Включено · 3,50% за суммонера", content)
-        self.assertIn("status--on", content)
-
     def test_status_on_for_welcome(self):
         settings = welcome_service.get_welcome_settings()
         settings.welcome_text = "Добро пожаловать!"
@@ -120,7 +104,6 @@ class SettingsTilesWebTests(TestCase):
         self.assertNotIn('name="add_rate"', content)
         self.assertNotIn('name="add_cast_rate"', content)
         self.assertNotIn('name="add_reg_rate"', content)
-        # But summoner/welcome/epic sections are still there
-        self.assertIn("Надбавка за суммонеров", content)
+        # But welcome/epic sections are still there
         self.assertIn("Приветствие", content)
         self.assertIn("Уведомления Эпик РБ", content)

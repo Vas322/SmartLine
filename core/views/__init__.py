@@ -31,7 +31,12 @@ from core.views.players import (
     players,
     toggle_player,
 )
-from core.views.settings import rates_view, settings_view, settings_welcome_view
+from core.views.settings import (
+    rates_view,
+    settings_epic_boss_view,
+    settings_view,
+    settings_welcome_view,
+)
 
 __all__ = [
     # common
@@ -61,6 +66,7 @@ __all__ = [
     "settings_view",
     "rates_view",
     "settings_welcome_view",
+    "settings_epic_boss_view",
     # instructions
     "instructions",
     "instruction_detail",

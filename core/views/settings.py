@@ -5,7 +5,6 @@ from urllib.parse import urlencode
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.formats import localize
 
 from core.decorators import staff_or_404
 from core.forms import (
@@ -105,38 +104,22 @@ def settings_view(request):
             reverse("settings_welcome") + "?edit=1", permanent=False
         )
 
-    epic_settings = boss_notification_service.get_settings()
-    epic_form = EpicBossNotificationSettingsForm(instance=epic_settings)
-    epic_edit_open = bool(request.GET.get("edit_epic_boss"))
+    # Epic boss section moved to /settings/epic-boss/ — redirect old links.
+    if request.GET.get("edit_epic_boss"):
+        return redirect(
+            reverse("settings_epic_boss") + "?edit=1", permanent=False
+        )
 
     welcome_settings = welcome_service.get_welcome_settings()
 
-    summoner_settings = summoner_bonus_service.get_settings()
-    summoner_form = SummonerBonusForm(instance=summoner_settings)
-    summoner_edit_open = bool(request.GET.get("edit_summoner_bonus"))
-
     if request.method == "POST":
-        # Summoner bonus section.
+        # Summoner bonus section moved to /rates/ — redirect old POSTs.
         if request.POST.get("save_summoner_bonus"):
-            summoner_form = SummonerBonusForm(
-                request.POST, instance=summoner_settings
-            )
-            if summoner_form.is_valid():
-                summoner_form.save()
-                return redirect("settings")
-            # Форма невалидна — остаёмся на странице с ошибками и держим форму открытой.
-            summoner_edit_open = True
+            return redirect("rates")
 
-        # Epic boss notification section.
+        # Epic boss section moved to /settings/epic-boss/ — redirect old POSTs.
         if request.POST.get("save_epic_boss"):
-            epic_form = EpicBossNotificationSettingsForm(
-                request.POST, instance=epic_settings
-            )
-            if epic_form.is_valid():
-                epic_form.save()
-                return redirect("settings")
-            # Форма невалидна — оставляем её открытой для исправления.
-            epic_edit_open = True
+            return redirect("settings_epic_boss")
 
         # Welcome section moved to /settings/welcome/ — redirect old POSTs.
         if request.POST.get("save_welcome") or request.POST.get("reset_welcome_block"):
@@ -150,14 +133,10 @@ def settings_view(request):
     active_cast = cast_rates.filter(active=True).count()
     active_reg = reg_rates.filter(active=True).count()
 
-    if summoner_settings.is_enabled:
-        summoner_status = f"Включено · {localize(summoner_settings.percent)}% за суммонера"
-    else:
-        summoner_status = "Выключено"
-
     welcome_on = bool(welcome_settings.welcome_text)
     welcome_status = "Включено" if welcome_on else "Выключено"
 
+    epic_settings = boss_notification_service.get_settings()
     if epic_settings.is_enabled:
         epic_status = (
             "Включено · "
@@ -192,14 +171,6 @@ def settings_view(request):
             "href": "settings",
         },
         {
-            "title": "Надбавка за суммонеров",
-            "description": "Доплата за использование суммонеров.",
-            "status": summoner_status,
-            "anchor": "summoner",
-            "on": summoner_settings.is_enabled,
-            "href": "settings",
-        },
-        {
             "title": "Приветствие",
             "description": "Автоприветствие новых участников Telegram-группы.",
             "status": welcome_status,
@@ -211,9 +182,8 @@ def settings_view(request):
             "title": "Уведомления Эпик РБ",
             "description": "Уведомления о начале окон эпик-боссов.",
             "status": epic_status,
-            "anchor": "epic-boss",
             "on": epic_settings.is_enabled,
-            "href": "settings",
+            "href": "settings_epic_boss",
         },
     ]
 
@@ -221,13 +191,6 @@ def settings_view(request):
         request,
         "core/settings.html",
         {
-            "epic_form": epic_form,
-            "epic_settings": epic_settings,
-            "epic_preview": boss_notification_service.get_notification_preview(),
-            "epic_edit_open": epic_edit_open,
-            "summoner_form": summoner_form,
-            "summoner_settings": summoner_settings,
-            "summoner_edit_open": summoner_edit_open,
             "tiles": tiles,
         },
     )
@@ -266,6 +229,37 @@ def settings_welcome_view(request):
             "welcome_settings": welcome_settings,
             "welcome_blocked": welcome_blocked,
             "welcome_edit_open": welcome_edit_open,
+        },
+    )
+
+
+@staff_or_404
+def settings_epic_boss_view(request):
+    """Standalone Epic RB notification settings page /settings/epic-boss/."""
+    epic_settings = boss_notification_service.get_settings()
+    epic_form = EpicBossNotificationSettingsForm(instance=epic_settings)
+    epic_edit_open = bool(request.GET.get("edit"))
+
+    if request.method == "POST":
+        if request.POST.get("save_epic_boss"):
+            epic_form = EpicBossNotificationSettingsForm(
+                request.POST, instance=epic_settings
+            )
+            if epic_form.is_valid():
+                epic_form.save()
+                return redirect("settings_epic_boss")
+            # Форма невалидна — оставляем её открытой для исправления.
+            epic_edit_open = True
+
+    epic_preview = boss_notification_service.get_notification_preview()
+    return render(
+        request,
+        "core/settings_epic_boss.html",
+        {
+            "epic_settings": epic_settings,
+            "epic_form": epic_form,
+            "epic_preview": epic_preview,
+            "epic_edit_open": epic_edit_open,
         },
     )
 
