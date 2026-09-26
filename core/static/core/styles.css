@@ -184,7 +184,7 @@ html { scroll-behavior: smooth; }
 .settings-tile h2 { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0 0 6px; }
 .settings-tile__description { font-size: 13px; color: var(--color-text-secondary); margin: 0 0 10px; }
 .settings-tile__status { font-size: 13px; margin: 0; }
-.status--on { color: var(--color-gold); }
+.status--on { color: var(--color-success); }
 .status--off { color: var(--color-text-secondary); }
 .settings-tile:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
 .settings-tile:active { transform: translateY(0); }
@@ -563,4 +563,13 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 .epic-preview--demo { border-left-color: var(--color-gold); color: var(--color-gold); }
 .epic-view { margin-bottom: 16px; }
 .epic-form p { margin: 0 0 14px; }
+.back-link {
+    display: inline-block;
+    margin-bottom: 16px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.back-link:hover { color: var(--color-gold); }
 

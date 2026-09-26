@@ -3,6 +3,8 @@
 {% block content %}
 <div class="page-head"><h1>Приветствие</h1></div>
 
+<a href="{% url 'settings' %}" class="back-link">← К настройкам</a>
+
 <div class="welcome-page">
     <div class="welcome-header">
         <span class="badge {% if welcome_settings.welcome_text %}badge-success{% else %}badge-error{% endif %}">

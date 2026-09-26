@@ -3,6 +3,8 @@
 {% block content %}
 <div class="page-head"><h1>Уведомления Эпик РБ</h1></div>
 
+<a href="{% url 'settings' %}" class="back-link">← К настройкам</a>
+
 <div class="epic-page">
     <div class="epic-header">
         <span class="badge {% if epic_settings.is_enabled %}badge-success{% else %}badge-error{% endif %}">
