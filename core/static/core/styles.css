@@ -506,7 +506,7 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 
 .bonus-info { font-size: 0.95em; color: var(--color-text); }
 .bonus-info strong { color: var(--color-gold, #d4af37); }
-.bonus-note { font-size: 0.85em; margin-top: -8px; margin-bottom: 16px; color: var(--color-text-muted, #8a8a8a); }
+.bonus-note { font-size: 0.85em; margin-top: -8px; margin-bottom: 16px; color: #B91C1C; }
 
 /* summoner bonus table columns */
 .stat-card ~ p.muted { margin-top: -12px; margin-bottom: 12px; }

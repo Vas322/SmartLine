@@ -131,6 +131,9 @@ def player_detail(request, pk: int):
     page_obj = paginator.get_page(page_number)
 
     cast_count = totals["cast_count"] or 0
+    registration_count = stats.registration_totals_for_player(
+        player, date_from, date_to
+    )["reg_clans"] or 0
 
     context = {
         "form": form,
@@ -141,6 +144,7 @@ def player_detail(request, pk: int):
         "page_obj": page_obj,
         "sort": sort,
         "cast_count": cast_count,
+        "registration_count": registration_count,
         "bonus_settings": bonus_settings,
         "player_summoner_count": summoner_count,
         "applied_period": applied_period,

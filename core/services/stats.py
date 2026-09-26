@@ -50,3 +50,12 @@ def registration_totals_for_players(date_from, date_to):
         )
     )
     return {row["player_id"]: row for row in qs}
+
+
+def registration_totals_for_player(player, date_from, date_to):
+    return Registration.objects.filter(
+        player=player, registered_at__range=(date_from, date_to)
+    ).aggregate(
+        reg_payment=Coalesce(Sum("payment_kk"), DECIMAL_ZERO),
+        reg_clans=Coalesce(Sum("clans_count"), 0),
+    )

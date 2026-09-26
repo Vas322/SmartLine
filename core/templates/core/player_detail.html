@@ -3,6 +3,7 @@
 {% block title %}{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}{% endblock %}
 {% block content %}
 <div class="page-head"><h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1></div>
+<a href="{% url 'dashboard' %}" class="back-link">← К сводке</a>
 {% if player.telegram_username %}<p class="muted">Ник в Telegram: {{ player.telegram_username }}</p>{% endif %}
 <div class="card">
 <form method="get" action="{% url 'player_detail' player.pk %}">
@@ -17,9 +18,11 @@
 <div class="stats">
     <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
     <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
+    <p class="totals-note muted" style="font-size:11px; margin:-8px 0 12px;">Включает DEF и CAST. Реги — отдельно.</p>
     <div class="stat-card"><h3>DEF</h3><div class="value">{{ summary.def_hours }}</div></div>
     <div class="stat-card"><h3>FARM</h3><div class="value">{{ summary.farm_hours }}</div></div>
     <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
+    <div class="stat-card"><h3>Реги</h3><div class="value">{{ registration_count|default:"—" }}</div></div>
     <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
 {% if bonus_settings.is_enabled and summary.base_payment %}
