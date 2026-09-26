@@ -31,7 +31,7 @@ class SummonerBonusSettingsWebTests(TestCase):
     def test_settings_page_contains_summoner_bonus_section(self):
         self._reset()
         self._login(self.staff)
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=summoner")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Надбавка за суммонеров", content)
@@ -48,17 +48,19 @@ class SummonerBonusSettingsWebTests(TestCase):
         settings.save()
 
         self._login(self.staff)
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=summoner")
         content = response.content.decode()
-        self.assertIn("Надбавка за суммонеров: Включена", content)
+        self.assertIn("badge-success", content)
+        self.assertIn(">Включена<", content)
         self.assertIn("% за 1 суммонера: 3,50%", content)
 
     def test_view_mode_shows_disabled_value(self):
         self._reset()
         self._login(self.staff)
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=summoner")
         content = response.content.decode()
-        self.assertIn("Надбавка за суммонеров: Выключена", content)
+        self.assertIn("badge-error", content)
+        self.assertIn(">Выключена<", content)
 
     def test_edit_param_opens_form(self):
         self._reset()
@@ -102,9 +104,10 @@ class SummonerBonusSettingsWebTests(TestCase):
         self.assertTrue(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("3.5"))
         # После сохранения — снова режим просмотра с новыми значениями.
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=summoner")
         content = response.content.decode()
-        self.assertIn("Надбавка за суммонеров: Включена", content)
+        self.assertIn("badge-success", content)
+        self.assertIn(">Включена<", content)
         self.assertIn("% за 1 суммонера: 3,50%", content)
         self.assertNotIn('name="save_summoner_bonus"', content)
 
@@ -128,9 +131,10 @@ class SummonerBonusSettingsWebTests(TestCase):
         self.assertFalse(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("2.0"))
         # После сохранения — снова режим просмотра с новыми значениями.
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=summoner")
         content = response.content.decode()
-        self.assertIn("Надбавка за суммонеров: Выключена", content)
+        self.assertIn("badge-error", content)
+        self.assertIn(">Выключена<", content)
         self.assertIn("% за 1 суммонера: 2,00%", content)
 
     def test_non_staff_cannot_access_settings(self):

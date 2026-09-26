@@ -125,13 +125,11 @@ def settings_view(request):
         if request.POST.get("save_welcome") or request.POST.get("reset_welcome_block"):
             return redirect("settings_welcome")
 
-    rates = Rate.objects.all()
-    cast_rates = CastRate.objects.all()
-    reg_rates = RegistrationRate.objects.all()
-
-    active_def = rates.filter(active=True).count()
-    active_cast = cast_rates.filter(active=True).count()
-    active_reg = reg_rates.filter(active=True).count()
+    active_rates_count = (
+        Rate.objects.filter(active=True).count()
+        + CastRate.objects.filter(active=True).count()
+        + RegistrationRate.objects.filter(active=True).count()
+    )
 
     welcome_on = bool(welcome_settings.welcome_text)
     welcome_status = "Включено" if welcome_on else "Выключено"
@@ -149,8 +147,8 @@ def settings_view(request):
         {
             "title": "Тарифы и надбавки",
             "description": "Тарифы за DEF/каст/регистрацию, надбавка за суммонеров.",
-            "status": f"{active_def + active_cast + active_reg} активных тарифов",
-            "on": (active_def + active_cast + active_reg) > 0,
+            "status": f"{active_rates_count} активных тарифов",
+            "on": active_rates_count > 0,
             "href": "rates",
         },
         {

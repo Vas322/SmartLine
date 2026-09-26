@@ -31,12 +31,15 @@ class RegistrationSettingsTests(TestCase):
     def _login(self):
         self.client.login(username="kl", password="test-password-123")
 
-    def test_settings_shows_registration_rates_section(self):
+    def test_rates_reg_tab_shows_registration_rates_section(self):
         self._login()
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates") + "?tab=reg")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn("Тарифы за регистрацию", content)
+        # Таб «reg» содержит карточку тарифов за регистрацию.
+        self.assertIn('data-panel="reg"', content)
+        self.assertIn('<div class="card" id="rates-reg">', content)
+        self.assertIn("<h2>Тарифы за регистрацию</h2>", content)
 
     def test_settings_add_registration_rate(self):
         self._login()
