@@ -742,9 +742,10 @@ class WebInterfaceTests(TestCase):
         self.player.refresh_from_db()
         self.assertEqual(self.player.nickname, "Swettka")
 
-    def test_settings_shows_rates_section(self):
+    def test_rates_page_shows_rate_tabs(self):
+        """Rates moved to a dedicated /rates/ page with DEF/CAST tabs."""
         self._login()
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Тарифы за DEF", content)
