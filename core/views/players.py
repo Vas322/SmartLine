@@ -69,6 +69,12 @@ def player_detail(request, pk: int):
     else:
         total_with_bonus = base_payment
 
+    reg_by_player = stats.registration_totals_for_players(date_from, date_to)
+    reg_payment = reg_by_player.get(
+        player.pk, {"reg_payment": Decimal("0"), "reg_clans": 0}
+    )["reg_payment"]
+    total_with_bonus += reg_payment  # в ОБЕИХ ветках (с бонусом и без)
+
     summary = {
         "total_hours": total_hours,
         "adena": total_with_bonus,  # Итого выплата (с надбавками)

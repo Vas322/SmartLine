@@ -14,6 +14,7 @@ from core.models import (
     Instruction,
     Player,
     Rate,
+    Registration,
     TelegramMessage,
 )
 from core.services import summoner_bonus_service
@@ -1101,3 +1102,87 @@ class WebInterfaceTests(TestCase):
         self.assertIn("Итого выплата, кк", content)
         self.assertIn("50,00", content)
         self.assertNotIn("52,50", content)
+
+    def test_dashboard_and_detail_payout_match(self):
+        """Дашборд и детализация игрока дают одинаковую выплату.
+
+        Проверяет две причины расхождения:
+        1. Дашборд-строка не начисляет надбавку ретроактивно (фильтр enabled_at).
+        2. Детализация включает регистрации в «Итого выплата, кк».
+        """
+        self._login()
+        player = Player.objects.create(
+            nickname="Payout", is_active=True, summoner_count=10
+        )
+        # DEF 60 дней назад (до enabled_at) — надбавка НЕ начисляется, но в базе есть.
+        old_tm = TelegramMessage.objects.create(
+            telegram_chat_id=600,
+            telegram_message_id=600,
+            original_text="+1|деф|Payout|старая",
+            message_date=timezone.now() - timedelta(days=60),
+        )
+        old_act = Activity.objects.create(
+            player=player,
+            telegram_message=old_tm,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("300.00"),
+        )
+        Activity.objects.filter(pk=old_act.pk).update(
+            created_at=timezone.now() - timedelta(days=60)
+        )
+        # DEF сегодня (после enabled_at) — надбавка начисляется.
+        new_tm = TelegramMessage.objects.create(
+            telegram_chat_id=601,
+            telegram_message_id=601,
+            original_text="+1|деф|Payout|новая",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=new_tm,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("150.00"),
+        )
+        # Регистрация кланов сегодня.
+        reg_tm = TelegramMessage.objects.create(
+            telegram_chat_id=602,
+            telegram_message_id=602,
+            text="Рега 2 кланами",
+            message_date=timezone.now(),
+        )
+        Registration.objects.create(
+            player=player,
+            telegram_message=reg_tm,
+            clans_count=2,
+            payment_kk=Decimal("50.00"),
+            registered_at=timezone.now(),
+        )
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.enabled_at = timezone.now() - timedelta(days=30)
+        settings.save()
+
+        today = timezone.localdate()
+        params = {
+            "period": "custom",
+            "date_from": (today - timedelta(days=90)).isoformat(),
+            "date_to": today.isoformat(),
+        }
+
+        # Дашборд: база 450.00 (300+150) + бонус 7.50 (150×10×0.5%) + рега 50.00 = 507.50.
+        dash = self.client.get(reverse("dashboard"), params)
+        self.assertEqual(dash.status_code, 200)
+        rows = {row["nickname"]: row for row in dash.context["rows"]}
+        self.assertEqual(rows["Payout"]["adena"], Decimal("507.50"))
+
+        # Детализация игрока: итоговая выплата = те же 507.50.
+        detail = self.client.get(reverse("player_detail", args=[player.pk]), params)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["summary"]["adena"], Decimal("507.50"))
+
+        # Фактический формат в рендере — запятая как десятичный разделитель (ru-ru).
+        self.assertContains(dash, "507,50")
+        self.assertContains(detail, "507,50")

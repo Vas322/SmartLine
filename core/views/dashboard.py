@@ -57,6 +57,17 @@ def dashboard(request):
         adena = (totals.get("payment") or Decimal("0")) + reg_payment
         if bonus_settings.is_enabled:
             def_payment = totals.get("def_payment") or Decimal("0")
+            if bonus_settings.enabled_at is not None:
+                # Надбавка только для DEF-активностей с даты включения (без ретроактивности).
+                def_payment = (
+                    Activity.objects.filter(
+                        player_id=player.pk,
+                        created_at__gte=bonus_settings.enabled_at,
+                        created_at__range=(date_from, date_to),
+                        activity_type=Activity.ActivityType.DEF,
+                    ).aggregate(total=Sum("payment_kk"))["total"]
+                    or Decimal("0")
+                )
             adena += summoner_bonus_service.calculate_bonus(
                 def_payment, player.summoner_count or 0, bonus_settings.percent
             )
