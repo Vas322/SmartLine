@@ -1,22 +1,17 @@
 """Deterministic parser for the craft-calc.ru boss respawn page.
 
 Parses the x5 server sections (ids `x5-epic` and `x5-subclass`) using only the
-stdlib `html.parser`. Times on the source page are in North-American Eastern
-time (data-timezone="EST"): EST is UTC-5 in winter and EDT is UTC-4 in summer.
-Conversion to UTC is done through the `America/New_York` IANA zone so both
-daylight regimes are handled automatically based on the date.
+stdlib `html.parser`. Times on the source page are already in Moscow local time
+(no timezone conversion is needed): they are parsed as naive datetimes and
+stored as-is.
 """
 import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
-from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
-
-UTC = ZoneInfo("UTC")
-NEW_YORK = ZoneInfo("America/New_York")
 
 DATETIME_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -31,7 +26,7 @@ class ParseError(Exception):
 
 @dataclass(frozen=True)
 class BossData:
-    """A single parsed boss respawn entry (times are UTC-aware)."""
+    """A single parsed boss respawn entry (times are naive Moscow local)."""
 
     boss_name: str
     boss_type: str  # BossRespawn.BossType: "EPIC" or "SUBCLASS"
@@ -42,17 +37,9 @@ class BossData:
     timezone_attr: str
 
 
-def convert_est_to_utc(dt_str: str, tz_attr: str) -> datetime:
-    """Parse an EST/EDT datetime string and convert it to UTC (aware).
-
-    tz_attr is the page's data-timezone value. Only "EST" is supported (it is
-    mapped to America/New_York, which resolves both EST and EDT by date).
-    """
-    if tz_attr != "EST":
-        raise ValueError(f"Unsupported timezone attribute: {tz_attr!r}")
-    naive = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
-    aware = naive.replace(tzinfo=NEW_YORK)
-    return aware.astimezone(UTC)
+def parse_naive_dt(dt_str: str) -> datetime:
+    """Parse a naive datetime string as-is (Moscow local time, no tzinfo)."""
+    return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
 
 
 def _attr_dict(attrs: list) -> dict:
@@ -194,8 +181,8 @@ def _build_boss(card: dict, section_type: str) -> BossData:
         raise ParseError("respawn start/end times missing")
 
     tz = card.get("timezone") or "EST"
-    respawn_start = convert_est_to_utc(start_match.group(0), tz)
-    respawn_end = convert_est_to_utc(end_match.group(0), tz)
+    respawn_start = parse_naive_dt(start_match.group(0))
+    respawn_end = parse_naive_dt(end_match.group(0))
     started = status == "Респ идёт"
     boss_type = "EPIC" if section_type == "EPIC" else "SUBCLASS"
 

@@ -2,6 +2,7 @@
 import logging
 import urllib.request
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.utils import timezone
@@ -12,6 +13,10 @@ from core.services.boss_respawn_parser import BossData, parse_bosses_from_html
 logger = logging.getLogger(__name__)
 
 FETCH_TIMEOUT_SECONDS = 30
+
+# Parsed respawn times are naive Moscow local time; this zone is attached so
+# they are comparable with the aware datetimes read back from the database.
+MSK_TZ = ZoneInfo("Europe/Moscow")
 
 
 def get_sync_status() -> BossRespawnSyncStatus:
@@ -54,6 +59,33 @@ def _upsert_bosses(bosses: list[BossData]) -> None:
             )
 
 
+def _reparse_existing_bosses(bosses: list[BossData]) -> None:
+    """Re-parse existing bosses from the DB to fix previously stored times.
+
+    Historical rows were saved with an erroneous EDT→UTC conversion (+7h off).
+    Compare each stored (aware MSK) row against the freshly parsed (naive MSK)
+    values and rewrite them when they differ.
+    """
+    updated_count = 0
+    for boss in BossRespawn.objects.all():
+        parsed = next(
+            (b for b in bosses if b.boss_name == boss.boss_name), None
+        )
+        if parsed is None:
+            continue
+        parsed_start = parsed.respawn_start.replace(tzinfo=MSK_TZ)
+        parsed_end = parsed.respawn_end.replace(tzinfo=MSK_TZ)
+        if (
+            boss.respawn_start != parsed_start
+            or boss.respawn_end != parsed_end
+        ):
+            boss.respawn_start = parsed_start
+            boss.respawn_end = parsed_end
+            boss.save(update_fields=["respawn_start", "respawn_end"])
+            updated_count += 1
+    logger.info("Boss respawn times updated: %s", updated_count)
+
+
 def fetch_and_sync() -> bool:
     """Fetch the page, parse and upsert bosses, then update the sync status.
 
@@ -71,6 +103,7 @@ def fetch_and_sync() -> bool:
         if not bosses:
             raise RuntimeError("No boss cards parsed — page markup may have changed")
         _upsert_bosses(bosses)
+        _reparse_existing_bosses(bosses)
         status.last_success_at = timezone.now()
         status.last_error = ""
         status.last_error_at = None
