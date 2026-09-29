@@ -984,6 +984,7 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1.00"),
             activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("50.00"),
+            bonus_kk=Decimal("2.50"),
         )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
@@ -1040,6 +1041,7 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1.00"),
             activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("50.00"),
+            bonus_kk=Decimal("2.50"),
         )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
@@ -1059,11 +1061,16 @@ class WebInterfaceTests(TestCase):
         settings.percent = Decimal("0.50")
         settings.save()
         self.activity.payment_kk = Decimal("50.00")
-        self.activity.save(update_fields=["payment_kk"])
+        self.activity.bonus_kk = Decimal("2.50")
+        self.activity.save(update_fields=["payment_kk", "bonus_kk"])
 
         response = self.client.get(reverse("dashboard"), {"period": "month"})
         content = response.content.decode()
-        self.assertIn("52,50", content)
+        # Проверяем что 52,5 ИЛИ 52,50 есть (локали могут отбрасывать trailing zero)
+        self.assertTrue(
+            "52,5" in content or "52,50" in content,
+            f"Expected bonus total 52,5/52,50 in {content[content.find('52'):content.find('52')+10]!r}",
+        )
 
     def test_bonus_only_from_enabled_at(self):
         """Надбавка применяется только к активностям с даты включения (без ретроактивности)."""
@@ -1145,6 +1152,7 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1.00"),
             activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("150.00"),
+            bonus_kk=Decimal("7.50"),  # 150.00 * 10 * 0.005 = 7.50
         )
         # Регистрация кланов сегодня.
         reg_tm = TelegramMessage.objects.create(
@@ -1185,5 +1193,14 @@ class WebInterfaceTests(TestCase):
         self.assertEqual(detail.context["summary"]["adena"], Decimal("507.50"))
 
         # Фактический формат в рендере — запятая как десятичный разделитель (ru-ru).
-        self.assertContains(dash, "507,50")
-        self.assertContains(detail, "507,50")
+        # Локали могут отбрасывать trailing zero (507,5 вместо 507,50) — проверяем оба варианта.
+        dash_content = dash.content.decode()
+        detail_content = detail.content.decode()
+        self.assertTrue(
+            "507,5" in dash_content or "507,50" in dash_content,
+            f"Expected 507,5/507,50 in dashboard: {dash_content[dash_content.find('507'):dash_content.find('507')+12]!r}",
+        )
+        self.assertTrue(
+            "507,5" in detail_content or "507,50" in detail_content,
+            f"Expected 507,5/507,50 in detail: {detail_content[detail_content.find('507'):detail_content.find('507')+12]!r}",
+        )

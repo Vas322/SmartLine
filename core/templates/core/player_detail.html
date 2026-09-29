@@ -22,9 +22,9 @@
     <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
     <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
-{% if bonus_settings.is_enabled and summary.base_payment %}
+{% if summary.bonus_total %}
 <p class="muted" style="font-size:0.8em; margin-top:2px; margin-bottom:0;">
-    (база {{ summary.base_payment }} + надбавки {{ summary.adena|sub:summary.base_payment|floatformat:2 }})
+    (база {{ summary.base_payment }} + надбавки {{ summary.bonus_total|floatformat:2 }})
 </p>
 {% endif %}
 <h2>Активности</h2>
@@ -51,8 +51,8 @@
         <td class="num">{{ activity.amount }}</td>
         <td class="num">{% if activity.activity_type == "FARM" %}—{% else %}{{ activity.payment_kk }}{% endif %}</td>
         <td class="num">{{ player.summoner_count|default:"0" }}</td>
-        <td class="num">{% if activity.activity_type == "DEF" and bonus_settings.is_enabled and player_summoner_count %}{{ activity.row_bonus|floatformat:2 }}{% else %}—{% endif %}</td>
-        <td class="num">{% if activity.activity_type == "DEF" and bonus_settings.is_enabled and player_summoner_count %}{{ activity.row_total|floatformat:2 }}{% else %}{{ activity.payment_kk|default:"—" }}{% endif %}</td>
+        <td class="num">{% if activity.bonus_kk %}{{ activity.row_bonus|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="num">{% if activity.bonus_kk %}{{ activity.row_total|floatformat:2 }}{% else %}{{ activity.payment_kk|default:"—" }}{% endif %}</td>
         <td title="{{ activity.telegram_message.original_text }}">{{ activity.telegram_message.original_text|truncatechars:60 }}</td>
     </tr>
     {% empty %}

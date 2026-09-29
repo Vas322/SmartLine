@@ -20,7 +20,12 @@ from core.models import (
     TelegramSettings,
     TelegramTopic,
 )
-from core.services import boss_respawn_service, schedule_mirror_service, scheduling_service
+from core.services import (
+    boss_respawn_service,
+    schedule_mirror_service,
+    scheduling_service,
+    summoner_bonus_service,
+)
 
 
 @admin.register(ScheduledMessage)
@@ -169,6 +174,16 @@ class ActivityAdmin(admin.ModelAdmin):
     list_display = ("player", "type_display", "amount", "created_at")
     list_filter = ("activity_type",)
     search_fields = ("player__nickname",)
+
+    def save_model(self, request, obj, form, change):
+        """Ручная правка админки — пересчитать snapshot надбавки за суммонеров.
+
+        bonus_kk хранит значение НА МОМЕНТ создания; при ручном изменении
+        payment_kk/activity_type/player в админке снимок осознанно обновляется.
+        """
+        super().save_model(request, obj, form, change)
+        obj.bonus_kk = summoner_bonus_service.stamp_bonus(obj)
+        obj.save(update_fields=["bonus_kk"])
 
 
 @admin.register(CastRate)

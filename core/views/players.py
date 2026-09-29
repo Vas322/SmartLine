@@ -3,7 +3,8 @@ import logging
 from decimal import Decimal
 
 from django.core.paginator import Paginator
-from django.db.models import Case, DecimalField, F, Sum, Value, When
+from django.db.models import F
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -11,6 +12,7 @@ from core.decorators import member_required, staff_or_404
 from core.forms import PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
 from core.services import stats, summoner_bonus_service
+from core.services.stats import DECIMAL_ZERO
 from core.views.common import _percent
 
 
@@ -49,25 +51,8 @@ def player_detail(request, pk: int):
 
     bonus_settings = summoner_bonus_service.get_settings()
     base_payment = totals["payment"] or Decimal("0")
-    if bonus_settings.is_enabled:
-        def_payment = totals.get("def_payment") or Decimal("0")
-        if bonus_settings.enabled_at is not None:
-            # Надбавка только для DEF-активностей с даты включения (без ретроактивности).
-            def_payment = (
-                Activity.objects.filter(
-                    player=player,
-                    created_at__gte=bonus_settings.enabled_at,
-                    created_at__range=(date_from, date_to),
-                    activity_type=Activity.ActivityType.DEF,
-                ).aggregate(total=Sum("payment_kk"))["total"]
-                or Decimal("0")
-            )
-        bonus_total = summoner_bonus_service.calculate_bonus(
-            def_payment, player.summoner_count or 0, bonus_settings.percent
-        )
-        total_with_bonus = base_payment + bonus_total
-    else:
-        total_with_bonus = base_payment
+    bonus_total = totals["bonus"] or Decimal("0")
+    total_with_bonus = base_payment + bonus_total
 
     reg_by_player = stats.registration_totals_for_players(date_from, date_to)
     reg_payment = reg_by_player.get(
@@ -79,6 +64,7 @@ def player_detail(request, pk: int):
         "total_hours": total_hours,
         "adena": total_with_bonus,  # Итого выплата (с надбавками)
         "base_payment": base_payment,  # для справки в шаблоне
+        "bonus_total": bonus_total,
         "def_hours": def_hours,
         "farm_hours": farm_hours,
         "percent": _percent(total_hours, days_in_period),
@@ -86,49 +72,14 @@ def player_detail(request, pk: int):
 
     sort = request.GET.get("sort", "desc")
     order = "created_at" if sort == "asc" else "-created_at"
-    summoner_count = player.summoner_count or 0
-    bonus_active = bonus_settings.is_enabled and summoner_count > 0
-    # Условие DEF для надбавки; если задана дата включения — только активности с неё.
-    bonus_when = {"activity_type": Activity.ActivityType.DEF}
-    if bonus_settings.enabled_at is not None:
-        bonus_when["created_at__gte"] = bonus_settings.enabled_at
     activities_qs = (
         Activity.objects.filter(
             player=player, created_at__range=(date_from, date_to)
         )
         .select_related("telegram_message")
         .annotate(
-            row_bonus=Case(
-                When(
-                    **bonus_when,
-                    then=(
-                        F("payment_kk")
-                        * Value(summoner_count)
-                        * Value(bonus_settings.percent)
-                        / Value(Decimal("100"))
-                        if bonus_active
-                        else Value(Decimal("0"))
-                    ),
-                ),
-                default=Value(Decimal("0")),
-                output_field=DecimalField(),
-            ),
-            row_total=Case(
-                When(
-                    **bonus_when,
-                    then=(
-                        F("payment_kk")
-                        * Value(summoner_count)
-                        * Value(bonus_settings.percent)
-                        / Value(Decimal("100"))
-                        + F("payment_kk")
-                        if bonus_active
-                        else F("payment_kk")
-                    ),
-                ),
-                default=F("payment_kk"),
-                output_field=DecimalField(),
-            ),
+            row_bonus=Coalesce("bonus_kk", DECIMAL_ZERO),
+            row_total=F("payment_kk") + Coalesce("bonus_kk", DECIMAL_ZERO),
         )
         .order_by(order)
     )
@@ -137,6 +88,7 @@ def player_detail(request, pk: int):
     page_obj = paginator.get_page(page_number)
 
     cast_count = totals["cast_count"] or 0
+    summoner_count = player.summoner_count or 0
 
     context = {
         "form": form,

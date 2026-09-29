@@ -2,12 +2,11 @@
 import logging
 from decimal import Decimal
 
-from django.db.models import DecimalField, F, Sum, Value
 from django.shortcuts import render
 
 from core.decorators import member_required
 from core.forms import PeriodForm
-from core.models import Activity, Player
+from core.models import Player
 from core.services import stats, summoner_bonus_service
 from core.views.common import _percent
 
@@ -29,6 +28,7 @@ def dashboard(request):
             "cast_count": row["cast_count"] or 0,
             "payment": row["payment"] or Decimal("0"),
             "def_payment": row["def_payment"] or Decimal("0"),
+            "bonus": row["bonus"] or Decimal("0"),
         }
         for pid, row in stats.activity_totals_for_players(date_from, date_to).items()
     }
@@ -55,22 +55,7 @@ def dashboard(request):
         if total_hours == 0 and cast_count == 0 and reg_clans == 0:
             continue
         adena = (totals.get("payment") or Decimal("0")) + reg_payment
-        if bonus_settings.is_enabled:
-            def_payment = totals.get("def_payment") or Decimal("0")
-            if bonus_settings.enabled_at is not None:
-                # Надбавка только для DEF-активностей с даты включения (без ретроактивности).
-                def_payment = (
-                    Activity.objects.filter(
-                        player_id=player.pk,
-                        created_at__gte=bonus_settings.enabled_at,
-                        created_at__range=(date_from, date_to),
-                        activity_type=Activity.ActivityType.DEF,
-                    ).aggregate(total=Sum("payment_kk"))["total"]
-                    or Decimal("0")
-                )
-            adena += summoner_bonus_service.calculate_bonus(
-                def_payment, player.summoner_count or 0, bonus_settings.percent
-            )
+        adena += totals.get("bonus") or Decimal("0")
         rows.append(
             {
                 "pk": player.pk,
@@ -87,58 +72,17 @@ def dashboard(request):
 
     rows.sort(key=lambda row: row["percent"], reverse=True)
 
-    # Total payout for the period (activities + registrations)
+    # Total payout for the period (activities + registrations + summoner bonus).
     total_activity_payment = sum(
         (row["payment"] for row in totals_by_player.values()), Decimal("0")
     )
     total_registration_payment = sum(
         (row["reg_payment"] for row in reg_by_player.values()), Decimal("0")
     )
-    total_payout = total_activity_payment + total_registration_payment
-
-    if bonus_settings.is_enabled:
-        if bonus_settings.enabled_at:
-            bonus_qs = (
-                Activity.objects.filter(
-                    player_id__in=totals_by_player.keys(),
-                    created_at__gte=bonus_settings.enabled_at,
-                    activity_type=Activity.ActivityType.DEF,
-                )
-                .values("player_id")
-                .annotate(
-                    bonus_sum=Sum(
-                        F("payment_kk")
-                        * F("player__summoner_count")
-                        * Value(bonus_settings.percent)
-                        / Value(100),
-                        output_field=DecimalField(max_digits=20, decimal_places=4),
-                    )
-                )
-            )
-            bonus_by_player = {
-                row["player_id"]: row["bonus_sum"] or Decimal("0")
-                for row in bonus_qs
-            }
-            total_bonus = sum(bonus_by_player.values(), Decimal("0"))
-        else:
-            # Нет даты включения — считаем по всему периоду как раньше.
-            players_counts = dict(
-                Player.objects.filter(id__in=totals_by_player.keys()).values_list(
-                    "id", "summoner_count"
-                )
-            )
-            total_bonus = sum(
-                (
-                    summoner_bonus_service.calculate_bonus(
-                        t.get("def_payment") or Decimal("0"),
-                        players_counts.get(pid, 0),
-                        bonus_settings.percent,
-                    )
-                    for pid, t in totals_by_player.items()
-                ),
-                Decimal("0"),
-            )
-        total_payout += total_bonus
+    total_bonus = sum(
+        (row["bonus"] for row in totals_by_player.values()), Decimal("0")
+    )
+    total_payout = total_activity_payment + total_registration_payment + total_bonus
 
     context = {
         "form": form,
