@@ -17,7 +17,7 @@
         <td>{{ rate.active|yesno:"Да,Нет" }}</td>
         <td>{{ rate.order }}</td>
         <td>
-            <a href="?edit={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
+            <a href="?tab=def&edit={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
             <form method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" name="delete_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
@@ -32,6 +32,7 @@
 {% if not edit_rate_pk %}<button type="button" class="btn" data-toggle-form="defAddForm">Добавить тариф</button>{% endif %}
 <form method="post" id="defAddForm"{% if not edit_rate_pk and not def_add_open %} hidden{% endif %}>
     {% csrf_token %}
+    <input type="hidden" name="tab" value="{{ tab }}">
     {% if edit_rate_pk %}<input type="hidden" name="edit_rate" value="{{ edit_rate_pk }}">{% endif %}
     <table>
         <tr>

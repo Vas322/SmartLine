@@ -115,7 +115,7 @@ def settings_view(request):
     if request.method == "POST":
         # Summoner bonus section moved to /rates/ — redirect old POSTs.
         if request.POST.get("save_summoner_bonus"):
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=summoner")
 
         # Epic boss section moved to /settings/epic-boss/ — redirect old POSTs.
         if request.POST.get("save_epic_boss"):
@@ -271,16 +271,16 @@ def rates_view(request):
             )
             if summoner_form.is_valid():
                 summoner_form.save()
-                return redirect("rates")
+                return redirect(f"{reverse('rates')}?tab=summoner")
             # Форма невалидна — остаёмся на странице с ошибками и держим форму открытой.
             summoner_edit_open = True
 
         if _delete_rate(request, "delete_rate", Rate):
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=def")
         if _delete_rate(request, "delete_cast_rate", CastRate):
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=cast")
         if _delete_rate(request, "delete_reg_rate", RegistrationRate):
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=reg")
 
         handled, def_add_open, rate_form = _process_rate_form(request, "", RateForm, Rate)
         if not handled:
@@ -293,11 +293,11 @@ def rates_view(request):
             )
 
         if rate_form is None and def_add_open:
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=def")
         if cast_rate_form is None and cast_add_open:
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=cast")
         if reg_rate_form is None and reg_add_open:
-            return redirect("rates")
+            return redirect(f"{reverse('rates')}?tab=reg")
 
     if rate_form is None:
         rate = Rate.objects.filter(pk=edit_rate_pk).first() if edit_rate_pk else None
@@ -340,6 +340,6 @@ def rates_view(request):
             "summoner_form": summoner_form,
             "summoner_settings": summoner_settings,
             "summoner_edit_open": summoner_edit_open,
-            "tab": request.GET.get("tab") or None,
+            "tab": request.POST.get("tab") or request.GET.get("tab") or None,
         },
     )

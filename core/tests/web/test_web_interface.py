@@ -782,7 +782,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         rate = Rate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("75.00"))
         self.assertTrue(rate.active)
@@ -812,7 +812,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
 
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
@@ -831,7 +831,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
         cast_rate = CastRate.objects.get(
             start_time=time(8, 0), end_time=time(16, 0)
         )
@@ -863,7 +863,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
 
         cast_rate.refresh_from_db()
         self.assertEqual(cast_rate.start_time, time(9, 0))
@@ -885,7 +885,7 @@ class WebInterfaceTests(TestCase):
             reverse("rates"),
             {"delete_cast_rate": str(cast_rate.pk)},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
         self.assertEqual(CastRate.objects.count(), 0)
 
     def test_settings_delete_rate(self):
@@ -902,7 +902,7 @@ class WebInterfaceTests(TestCase):
             reverse("rates"),
             {"delete_rate": str(rate.pk)},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         self.assertEqual(Rate.objects.count(), 0)
 
     def test_instructions_list_table(self):
@@ -1198,9 +1198,11 @@ class WebInterfaceTests(TestCase):
         detail_content = detail.content.decode()
         self.assertTrue(
             "507,5" in dash_content or "507,50" in dash_content,
-            f"Expected 507,5/507,50 in dashboard: {dash_content[dash_content.find('507'):dash_content.find('507')+12]!r}",
+            f"Expected 507,5/507,50 in dashboard: "
+            f"{dash_content[dash_content.find('507'):dash_content.find('507')+12]!r}",
         )
         self.assertTrue(
             "507,5" in detail_content or "507,50" in detail_content,
-            f"Expected 507,5/507,50 in detail: {detail_content[detail_content.find('507'):detail_content.find('507')+12]!r}",
+            f"Expected 507,5/507,50 in detail: "
+            f"{detail_content[detail_content.find('507'):detail_content.find('507')+12]!r}",
         )

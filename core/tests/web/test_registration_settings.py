@@ -52,7 +52,7 @@ class RegistrationSettingsTests(TestCase):
                 "rate_kk": "15.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=reg")
         rate = RegistrationRate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("15.00"))
         self.assertTrue(rate.active)
@@ -80,7 +80,7 @@ class RegistrationSettingsTests(TestCase):
                 "rate_kk": "25.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=reg")
 
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
@@ -99,7 +99,7 @@ class RegistrationSettingsTests(TestCase):
             reverse("rates"),
             {"delete_reg_rate": str(rate.pk)},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=reg")
         self.assertEqual(RegistrationRate.objects.count(), 0)
 
     def test_settings_registration_rate_form_hidden_by_default(self):

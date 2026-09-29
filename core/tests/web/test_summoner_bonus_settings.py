@@ -98,7 +98,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "percent": "3.5",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=summoner")
         settings = summoner_bonus_service.get_settings()
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
@@ -126,7 +126,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "percent": "2.0",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=summoner")
         settings.refresh_from_db()
         self.assertFalse(settings.is_enabled)
         self.assertEqual(settings.percent, Decimal("2.0"))
@@ -177,7 +177,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "enabled_at_display": custom.strftime("%d.%m.%Y %H:%M"),
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=summoner")
         settings = summoner_bonus_service.get_settings()
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
@@ -213,7 +213,7 @@ class SummonerBonusSettingsWebTests(TestCase):
                 "enabled_at_display": "",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=summoner")
         settings.refresh_from_db()
         self.assertTrue(settings.is_enabled)
         self.assertIsNotNone(settings.enabled_at)
