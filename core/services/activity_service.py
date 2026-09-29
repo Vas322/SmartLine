@@ -21,6 +21,7 @@ from core.services.notification_service import (
     notify_processing_error,
 )
 from core.services.rates import payment_cast_kk, payment_kk, registration_payment_kk
+from core.services.summoner_bonus_service import stamp_bonus
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,15 @@ def _compute_payment(parsed: ParsedActivity) -> Decimal:
     return payment
 
 
+def _stamp_bonus(activity: Activity) -> None:
+    """Persist the summoner bonus snapshot for a freshly created Activity.
+
+    bonus_kk is written ONCE at creation and never recalculated afterwards.
+    """
+    activity.bonus_kk = stamp_bonus(activity)
+    activity.save(update_fields=["bonus_kk"])
+
+
 def process_telegram_message(
     *,
     chat_id: int,
@@ -246,6 +256,7 @@ def process_telegram_message(
             wave_start_time=parsed.wave_start,
             payment_kk=payment,
         )
+        _stamp_bonus(activity)
 
         telegram_message.status = TelegramMessage.Status.PROCESSED
         telegram_message.save(update_fields=["status"])
@@ -342,6 +353,7 @@ def process_telegram_edit(
                     activity_type=parsed.activity_type, has_cast=parsed.has_cast,
                     description=parsed.description, wave_start_time=parsed.wave_start, payment_kk=payment,
                 )
+                _stamp_bonus(activity)
                 tm.status = TelegramMessage.Status.PROCESSED
                 tm.save(update_fields=["status"])
                 if nick_changed:
@@ -440,7 +452,7 @@ def process_telegram_edit(
 
         payment = _compute_payment(parsed)
 
-        Activity.objects.create(
+        activity = Activity.objects.create(
             player=player,
             telegram_message=tm,
             amount=parsed.amount,
@@ -450,6 +462,7 @@ def process_telegram_edit(
             wave_start_time=parsed.wave_start,
             payment_kk=payment,
         )
+        _stamp_bonus(activity)
         tm.status = TelegramMessage.Status.PROCESSED
         tm.save(update_fields=["status", "text", "message_date", "message_thread_id"])
 

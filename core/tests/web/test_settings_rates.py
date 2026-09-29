@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from core.models import Rate
+from core.models import CastRate, Rate
 
 
 class RatesPageWebTests(TestCase):
@@ -58,6 +58,43 @@ class RatesPageWebTests(TestCase):
         self.assertIn('id="summoner"', content)
         self.assertIn("Надбавка за суммонеров", content)
 
+    def test_cast_edit_param_activates_cast_tab_and_opens_form(self):
+        CastRate.objects.all().delete()
+        cast_rate = CastRate.objects.create(
+            start_time=time(0, 1),
+            end_time=time(8, 0),
+            rate_kk=Decimal("100"),
+        )
+        response = self.client.get(
+            reverse("rates") + f"?tab=cast&edit_cast={cast_rate.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Активна вкладка cast, панель cast показана, остальные скрыты.
+        self.assertIn('data-panel="cast" class="tab-panel"', content)
+        self.assertIn('data-panel="def" class="tab-panel hidden', content)
+        self.assertIn('data-panel="summoner" class="tab-panel hidden', content)
+        # Форма редактирования CAST открыта.
+        self.assertIn('name="edit_cast_rate"', content)
+        self.assertIn('id="rates-cast"', content)
+
+    def test_edit_buttons_include_tab_param(self):
+        # Формируем тарифы во всех секциях и проверяем ссылки «Редактировать».
+        Rate.objects.all().delete()
+        CastRate.objects.all().delete()
+        rate = Rate.objects.create(
+            start_time=time(0, 1), end_time=time(8, 0), rate_kk=Decimal("100")
+        )
+        cast_rate = CastRate.objects.create(
+            start_time=time(0, 1), end_time=time(8, 0), rate_kk=Decimal("100")
+        )
+        content = self._get(reverse("rates"))
+        self.assertIn(f'?tab=def&edit={rate.pk}', content)
+        content_cast = self._get(reverse("rates") + "?tab=cast")
+        self.assertIn(f'?tab=cast&edit_cast={cast_rate.pk}', content_cast)
+        content_summoner = self._get(reverse("rates") + "?tab=summoner")
+        self.assertIn('?tab=summoner&edit_summoner_bonus=1', content_summoner)
+
     def test_post_add_rate_redirects_and_creates(self):
         response = self.client.post(
             reverse("rates"),
@@ -68,7 +105,7 @@ class RatesPageWebTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         rate = Rate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("75.00"))
         self.assertTrue(rate.active)
@@ -89,7 +126,7 @@ class RatesPageWebTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
         self.assertEqual(rate.end_time, time(17, 0))
@@ -103,7 +140,7 @@ class RatesPageWebTests(TestCase):
             rate_kk=Decimal("100"),
         )
         response = self.client.post(reverse("rates"), {"delete_rate": str(rate.pk)})
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         self.assertEqual(Rate.objects.count(), 0)
 
     def test_get_edit_redirects_from_settings_to_rates(self):
@@ -123,7 +160,7 @@ class RatesPageWebTests(TestCase):
             reverse("settings"),
             {"save_summoner_bonus": "1", "is_enabled": "on", "percent": "3.5"},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=summoner")
 
     def test_settings_page_still_shows_tiles(self):
         response = self.client.get(reverse("settings"))

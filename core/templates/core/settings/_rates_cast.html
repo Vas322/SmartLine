@@ -17,7 +17,7 @@
         <td>{{ rate.active|yesno:"Да,Нет" }}</td>
         <td>{{ rate.order }}</td>
         <td>
-            <a href="?edit_cast={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
+            <a href="?tab=cast&edit_cast={{ rate.pk }}" class="btn btn-secondary">Редактировать</a>
             <form method="post" class="inline-form">
                 {% csrf_token %}
                 <button type="submit" name="delete_cast_rate" value="{{ rate.pk }}" class="btn btn-danger">Удалить</button>
@@ -32,6 +32,7 @@
 {% if not edit_cast_rate_pk %}<button type="button" class="btn" data-toggle-form="castAddForm">Добавить тариф</button>{% endif %}
 <form method="post" id="castAddForm"{% if not edit_cast_rate_pk and not cast_add_open %} hidden{% endif %}>
     {% csrf_token %}
+    <input type="hidden" name="tab" value="{{ tab }}">
     {% if edit_cast_rate_pk %}<input type="hidden" name="edit_cast_rate" value="{{ edit_cast_rate_pk }}">{% endif %}
     <table>
         <tr>

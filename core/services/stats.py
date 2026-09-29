@@ -22,6 +22,7 @@ def _activity_annotations() -> dict:
             Sum("payment_kk", filter=Q(activity_type=Activity.ActivityType.DEF)),
             DECIMAL_ZERO,
         ),
+        "bonus": Coalesce(Sum("bonus_kk"), DECIMAL_ZERO),
     }
 
 

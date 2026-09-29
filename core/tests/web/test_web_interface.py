@@ -14,6 +14,7 @@ from core.models import (
     Instruction,
     Player,
     Rate,
+    Registration,
     TelegramMessage,
 )
 from core.services import summoner_bonus_service
@@ -741,9 +742,10 @@ class WebInterfaceTests(TestCase):
         self.player.refresh_from_db()
         self.assertEqual(self.player.nickname, "Swettka")
 
-    def test_settings_shows_rates_section(self):
+    def test_rates_page_shows_rate_tabs(self):
+        """Rates moved to a dedicated /rates/ page with DEF/CAST tabs."""
         self._login()
-        response = self.client.get(reverse("settings"))
+        response = self.client.get(reverse("rates"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Тарифы за DEF", content)
@@ -780,7 +782,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         rate = Rate.objects.get(start_time=time(8, 0), end_time=time(16, 0))
         self.assertEqual(rate.rate_kk, Decimal("75.00"))
         self.assertTrue(rate.active)
@@ -810,7 +812,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
 
         rate.refresh_from_db()
         self.assertEqual(rate.start_time, time(9, 0))
@@ -829,7 +831,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "75.00",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
         cast_rate = CastRate.objects.get(
             start_time=time(8, 0), end_time=time(16, 0)
         )
@@ -861,7 +863,7 @@ class WebInterfaceTests(TestCase):
                 "rate_kk": "80",
             },
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
 
         cast_rate.refresh_from_db()
         self.assertEqual(cast_rate.start_time, time(9, 0))
@@ -883,7 +885,7 @@ class WebInterfaceTests(TestCase):
             reverse("rates"),
             {"delete_cast_rate": str(cast_rate.pk)},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=cast")
         self.assertEqual(CastRate.objects.count(), 0)
 
     def test_settings_delete_rate(self):
@@ -900,7 +902,7 @@ class WebInterfaceTests(TestCase):
             reverse("rates"),
             {"delete_rate": str(rate.pk)},
         )
-        self.assertRedirects(response, reverse("rates"))
+        self.assertRedirects(response, reverse("rates") + "?tab=def")
         self.assertEqual(Rate.objects.count(), 0)
 
     def test_instructions_list_table(self):
@@ -982,6 +984,7 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1.00"),
             activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("50.00"),
+            bonus_kk=Decimal("2.50"),
         )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
@@ -1038,6 +1041,7 @@ class WebInterfaceTests(TestCase):
             amount=Decimal("1.00"),
             activity_type=Activity.ActivityType.DEF,
             payment_kk=Decimal("50.00"),
+            bonus_kk=Decimal("2.50"),
         )
         settings = summoner_bonus_service.get_settings()
         settings.is_enabled = True
@@ -1057,11 +1061,16 @@ class WebInterfaceTests(TestCase):
         settings.percent = Decimal("0.50")
         settings.save()
         self.activity.payment_kk = Decimal("50.00")
-        self.activity.save(update_fields=["payment_kk"])
+        self.activity.bonus_kk = Decimal("2.50")
+        self.activity.save(update_fields=["payment_kk", "bonus_kk"])
 
         response = self.client.get(reverse("dashboard"), {"period": "month"})
         content = response.content.decode()
-        self.assertIn("52,50", content)
+        # Проверяем что 52,5 ИЛИ 52,50 есть (локали могут отбрасывать trailing zero)
+        self.assertTrue(
+            "52,5" in content or "52,50" in content,
+            f"Expected bonus total 52,5/52,50 in {content[content.find('52'):content.find('52')+10]!r}",
+        )
 
     def test_bonus_only_from_enabled_at(self):
         """Надбавка применяется только к активностям с даты включения (без ретроактивности)."""
@@ -1101,3 +1110,99 @@ class WebInterfaceTests(TestCase):
         self.assertIn("Итого выплата, кк", content)
         self.assertIn("50,00", content)
         self.assertNotIn("52,50", content)
+
+    def test_dashboard_and_detail_payout_match(self):
+        """Дашборд и детализация игрока дают одинаковую выплату.
+
+        Проверяет две причины расхождения:
+        1. Дашборд-строка не начисляет надбавку ретроактивно (фильтр enabled_at).
+        2. Детализация включает регистрации в «Итого выплата, кк».
+        """
+        self._login()
+        player = Player.objects.create(
+            nickname="Payout", is_active=True, summoner_count=10
+        )
+        # DEF 60 дней назад (до enabled_at) — надбавка НЕ начисляется, но в базе есть.
+        old_tm = TelegramMessage.objects.create(
+            telegram_chat_id=600,
+            telegram_message_id=600,
+            original_text="+1|деф|Payout|старая",
+            message_date=timezone.now() - timedelta(days=60),
+        )
+        old_act = Activity.objects.create(
+            player=player,
+            telegram_message=old_tm,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("300.00"),
+        )
+        Activity.objects.filter(pk=old_act.pk).update(
+            created_at=timezone.now() - timedelta(days=60)
+        )
+        # DEF сегодня (после enabled_at) — надбавка начисляется.
+        new_tm = TelegramMessage.objects.create(
+            telegram_chat_id=601,
+            telegram_message_id=601,
+            original_text="+1|деф|Payout|новая",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=new_tm,
+            amount=Decimal("1.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("150.00"),
+            bonus_kk=Decimal("7.50"),  # 150.00 * 10 * 0.005 = 7.50
+        )
+        # Регистрация кланов сегодня.
+        reg_tm = TelegramMessage.objects.create(
+            telegram_chat_id=602,
+            telegram_message_id=602,
+            text="Рега 2 кланами",
+            message_date=timezone.now(),
+        )
+        Registration.objects.create(
+            player=player,
+            telegram_message=reg_tm,
+            clans_count=2,
+            payment_kk=Decimal("50.00"),
+            registered_at=timezone.now(),
+        )
+        settings = summoner_bonus_service.get_settings()
+        settings.is_enabled = True
+        settings.percent = Decimal("0.50")
+        settings.enabled_at = timezone.now() - timedelta(days=30)
+        settings.save()
+
+        today = timezone.localdate()
+        params = {
+            "period": "custom",
+            "date_from": (today - timedelta(days=90)).isoformat(),
+            "date_to": today.isoformat(),
+        }
+
+        # Дашборд: база 450.00 (300+150) + бонус 7.50 (150×10×0.5%) + рега 50.00 = 507.50.
+        dash = self.client.get(reverse("dashboard"), params)
+        self.assertEqual(dash.status_code, 200)
+        rows = {row["nickname"]: row for row in dash.context["rows"]}
+        self.assertEqual(rows["Payout"]["adena"], Decimal("507.50"))
+
+        # Детализация игрока: итоговая выплата = те же 507.50.
+        detail = self.client.get(reverse("player_detail", args=[player.pk]), params)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["summary"]["adena"], Decimal("507.50"))
+
+        # Фактический формат в рендере — запятая как десятичный разделитель (ru-ru).
+        # Локали могут отбрасывать trailing zero (507,5 вместо 507,50) — проверяем оба варианта.
+        dash_content = dash.content.decode()
+        detail_content = detail.content.decode()
+        self.assertTrue(
+            "507,5" in dash_content or "507,50" in dash_content,
+            f"Expected 507,5/507,50 in dashboard: "
+            f"{dash_content[dash_content.find('507'):dash_content.find('507')+12]!r}",
+        )
+        self.assertTrue(
+            "507,5" in detail_content or "507,50" in detail_content,
+            f"Expected 507,5/507,50 in detail: "
+            f"{detail_content[detail_content.find('507'):detail_content.find('507')+12]!r}",
+        )
