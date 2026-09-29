@@ -573,3 +573,11 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 }
 .back-link:hover { color: #991B1B; text-decoration: underline; }
 
+
+.boss-target {
+    font-size: 0.85em;
+    color: var(--color-text-muted);
+    font-family: monospace;
+    margin: 4px 0;
+}
+

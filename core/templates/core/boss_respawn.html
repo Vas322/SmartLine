@@ -32,6 +32,9 @@
             {% endif %}
         </h2>
         <p class="boss-location">{{ card.location }}</p>
+        {% if card.target %}
+        <p class="boss-target">{{ card.target }}</p>
+        {% endif %}
         <p class="boss-status{% if card.started %} status-live{% else %} status-wait{% endif %}">
             {% if card.started %}Респ идёт{% else %}Респ не начался{% endif %}
         </p>

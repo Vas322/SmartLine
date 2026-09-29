@@ -80,3 +80,15 @@ class BossRespawnPageTests(TestCase):
         )
         response = self.client.get(reverse("boss_respawn"))
         self.assertNotContains(response, "Данные могут быть устаревшими")
+
+    def test_subclass_boss_shows_target_chest_command(self):
+        response = self.client.get(reverse("boss_respawn"))
+        self.assertContains(response, "/target Chest of Kernon")
+        self.assertContains(response, "boss-target")
+
+    def test_epic_boss_without_target_has_no_target_block(self):
+        response = self.client.get(reverse("boss_respawn"))
+        # Kernon (subclass) renders its target; Antharas (epic) must not.
+        self.assertContains(response, "/target Chest of Kernon")
+        # Only one boss-target element should exist (Kernon's).
+        self.assertEqual(response.content.count(b"class=\"boss-target\""), 1)

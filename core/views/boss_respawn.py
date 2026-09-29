@@ -17,6 +17,14 @@ MSK_TZ = ZoneInfo("Europe/Moscow")
 ALLOWED_FILTERS = ("all", "epic", "subclass")
 STALE_AFTER_HOURS = 2
 
+# Static /target chest commands for subclass bosses (hardcoded).
+TARGET_MAP = {
+    "Shilen's Messenger Cabrio": "/target Coffer of the Dead",
+    "Death Lord Hallate": "/target Hallate's chest",
+    "Kernon": "/target Chest of Kernon",
+    "Longhorn Golkonda": "/target Chest of Golkonda",
+}
+
 
 def _boss_card(boss: BossRespawn) -> dict:
     """Prepare a boss card dict with render-time status and MSK window."""
@@ -34,6 +42,7 @@ def _boss_card(boss: BossRespawn) -> dict:
         "start_msk": start_msk,
         "end_msk": end_msk,
         "countdown_msk": countdown_msk,
+        "target": TARGET_MAP.get(boss.boss_name, ""),
     }
 
 
