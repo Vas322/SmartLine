@@ -7,7 +7,11 @@
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit" class="btn">Сохранить</button>
-    <a href="{% url 'instructions' %}" class="btn btn-secondary">Отмена</a>
+    <form action="{% url 'instruction_edit' instruction.pk %}" method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="cancel" value="1">
+        <button type="submit" class="btn btn-secondary">Отмена</button>
+    </form>
 </form>
 </div>
 {% endblock %}

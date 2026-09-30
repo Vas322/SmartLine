@@ -72,6 +72,16 @@ def instruction_detail(request, pk: int):
 @staff_or_404
 def instruction_edit(request, pk: int):
     instr = get_object_or_404(Instruction, pk=pk)
+    if request.method == "POST" and request.POST.get("cancel") == "1":
+        # Отмена — POST-запрос. Разрешаем удаление только если current_user —
+        # создатель инструкции ИЛИ инструкция ещё не сохранялась (updated_by не задан).
+        can_delete = (
+            instr.updated_by_id is None
+            or instr.updated_by_id == request.user.pk
+        )
+        if can_delete:
+            instr.delete()
+        return redirect("instructions")
     if request.method == "POST":
         form = InstructionForm(request.POST, instance=instr)
         if form.is_valid():

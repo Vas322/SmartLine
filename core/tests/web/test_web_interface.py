@@ -969,6 +969,61 @@ class WebInterfaceTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_instruction_cancel_deletes_fresh_instruction(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="fresh", title="Новая инструкция", content=""
+        )
+        self.assertIsNone(instr.updated_by_id)
+        response = self.client.post(
+            reverse("instruction_edit", args=[instr.pk]),
+            {"cancel": "1"},
+        )
+        self.assertRedirects(response, reverse("instructions"))
+        self.assertFalse(Instruction.objects.filter(pk=instr.pk).exists())
+
+    def test_instruction_cancel_keeps_saved_instruction(self):
+        self._login()
+        other = User.objects.create_user(
+            username="other_staff", password="test-password-123", is_staff=True
+        )
+        instr = Instruction.objects.create(
+            slug="saved", title="Сохранённая", content="Тело"
+        )
+        instr.updated_by = other
+        instr.save()
+        response = self.client.post(
+            reverse("instruction_edit", args=[instr.pk]),
+            {"cancel": "1"},
+        )
+        self.assertRedirects(response, reverse("instructions"))
+        self.assertTrue(Instruction.objects.filter(pk=instr.pk).exists())
+
+    def test_instruction_cancel_deletes_own_saved_instruction(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="own", title="Моя", content="Тело"
+        )
+        instr.updated_by = self.user
+        instr.save()
+        response = self.client.post(
+            reverse("instruction_edit", args=[instr.pk]),
+            {"cancel": "1"},
+        )
+        self.assertRedirects(response, reverse("instructions"))
+        self.assertFalse(Instruction.objects.filter(pk=instr.pk).exists())
+
+    def test_instruction_cancel_via_get_keeps_instruction(self):
+        self._login()
+        instr = Instruction.objects.create(
+            slug="fresh2", title="Новая инструкция", content=""
+        )
+        response = self.client.get(
+            reverse("instruction_edit", args=[instr.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Instruction.objects.filter(pk=instr.pk).exists())
+
     def test_player_detail_bonus_columns_in_table(self):
         self._login()
         player = Player.objects.create(nickname="BCol", is_active=True, summoner_count=10)
@@ -1112,10 +1167,10 @@ class WebInterfaceTests(TestCase):
         self.assertNotIn("52,50", content)
 
     def test_dashboard_and_detail_payout_match(self):
-        """Дашборд и детализация игрока дают одинаковую выплату.
+        """Форты и детализация игрока дают одинаковую выплату.
 
         Проверяет две причины расхождения:
-        1. Дашборд-строка не начисляет надбавку ретроактивно (фильтр enabled_at).
+        1. Форты-строка не начисляет надбавку ретроактивно (фильтр enabled_at).
         2. Детализация включает регистрации в «Итого выплата, кк».
         """
         self._login()
@@ -1181,7 +1236,7 @@ class WebInterfaceTests(TestCase):
             "date_to": today.isoformat(),
         }
 
-        # Дашборд: база 450.00 (300+150) + бонус 7.50 (150×10×0.5%) + рега 50.00 = 507.50.
+        # Форты: база 450.00 (300+150) + бонус 7.50 (150×10×0.5%) + рега 50.00 = 507.50.
         dash = self.client.get(reverse("dashboard"), params)
         self.assertEqual(dash.status_code, 200)
         rows = {row["nickname"]: row for row in dash.context["rows"]}
