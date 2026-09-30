@@ -4,6 +4,7 @@
 {% block content %}
 <div class="page-head"><h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1></div>
 {% if player.telegram_username %}<p class="muted">Ник в Telegram: {{ player.telegram_username }}</p>{% endif %}
+<p><a href="{% url 'dashboard' %}">← К фортам</a></p>
 <div class="card">
 <form method="get" action="{% url 'player_detail' player.pk %}">
     {{ form.period.label_tag }} {{ form.period }}
@@ -17,16 +18,16 @@
 <div class="stats">
     <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
     <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
+    {% if summary.base_payment > 0 %}
+    <div class="stat-card"><h3>Активности, кк</h3><div class="value">{{ summary.base_payment }}</div></div>
+    {% endif %}
+    {% if summary.bonus_total > 0 %}
+    <div class="stat-card"><h3>Суммоны, кк</h3><div class="value">{{ summary.bonus_total|floatformat:2 }}</div></div>
+    {% endif %}
     <div class="stat-card"><h3>DEF</h3><div class="value">{{ summary.def_hours }}</div></div>
     <div class="stat-card"><h3>FARM</h3><div class="value">{{ summary.farm_hours }}</div></div>
     <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
-    <div class="stat-card"><h3>%</h3><div class="value">{{ summary.percent }}</div></div>
 </div>
-{% if summary.bonus_total %}
-<p class="muted" style="font-size:0.8em; margin-top:2px; margin-bottom:0;">
-    (база {{ summary.base_payment }} + надбавки {{ summary.bonus_total|floatformat:2 }})
-</p>
-{% endif %}
 <h2>Активности</h2>
 <div class="card"><div class="table-wrap">
 <table>
@@ -71,5 +72,4 @@
     {% endif %}
 </div>
 {% endif %}
-<p><a href="{% url 'dashboard' %}">← К дашборду</a></p>
 {% endblock %}

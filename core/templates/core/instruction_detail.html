@@ -13,5 +13,5 @@
 {% if user.is_staff %}
 <a class="btn" href="{% url 'instruction_edit' instruction.pk %}">Редактировать</a>
 {% endif %}
-<p><a href="{% url 'instructions' %}">← Назад к списку</a></p>
+<p><a href="{% url 'instructions' %}">← К списку инструкций</a></p>
 {% endblock %}
