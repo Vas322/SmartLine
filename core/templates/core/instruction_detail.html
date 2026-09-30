@@ -3,9 +3,11 @@
 {% load instruction_tags %}
 {% block title %}{{ instruction.title }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>{{ instruction.title }}</h1></div>
-<div class="instruction-content">
-    {{ instruction.content|render_instruction }}
+<div class="card">
+    <div class="page-head"><h1>{{ instruction.title }}</h1></div>
+    <div class="instruction-content">
+        {{ instruction.content|render_instruction }}
+    </div>
 </div>
 <p class="instruction-meta">Слаг: {{ instruction.slug }} · Обновлено: {{ instruction.updated_at|date:"d.m.Y H:i" }}</p>
 {% if user.is_staff %}

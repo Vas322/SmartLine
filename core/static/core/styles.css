@@ -424,7 +424,12 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-br
 }
 
 /* ===== INSTRUCTIONS ===== */
-.instruction-content { max-width: 800px; }
+.instruction-content {
+    max-width: 800px;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
 .instruction-content .instruction-subheading { font-size: 18px; font-weight: 600; color: var(--color-gold); margin-top: 28px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid rgba(212, 175, 55, 0.25); }
 .instruction-content .instruction-code-block { background: #0B1120; border: 1px solid var(--color-border); border-left: 3px solid var(--color-brand); border-radius: 4px; padding: 12px 16px; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; margin-bottom: 16px; color: #CBD5E1; }
 .instruction-content .instruction-code-block code { font-family: inherit; background: none; padding: 0; font-size: inherit; }
