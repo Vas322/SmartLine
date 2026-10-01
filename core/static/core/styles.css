@@ -167,6 +167,10 @@ main {
 .stat-card .value small { font-size: 0.6em; color: var(--color-text-secondary); font-weight: 400; }
 .stat-card--gold { border-top: 3px solid var(--color-gold); }
 .stat-card--gold .value { color: var(--color-gold); }
+.stat-card--red { border-top: 3px solid var(--color-brand); }
+.stat-card--red .value { color: var(--color-brand); }
+.stat-card--green { border-top: 3px solid var(--color-success); }
+.stat-card--green .value { color: var(--color-success); }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); border-color: rgba(212, 175, 55, 0.4); }
 
 /* Блок "Всего часов" — два столбца */

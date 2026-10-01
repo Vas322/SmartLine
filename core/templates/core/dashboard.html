@@ -23,15 +23,15 @@
 </div>
 
 <div class="stats">
-    <div class="stat-card">
+    <div class="stat-card stat-card--red">
         <h3>Игроков с активностью</h3>
         <div class="value">{{ rows|length }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card stat-card--gold">
         <h3>Дней в периоде</h3>
         <div class="value">{{ days_in_period }}</div>
     </div>
-    <div class="stat-card stat-card--gold">
+    <div class="stat-card stat-card--green">
         <h3>Итого к выплате</h3>
         <div class="value">{{ total_payout }}</div>
         {% if bonus_settings.is_enabled %}
