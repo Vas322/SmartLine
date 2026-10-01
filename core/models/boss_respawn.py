@@ -109,7 +109,7 @@ class EpicBossNotificationSettings(models.Model):
         blank=True,
         default=DEFAULT_BOSS_TEMPLATE,
         verbose_name="Шаблон текста",
-        help_text="Переменная {bosses} — список выбранных боссов с временем респа.",
+        help_text="Вместо {bosses} подставится список имён выбранных боссов.",
     )
     selected_bosses = models.JSONField(
         default=list,

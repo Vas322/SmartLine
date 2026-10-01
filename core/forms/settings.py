@@ -139,9 +139,7 @@ class EpicBossNotificationSettingsForm(forms.ModelForm):
             "topic": "Тема в Telegram",
         }
         help_texts = {
-            "text_template": (
-                "Вместо {bosses} подставится список выбранных боссов с временем респа."
-            ),
+            "text_template": "Вместо {bosses} подставится список имён выбранных боссов.",
         }
 
     def __init__(self, *args, **kwargs):

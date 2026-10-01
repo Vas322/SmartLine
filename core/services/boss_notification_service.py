@@ -1,6 +1,6 @@
 """Business logic for Telegram notifications about Epic RB respawns."""
 import logging
-from datetime import date, datetime, timezone as dt_timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 MSK_TZ = ZoneInfo("Europe/Moscow")
 
+EPIC_SPAWN_BOUNDARY_HOUR = 18  # эпики с респом >= 18:00 появляются на следующий день
+
 
 def get_settings() -> EpicBossNotificationSettings:
     """Return the singleton EpicBossNotificationSettings (pk=1)."""
@@ -31,15 +33,30 @@ def should_notify_today(today: date | None = None) -> bool:
     return not EpicBossNotificationLog.objects.filter(notify_date=today).exists()
 
 
-def _boss_line(boss: BossRespawn) -> str:
-    """Одна строка босса для сообщения: «Имя — с ЧЧ:ММ до ЧЧ:ММ МСК»."""
+def _epic_appearance_date(boss: BossRespawn) -> date:
+    """День фактического появления босса (МСК).
+
+    Эпики на сервере появляются в окне 18:00–23:00: если время респа
+    по данным сайта >= 18:00, окно этого дня уже прошло частично/целиком,
+    и босс появится на следующий день. Сабклассы — в день респа по сайту.
+    """
     start_msk = boss.respawn_start.astimezone(MSK_TZ)
-    end_msk = boss.respawn_end.astimezone(MSK_TZ)
-    return f"{boss.boss_name} — с {start_msk:%H:%M} до {end_msk:%H:%M} МСК"
+    if boss.boss_type == BossRespawn.BossType.EPIC and start_msk.hour >= EPIC_SPAWN_BOUNDARY_HOUR:
+        return start_msk.date() + timedelta(days=1)
+    return start_msk.date()
+
+
+def _boss_line(boss: BossRespawn) -> str:
+    """Строка босса для сообщения — только имя."""
+    return boss.boss_name
 
 
 def get_bosses_for_notification() -> list[BossRespawn]:
-    """Выбранные в настройках боссы (любого типа), респающие сегодня (МСК)."""
+    """Выбранные в настройках боссы, появляющиеся сегодня (МСК).
+
+    Для эпиков «появление» может быть на день позже респа по сайту
+    (см. _epic_appearance_date); сабклассы — в день респа.
+    """
     settings_obj = get_settings()
     selected = settings_obj.selected_bosses or []
     today = timezone.now().astimezone(MSK_TZ).date()
@@ -47,7 +64,7 @@ def get_bosses_for_notification() -> list[BossRespawn]:
         b
         for b in BossRespawn.objects.filter(boss_name__in=selected)
         .order_by("respawn_start")
-        if b.respawn_start.astimezone(MSK_TZ).date() == today
+        if _epic_appearance_date(b) == today
     ]
 
 

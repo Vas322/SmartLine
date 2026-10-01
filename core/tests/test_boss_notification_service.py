@@ -1,6 +1,7 @@
 """Tests for the epic boss notification service."""
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone as dt_timezone
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -11,6 +12,34 @@ from core.models import (
     EpicBossNotificationSettings,
 )
 from core.services import boss_notification_service, messaging_service
+
+MSK_TZ = ZoneInfo("Europe/Moscow")
+
+
+def _msk(value: str) -> datetime:
+    """'YYYY-MM-DD HH:MM' как aware datetime в МСК."""
+    return datetime.strptime(value, "%Y-%m-%d %H:%M").replace(tzinfo=MSK_TZ)
+
+
+def _mock_now(msk_dt: datetime) -> mock._patch:
+    """Зафиксировать «сейчас» (патчим timezone.now → производные MSK-даты)."""
+    return mock.patch(
+        "django.utils.timezone.now",
+        return_value=msk_dt.astimezone(dt_timezone.utc),
+    )
+
+
+def _boss_at(
+    name: str, msk_dt: datetime, boss_type: str = BossRespawn.BossType.EPIC
+) -> BossRespawn:
+    """Босс с респом в заданный момент времени (МСК)."""
+    start_utc = msk_dt.astimezone(dt_timezone.utc)
+    return BossRespawn.objects.create(
+        boss_name=name,
+        boss_type=boss_type,
+        respawn_start=start_utc,
+        respawn_end=start_utc + timedelta(hours=1),
+    )
 
 
 def _boss(
@@ -79,15 +108,15 @@ class EpicBossNotificationServiceTests(TestCase):
 
     # ---------- generate_notification_text ----------
 
-    def test_generate_text_substitutes_bosses_with_msk_window(self):
+    def test_generate_text_substitutes_bosses_with_names_only(self):
         bosses = [_boss("Antharas", 1), _boss("Baium", 2)]
         text = boss_notification_service.generate_notification_text(bosses)
-        # Каждый босс — строка вида «Имя — с ЧЧ:ММ до ЧЧ:ММ МСК».
+        # Каждый босс — строка только с именем, без времени респа.
         self.assertIn("Antharas", text)
         self.assertIn("Baium", text)
-        self.assertIn("МСК", text)
-        self.assertIn("с ", text)
-        self.assertIn(" до ", text)
+        self.assertNotIn("МСК", text)
+        self.assertNotIn("с ", text)
+        self.assertNotIn(" до ", text)
 
     def test_generate_text_keeps_template_without_placeholder(self):
         self.settings.text_template = "Просто текст без переменных"
@@ -152,8 +181,86 @@ class EpicBossNotificationServiceTests(TestCase):
 
         preview = boss_notification_service.get_notification_preview()
         self.assertIn("Antharas", preview)
-        self.assertIn("21:07", preview)
-        self.assertIn("МСК", preview)
+
+    # ---------- {bosses} только имена ----------
+
+    def test_bosses_placeholder_substitutes_names_only(self):
+        """Шаблон с {bosses}: эпик с респом 14:00 МСК сегодня → только имя."""
+        now = _msk("2026-01-10 12:00")
+        with _mock_now(now):
+            _boss_at("Antharas", _msk("2026-01-10 14:00"))
+            self.settings.text_template = "Боссы:\n{bosses}"
+            self.settings.save()
+
+            bosses = boss_notification_service.get_bosses_for_notification()
+            text = boss_notification_service.generate_notification_text(bosses)
+
+        self.assertIn("Antharas", text)
+        self.assertNotIn("МСК", text)
+        self.assertNotIn("— с", text)
+
+    # ---------- День появления (эпик >= 18:00 → на следующий день) ----------
+
+    def test_epic_1400_today_appears_today(self):
+        """Эпик 14:00 сегодня → появляется и уведомляется сегодня."""
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at("Antharas", _msk("2026-01-10 14:00"))
+            bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in bosses], ["Antharas"])
+
+    def test_epic_1800_today_appears_tomorrow(self):
+        """Эпик 18:00 сегодня → появление завтра; сегодня не возвращается."""
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at("Antharas", _msk("2026-01-10 18:00"))
+            today_bosses = boss_notification_service.get_bosses_for_notification()
+            self.assertEqual(today_bosses, [])
+
+        with _mock_now(_msk("2026-01-11 12:00")):
+            tomorrow_bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in tomorrow_bosses], ["Antharas"])
+
+    def test_epic_2248_today_appears_tomorrow(self):
+        """Эпик 22:48 сегодня → появление завтра (кейс пользователя)."""
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at("Antharas", _msk("2026-01-10 22:48"))
+            today_bosses = boss_notification_service.get_bosses_for_notification()
+            self.assertEqual(today_bosses, [])
+
+        with _mock_now(_msk("2026-01-11 12:00")):
+            tomorrow_bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in tomorrow_bosses], ["Antharas"])
+
+    def test_epic_2359_today_appears_tomorrow(self):
+        """Эпик 23:59 сегодня → появление завтра."""
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at("Antharas", _msk("2026-01-10 23:59"))
+            today_bosses = boss_notification_service.get_bosses_for_notification()
+            self.assertEqual(today_bosses, [])
+
+        with _mock_now(_msk("2026-01-11 12:00")):
+            tomorrow_bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in tomorrow_bosses], ["Antharas"])
+
+    def test_epic_1759_today_appears_today(self):
+        """Граница: эпик 17:59 сегодня → появление сегодня."""
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at("Antharas", _msk("2026-01-10 17:59"))
+            bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in bosses], ["Antharas"])
+
+    def test_subclass_appears_on_respawn_day_regardless_of_time(self):
+        """Сабкласс в любое время → появление в день респа (без сдвига)."""
+        # Сабкласс поздним вечером — всё равно сегодня.
+        self.settings.selected_bosses = ["Kernon"]
+        self.settings.save()
+        with _mock_now(_msk("2026-01-10 12:00")):
+            _boss_at(
+                "Kernon",
+                _msk("2026-01-10 22:00"),
+                boss_type=BossRespawn.BossType.SUBCLASS,
+            )
+            bosses = boss_notification_service.get_bosses_for_notification()
+        self.assertEqual([b.boss_name for b in bosses], ["Kernon"])
 
     # ---------- send_epic_boss_notification ----------
 
@@ -256,6 +363,34 @@ class EpicBossNotificationServiceTests(TestCase):
         self.assertTrue(log.success)
 
     @mock.patch("core.services.messaging_service.send_epic_boss_notification")
+    def test_sends_on_appearance_day_not_respawn_day(self, mock_send):
+        """Эпик респ 22:48 сегодня → появление завтра.
+
+        Сегодня (респ день) уведомление НЕ отправляется; завтра (день
+        появления) — отправляется, в лог пишется bosses.
+        """
+        mock_send.return_value = mock.Mock()
+        self.settings.notification_time = time(18, 0)
+        self.settings.save()
+
+        # День респа: now = 2026-01-10 23:00 МСК, респ 22:48 того же дня.
+        with _mock_now(_msk("2026-01-10 23:00")):
+            _boss_at("Antharas", _msk("2026-01-10 22:48"))
+            boss_notification_service.send_epic_boss_notification()
+            mock_send.assert_not_called()
+            self.assertEqual(EpicBossNotificationLog.objects.count(), 0)
+
+        # День появления: now = 2026-01-11 19:00 МСК, notification_time прошёл.
+        with _mock_now(_msk("2026-01-11 19:00")):
+            boss_notification_service.send_epic_boss_notification()
+
+        mock_send.assert_called_once()
+        log = EpicBossNotificationLog.objects.get()
+        self.assertEqual(log.notify_date, _msk("2026-01-11 00:00").date())
+        self.assertEqual(log.bosses, ["Antharas"])
+        self.assertTrue(log.success)
+
+    @mock.patch("core.services.messaging_service.send_epic_boss_notification")
     def test_only_selected_bosses_in_sent_message(self, mock_send):
         """Выбран Antharas; респают Antharas и Valakas → в тексте только Antharas."""
         mock_send.return_value = mock.Mock()
@@ -274,7 +409,7 @@ class EpicBossNotificationServiceTests(TestCase):
         self.assertEqual(log.bosses, ["Antharas"])
 
     @mock.patch("core.services.messaging_service.send_epic_boss_notification")
-    def test_sent_text_contains_msk_window(self, mock_send):
+    def test_sent_text_contains_boss_names_only(self, mock_send):
         mock_send.return_value = mock.Mock()
         _boss_today("Antharas")
 
@@ -282,9 +417,9 @@ class EpicBossNotificationServiceTests(TestCase):
 
         sent_text = mock_send.call_args.args[1]
         self.assertIn("Antharas", sent_text)
-        self.assertIn("с ", sent_text)
-        self.assertIn(" до ", sent_text)
-        self.assertIn("МСК", sent_text)
+        self.assertNotIn("МСК", sent_text)
+        self.assertNotIn("с ", sent_text)
+        self.assertNotIn(" до ", sent_text)
 
     @mock.patch("core.services.messaging_service.send_epic_boss_notification")
     def test_no_active_group_logs_failure(self, mock_send):
