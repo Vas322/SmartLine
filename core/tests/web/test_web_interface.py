@@ -368,7 +368,9 @@ class WebInterfaceTests(TestCase):
             )
         response = self.client.get(reverse("player_detail", args=[player.pk]))
         content = response.content.decode()
-        self.assertIn('<h3>CAST</h3><div class="value">3</div>', content)
+        # CAST выводится в breakdown-строке блока «Всего часов».
+        self.assertIn("CAST", content)
+        self.assertIn('<span>CAST</span>', content)
 
     def test_player_detail_cast_type_no_duplicate(self):
         """CAST activity type with has_cast does not render CAST+CAST."""
@@ -1261,3 +1263,77 @@ class WebInterfaceTests(TestCase):
             f"Expected 507,5/507,50 in detail: "
             f"{detail_content[detail_content.find('507'):detail_content.find('507')+12]!r}",
         )
+
+    def test_player_detail_hours_breakdown(self):
+        """Блок «Всего часов» содержит breakdown DEF/FARM/CAST."""
+        self._login()
+        player = Player.objects.create(nickname="BreakDown", is_active=True)
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=700,
+            telegram_message_id=700,
+            original_text="+1|деф|BreakDown|t",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=msg,
+            amount=Decimal("2.00"),
+            activity_type=Activity.ActivityType.DEF,
+            payment_kk=Decimal("100.00"),
+        )
+        msg2 = TelegramMessage.objects.create(
+            telegram_chat_id=701,
+            telegram_message_id=701,
+            original_text="+0.5|фарм|BreakDown|t",
+            message_date=timezone.now(),
+        )
+        Activity.objects.create(
+            player=player,
+            telegram_message=msg2,
+            amount=Decimal("0.50"),
+            activity_type=Activity.ActivityType.FARM,
+        )
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        # Проверяем breakdown-строки
+        self.assertIn("DEF", content)
+        self.assertIn("FARM", content)
+        self.assertIn("CAST", content)
+        self.assertIn("2,00", content)  # DEF hours
+        self.assertIn("0,50", content)  # FARM hours
+
+    def test_player_detail_reg_block(self):
+        """Блок «Реги» отображается при наличии регистраций."""
+        self._login()
+        player = Player.objects.create(nickname="RegBlock", is_active=True)
+        msg = TelegramMessage.objects.create(
+            telegram_chat_id=800,
+            telegram_message_id=800,
+            text="Рега 3 кланами",
+            message_date=timezone.now(),
+        )
+        Registration.objects.create(
+            player=player,
+            telegram_message=msg,
+            clans_count=3,
+            payment_kk=Decimal("75.00"),
+            registered_at=timezone.now(),
+        )
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn("Реги", content)
+        self.assertIn("1", content)  # reg_count = 1
+        self.assertIn("3", content)  # КК = 3
+        self.assertIn("75", content)  # адена
+
+    def test_player_detail_reg_block_hidden_when_no_regs(self):
+        """Блок «Реги» скрыт, если регистраций нет."""
+        self._login()
+        player = Player.objects.create(nickname="NoRegs", is_active=True)
+        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        # Блок "Реги" не должен отображаться
+        self.assertNotIn("Реги", content)

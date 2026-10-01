@@ -48,6 +48,7 @@ def registration_totals_for_players(date_from, date_to):
         .annotate(
             reg_payment=Coalesce(Sum("payment_kk"), DECIMAL_ZERO),
             reg_clans=Coalesce(Sum("clans_count"), 0),
+            reg_count=Count("pk"),
         )
     )
     return {row["player_id"]: row for row in qs}

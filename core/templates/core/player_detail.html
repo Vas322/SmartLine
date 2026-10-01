@@ -21,7 +21,15 @@
 </form>
 </div>
 <div class="stats">
-    <div class="stat-card"><h3>Всего часов</h3><div class="value">{{ summary.total_hours }}</div></div>
+    <div class="stat-card">
+        <h3>Всего часов</h3>
+        <div class="value">{{ summary.total_hours }}</div>
+        <div class="stat-breakdown">
+            <div class="stat-row"><span>DEF</span><span>{{ summary.def_hours }}</span></div>
+            <div class="stat-row"><span>FARM</span><span>{{ summary.farm_hours }}</span></div>
+            <div class="stat-row"><span>CAST</span><span>{{ summary.cast_hours|default:"0" }}</span></div>
+        </div>
+    </div>
     <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
     {% if summary.base_payment > 0 %}
     <div class="stat-card"><h3>Активности, кк</h3><div class="value">{{ summary.base_payment }}</div></div>
@@ -29,9 +37,16 @@
     {% if summary.bonus_total > 0 %}
     <div class="stat-card"><h3>Суммоны, кк</h3><div class="value">{{ summary.bonus_total|floatformat:2 }}</div></div>
     {% endif %}
-    <div class="stat-card"><h3>DEF</h3><div class="value">{{ summary.def_hours }}</div></div>
-    <div class="stat-card"><h3>FARM</h3><div class="value">{{ summary.farm_hours }}</div></div>
-    <div class="stat-card"><h3>CAST</h3><div class="value">{{ cast_count }}</div></div>
+    {% if summary.reg_count > 0 %}
+    <div class="stat-card stat-card--reg">
+        <h3>Реги</h3>
+        <div class="value">{{ summary.reg_count }}</div>
+        <div class="stat-breakdown">
+            <div class="stat-row"><span>КК</span><span>{{ summary.reg_clans }}</span></div>
+            <div class="stat-row"><span>Адена</span><span>{{ summary.reg_payment|floatformat:2 }}</span></div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 <h2>Активности</h2>
 <div class="card"><div class="table-wrap">
