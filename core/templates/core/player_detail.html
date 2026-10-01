@@ -21,13 +21,18 @@
 </form>
 </div>
 <div class="stats">
-    <div class="stat-card">
+    <div class="stat-card stat-card--hours">
         <h3>Всего часов</h3>
-        <div class="value">{{ summary.total_hours }}</div>
-        <div class="stat-breakdown">
-            <div class="stat-row"><span>DEF</span><span>{{ summary.def_hours }}</span></div>
-            <div class="stat-row"><span>FARM</span><span>{{ summary.farm_hours }}</span></div>
-            <div class="stat-row"><span>CAST</span><span>{{ summary.cast_hours|default:"0" }}</span></div>
+        <div class="hours-layout">
+            <div class="hours-total">
+                <div class="value">{{ summary.total_hours }}</div>
+            </div>
+            <div class="hours-divider"></div>
+            <div class="hours-breakdown">
+                <div class="hours-row"><span>DEF</span><span>{{ summary.def_hours }}</span></div>
+                <div class="hours-row"><span>FARM</span><span>{{ summary.farm_hours }}</span></div>
+                <div class="hours-row"><span>CAST</span><span>{{ summary.cast_hours|default:"0" }}</span></div>
+            </div>
         </div>
     </div>
     <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
