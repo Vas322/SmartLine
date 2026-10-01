@@ -1,10 +1,11 @@
 {% extends "core/base.html" %}
 {% load math_tags %}
 {% block title %}{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}{% endblock %}
+{% block body_attrs %} data-current-month="{{ current_month }}"{% endblock %}
 {% block content %}
 <div class="page-head"><h1>{% if player.nickname %}{{ player.nickname }}{% else %}—{% endif %}</h1></div>
 {% if player.telegram_username %}<p class="muted">Ник в Telegram: {{ player.telegram_username }}</p>{% endif %}
-<p><a href="{% url 'dashboard' %}">← К фортам</a></p>
+<p><a href="{% url 'dashboard' %}?period={{ applied_period }}{% if applied_period == 'month' and applied_month %}&month={{ applied_month }}{% elif applied_period == 'custom' %}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}{% endif %}">← К фортам</a></p>
 <div class="card">
 <form method="get" action="{% url 'player_detail' player.pk %}">
     {{ form.period.label_tag }} {{ form.period }}
@@ -12,7 +13,11 @@
         {{ form.date_from.label_tag }} {{ form.date_from }}
         {{ form.date_to.label_tag }} {{ form.date_to }}
     </div>
+    <div class="period-month-group" id="month-select-wrapper">
+        {{ form.month.label_tag }} {{ form.month }}
+    </div>
     <button type="submit" class="btn">Применить</button>
+    <button type="button" class="btn btn-ghost" id="reset-filter" data-url="{% url 'player_detail' player.pk %}">Сброс</button>
 </form>
 </div>
 <div class="stats">
@@ -33,7 +38,7 @@
 <table>
     <tr>
         <th>#</th>
-        <th><a href="?period={{ applied_period }}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}&sort={% if sort == 'asc' %}desc{% else %}asc{% endif %}&page=1">Дата{% if sort == 'asc' %} ▲{% else %} ▼{% endif %}</a></th>
+        <th><a href="?period={{ applied_period }}{% if applied_period == 'month' and applied_month %}&month={{ applied_month }}{% elif applied_period == 'custom' %}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}{% endif %}&sort={% if sort == 'asc' %}desc{% else %}asc{% endif %}&page=1">Дата{% if sort == 'asc' %} ▲{% else %} ▼{% endif %}</a></th>
         <th>Тип</th>
         <th>Начало волны</th>
         <th class="num">Часов</th>
@@ -64,11 +69,11 @@
 {% if page_obj.has_other_pages %}
 <div class="pagination">
     {% if page_obj.has_previous %}
-    <a href="?period={{ applied_period }}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}&sort={{ sort }}&page={{ page_obj.previous_page_number }}">← Назад</a>
+    <a href="?period={{ applied_period }}{% if applied_period == 'month' and applied_month %}&month={{ applied_month }}{% elif applied_period == 'custom' %}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}{% endif %}&sort={{ sort }}&page={{ page_obj.previous_page_number }}">← Назад</a>
     {% endif %}
     <span>Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-    <a href="?period={{ applied_period }}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}&sort={{ sort }}&page={{ page_obj.next_page_number }}">Вперёд →</a>
+    <a href="?period={{ applied_period }}{% if applied_period == 'month' and applied_month %}&month={{ applied_month }}{% elif applied_period == 'custom' %}&date_from={{ applied_date_from }}&date_to={{ applied_date_to }}{% endif %}&sort={{ sort }}&page={{ page_obj.next_page_number }}">Вперёд →</a>
     {% endif %}
 </div>
 {% endif %}
