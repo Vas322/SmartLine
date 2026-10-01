@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import F
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.decorators import member_required, staff_or_404
@@ -21,7 +22,10 @@ logger = logging.getLogger(__name__)
 @member_required
 def player_detail(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
-    form = PeriodForm(request.GET or None, initial={"period": "month"})
+    form = PeriodForm(
+        request.GET or None,
+        initial={"period": "month", "month": timezone.localdate().strftime("%Y-%m")},
+    )
     date_from, date_to = form.get_date_range()
 
     if form.is_valid():
@@ -36,10 +40,16 @@ def player_detail(request, pk: int):
             if form.cleaned_data.get("date_to")
             else ""
         )
+        applied_month = form.cleaned_data.get("month") or ""
     else:
         applied_period = form.initial.get("period") or "month"
         applied_date_from = ""
         applied_date_to = ""
+        applied_month = form.initial.get("month") or ""
+
+    current_month = timezone.localdate().strftime("%Y-%m")
+    if applied_period == "month" and not applied_month:
+        applied_month = current_month
 
     totals = stats.activity_totals_for_player(player, date_from, date_to)
     def_hours = totals["def_hours"] or Decimal("0")
@@ -101,6 +111,8 @@ def player_detail(request, pk: int):
         "applied_period": applied_period,
         "applied_date_from": applied_date_from,
         "applied_date_to": applied_date_to,
+        "applied_month": applied_month,
+        "current_month": current_month,
     }
     return render(request, "core/player_detail.html", context)
 

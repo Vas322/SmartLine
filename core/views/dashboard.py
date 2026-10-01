@@ -3,6 +3,7 @@ import logging
 from decimal import Decimal
 
 from django.shortcuts import render
+from django.utils import timezone
 
 from core.decorators import member_required
 from core.forms import PeriodForm
@@ -16,9 +17,25 @@ logger = logging.getLogger(__name__)
 
 @member_required
 def dashboard(request):
-    form = PeriodForm(request.GET or None, initial={"period": "month"})
+    form = PeriodForm(
+        request.GET or None,
+        initial={"period": "month", "month": timezone.localdate().strftime("%Y-%m")},
+    )
     date_from, date_to = form.get_date_range()
     days_in_period = form.get_days_in_period()
+
+    if form.is_valid():
+        applied_period = (
+            form.cleaned_data.get("period") or form.initial.get("period") or "month"
+        )
+        applied_month = form.cleaned_data.get("month") or ""
+    else:
+        applied_period = form.initial.get("period") or "month"
+        applied_month = ""
+
+    current_month = timezone.localdate().strftime("%Y-%m")
+    if applied_period == "month" and not applied_month:
+        applied_month = current_month
 
     totals_by_player: dict[int, dict] = {
         pid: {
@@ -92,5 +109,8 @@ def dashboard(request):
         "rows": rows,
         "total_payout": total_payout,
         "bonus_settings": bonus_settings,
+        "applied_period": applied_period,
+        "applied_month": applied_month,
+        "current_month": current_month,
     }
     return render(request, "core/dashboard.html", context)
