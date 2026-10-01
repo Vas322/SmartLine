@@ -81,5 +81,5 @@ class LoginPageNavTests(TestCase):
         header_start = content.index("<header")
         header_end = content.index("</header>")
         header = content[header_start:header_end]
-        self.assertIn("Дашборд", header)
+        self.assertIn("Форты", header)
         self.assertIn("Выйти", header)

@@ -13,7 +13,6 @@ from core.forms import PeriodForm, PlayerEditForm, PlayerForm
 from core.models import Activity, Player
 from core.services import stats, summoner_bonus_service
 from core.services.stats import DECIMAL_ZERO
-from core.views.common import _percent
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,6 @@ def player_detail(request, pk: int):
     player = get_object_or_404(Player, pk=pk)
     form = PeriodForm(request.GET or None, initial={"period": "month"})
     date_from, date_to = form.get_date_range()
-    days_in_period = form.get_days_in_period()
 
     if form.is_valid():
         applied_period = form.cleaned_data.get("period") or form.initial.get("period") or "month"
@@ -67,7 +65,6 @@ def player_detail(request, pk: int):
         "bonus_total": bonus_total,
         "def_hours": def_hours,
         "farm_hours": farm_hours,
-        "percent": _percent(total_hours, days_in_period),
     }
 
     sort = request.GET.get("sort", "desc")

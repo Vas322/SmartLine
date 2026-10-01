@@ -3,11 +3,17 @@
 {% block content %}
 <div class="page-head"><h1>Редактирование инструкции</h1></div>
 <div class="card">
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn">Сохранить</button>
-</form>
-<a href="{% url 'instructions' %}">← Отмена</a>
+<div class="form-actions">
+    <form method="post" class="inline-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn">Сохранить</button>
+    </form>
+    <form action="{% url 'instruction_edit' instruction.pk %}" method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="cancel" value="1">
+        <button type="submit" class="btn btn-secondary">Отмена</button>
+    </form>
+</div>
 </div>
 {% endblock %}

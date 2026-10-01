@@ -21,7 +21,7 @@
         {% if request.resolver_match.url_name != 'login' %}
             {% if user.is_authenticated %}
                 <nav class="site-nav">
-                    <a href="{% url 'dashboard' %}" class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}">Дашборд</a>
+                    <a href="{% url 'dashboard' %}" class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}">Форты</a>
                     <a href="{% url 'boss_respawn' %}" class="nav-link{% if request.resolver_match.url_name == 'boss_respawn' %} active{% endif %}">Респ РБ</a>
                     {% if user.is_staff %}
                         <a href="{% url 'players' %}" class="nav-link{% if request.resolver_match.url_name in 'players player_detail player_toggle player_delete player_edit' %} active{% endif %}">Игроки</a>
@@ -57,7 +57,7 @@
             <a href="{% url 'instructions' %}" class="footer-link">Инструкции</a>
             <a href="{% url 'boss_respawn' %}" class="footer-link">Респ РБ</a>
             {% if user.is_authenticated %}
-                <a href="{% url 'dashboard' %}" class="footer-link">Дашборд</a>
+                <a href="{% url 'dashboard' %}" class="footer-link">Форты</a>
             {% endif %}
         </nav>
     </footer>
