@@ -49,15 +49,14 @@ class Command(BaseCommand):
             return
 
         try:
-            # Временно убрана проверка интервала для ручного запуска.
-            # status = get_sync_status()
-            # if (
-            #     status.last_success_at
-            #     and timezone.now() - status.last_success_at < timedelta(minutes=interval)
-            # ):
-            #     logger.info("Boss respawn synced recently; skipping.")
-            #     self.stdout.write("Synced recently; skipping.")
-            #     return
+            status = get_sync_status()
+            if (
+                status.last_success_at
+                and timezone.now() - status.last_success_at < timedelta(minutes=interval)
+            ):
+                logger.info("Boss respawn synced recently; skipping.")
+                self.stdout.write("Synced recently; skipping.")
+                return
 
             ok = fetch_and_sync()
             if ok:
