@@ -671,4 +671,7 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 .stat-card--reg .value {
     color: var(--color-success);
 }
+.stat-card--reg .stat-row span:last-child {
+    color: var(--color-success);
+}
 

@@ -37,10 +37,10 @@
     </div>
     <div class="stat-card stat-card--gold"><h3>Итого выплата, кк</h3><div class="value">{{ summary.adena }}</div></div>
     {% if summary.base_payment > 0 %}
-    <div class="stat-card"><h3>Активности, кк</h3><div class="value">{{ summary.base_payment }}</div></div>
+    <div class="stat-card stat-card--gold"><h3>Активности, кк</h3><div class="value">{{ summary.base_payment }}</div></div>
     {% endif %}
     {% if summary.bonus_total > 0 %}
-    <div class="stat-card"><h3>Суммоны, кк</h3><div class="value">{{ summary.bonus_total|floatformat:2 }}</div></div>
+    <div class="stat-card stat-card--gold"><h3>Суммоны, кк</h3><div class="value">{{ summary.bonus_total|floatformat:2 }}</div></div>
     {% endif %}
     {% if summary.reg_count > 0 %}
     <div class="stat-card stat-card--reg">
