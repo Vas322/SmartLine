@@ -1,5 +1,6 @@
 {% extends "core/base.html" %}
 {% block title %}Форты{% endblock %}
+{% block body_attrs %} data-current-month="{{ current_month }}"{% endblock %}
 {% block content %}
 <div class="page-head">
     <h1>Форты</h1>
@@ -13,7 +14,11 @@
             {{ form.date_from.label_tag }} {{ form.date_from }}
             {{ form.date_to.label_tag }} {{ form.date_to }}
         </div>
+        <div class="period-month-group" id="month-select-wrapper">
+            {{ form.month.label_tag }} {{ form.month }}
+        </div>
         <button type="submit" class="btn">Применить</button>
+        <button type="button" class="btn btn-ghost" id="reset-filter" data-url="{% url 'dashboard' %}">Сброс</button>
     </form>
 </div>
 
@@ -59,7 +64,7 @@
             <tbody>
                 {% for row in rows %}
                 <tr>
-                    <td><a href="{% url 'player_detail' row.pk %}">{{ row.nickname }}</a></td>
+                    <td><a href="{% url 'player_detail' row.pk %}" class="player-link">{{ row.nickname }}</a></td>
                     <td class="num">{{ row.total_hours }}</td>
                     <td class="num">{{ row.adena }}</td>
                     <td class="num">{{ row.registration }}</td>
@@ -79,4 +84,25 @@
     </div>
     {% endif %}
 </div>
+<script>
+(function () {
+    "use strict";
+    // Сохранение фильтра при переходе в детализацию игрока (Вариант B).
+    var currentParams = new URLSearchParams(window.location.search);
+    document.querySelectorAll(".player-link").forEach(function (link) {
+        link.addEventListener("click", function () {
+            var url = new URL(this.href);
+            if (url.searchParams.has("period")) {
+                return;
+            }
+            for (var entry of currentParams.entries()) {
+                if (entry[0] !== "page") {
+                    url.searchParams.set(entry[0], entry[1]);
+                }
+            }
+            this.href = url.toString();
+        });
+    });
+})();
+</script>
 {% endblock %}
