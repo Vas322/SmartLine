@@ -14,6 +14,34 @@ _PERIOD_CHOICES = [
     ("custom", "Произвольный период"),
 ]
 
+_MONTH_NAMES = [
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+]
+
+
+def _months_ago(ref, count):
+    """Return (year, month) tuple `count` months before `ref` (a date)."""
+    month = ref.month - count
+    year = ref.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    return year, month
+
+
+def get_month_choices():
+    """Last 13 calendar months including the current one, as (YYYY-MM, label)."""
+    now = timezone.localdate()
+    return [
+        (
+            f"{year:04d}-{month:02d}",
+            f"{_MONTH_NAMES[month - 1].capitalize()} {year}",
+        )
+        for year, month in (_months_ago(now, i) for i in range(12, -1, -1))
+    ]
+
+
 _TYPE_CHOICES = [
     ("", "Все"),
     ("DEF", "DEF"),
@@ -87,6 +115,11 @@ class PeriodForm(forms.Form):
             attrs={"type": "date", "class": "period-date"}
         ),
     )
+    month = forms.ChoiceField(
+        choices=get_month_choices,
+        required=False,
+        label="Месяц",
+    )
 
     def clean(self) -> dict:
         cleaned = super().clean()
@@ -104,10 +137,12 @@ class PeriodForm(forms.Form):
             period = self.cleaned_data.get("period") or self.initial.get("period") or "today"
             date_from = self.cleaned_data.get("date_from")
             date_to = self.cleaned_data.get("date_to")
+            month = self.cleaned_data.get("month")
         else:
             period = self.initial.get("period") or "today"
             date_from = None
             date_to = None
+            month = self.initial.get("month")
 
         today = timezone.localdate()
         if period == "today":
@@ -118,7 +153,12 @@ class PeriodForm(forms.Form):
             end = today
         elif period == "month":
             start = today.replace(day=1)
-            # Last day of the current calendar month.
+            if month:
+                try:
+                    start = datetime.strptime(month, "%Y-%m").date()
+                except (ValueError, TypeError):
+                    pass
+            # Last day of the selected calendar month.
             next_month = start.replace(day=28) + timezone.timedelta(days=4)
             end = next_month.replace(day=1) - timezone.timedelta(days=1)
         elif period == "custom":
