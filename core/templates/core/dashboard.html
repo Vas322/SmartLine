@@ -34,11 +34,11 @@
     <div class="stat-card stat-card--gold">
         <h3>Итого к выплате</h3>
         <div class="value">{{ total_payout }}</div>
+        {% if bonus_settings.is_enabled %}
+        <div class="bonus-note">* Включая надбавки за суммонеров</div>
+        {% endif %}
     </div>
 </div>
-{% if bonus_settings.is_enabled %}
-<p class="bonus-note">* Включая надбавки за суммонеров</p>
-{% endif %}
 
 <div class="card">
     {% if not rows %}

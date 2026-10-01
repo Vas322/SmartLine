@@ -4,12 +4,12 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django import forms
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from core.forms import PeriodForm
-from core.forms.activity import get_month_choices
 from core.models import Activity, Player, TelegramMessage
 
 
@@ -24,32 +24,35 @@ def _months_ago_str(months: int) -> str:
     return f"{y:04d}-{m:02d}"
 
 
-class GetMonthChoicesTests(TestCase):
-    """Tests for get_month_choices()."""
+class PeriodFormMonthFieldTests(TestCase):
+    """Tests for the month field of PeriodForm (type="month" widget)."""
 
-    def test_returns_13_months_including_current(self):
-        choices = get_month_choices()
-        self.assertEqual(len(choices), 13)
+    def test_widget_is_type_month(self):
+        field = PeriodForm.base_fields["month"]
+        self.assertIsInstance(field.widget, forms.DateInput)
+        self.assertEqual(field.widget.input_type, "month")
 
-    def test_last_choice_is_current_month(self):
-        choices = get_month_choices()
-        now = timezone.localdate()
-        self.assertEqual(choices[-1][0], now.strftime("%Y-%m"))
-        self.assertTrue(choices[-1][1].endswith(f" {now.year}"))
+    def test_field_is_date_field(self):
+        field = PeriodForm.base_fields["month"]
+        self.assertIsInstance(field, forms.DateField)
 
-    def test_first_choice_is_12_months_ago(self):
-        choices = get_month_choices()
-        self.assertEqual(choices[0][0], _months_ago_str(12))
+    def test_parses_yyyy_mm_string(self):
+        month = _months_ago_str(1)
+        year, mm = month.split("-")
+        form = PeriodForm(data={"period": "month", "month": month})
+        self.assertTrue(form.is_valid())
+        self.assertEqual(
+            form.cleaned_data["month"], date(int(year), int(mm), 1)
+        )
 
-    def test_choices_are_ordered_oldest_to_newest(self):
-        choices = get_month_choices()
-        keys = [key for key, _ in choices]
-        self.assertEqual(keys, sorted(keys))
+    def test_empty_month_allowed(self):
+        form = PeriodForm(data={"period": "month", "month": ""})
+        self.assertTrue(form.is_valid())
+        self.assertIsNone(form.cleaned_data["month"])
 
-    def test_label_format(self):
-        choices = get_month_choices()
-        for _, label in choices:
-            self.assertRegex(label, r"^[А-ЯЁ][а-яё]+ \d{4}$")
+    def test_invalid_month_not_valid(self):
+        form = PeriodForm(data={"period": "month", "month": "2026-13"})
+        self.assertFalse(form.is_valid())
 
 
 class PeriodFormMonthTests(TestCase):
@@ -71,7 +74,7 @@ class PeriodFormMonthTests(TestCase):
     def test_no_month_uses_current_month(self):
         form = PeriodForm(
             data={"period": "month"},
-            initial={"period": "month", "month": timezone.localdate().strftime("%Y-%m")},
+            initial={"period": "month", "month": timezone.localdate()},
         )
         start, end = form.get_date_range()
         today = timezone.localdate()
@@ -188,6 +191,7 @@ class MonthFilterWebTests(TestCase):
         content = response.content.decode()
         self.assertIn('id="month-select-wrapper"', content)
         self.assertIn('id="reset-filter"', content)
+        self.assertIn('class="filter-form"', content)
 
     def test_player_detail_sort_link_keeps_month(self):
         player = Player.objects.create(nickname="Тестер")

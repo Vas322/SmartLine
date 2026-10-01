@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def dashboard(request):
     form = PeriodForm(
         request.GET or None,
-        initial={"period": "month", "month": timezone.localdate().strftime("%Y-%m")},
+        initial={"period": "month", "month": timezone.localdate()},
     )
     date_from, date_to = form.get_date_range()
     days_in_period = form.get_days_in_period()
@@ -28,12 +28,13 @@ def dashboard(request):
         applied_period = (
             form.cleaned_data.get("period") or form.initial.get("period") or "month"
         )
-        applied_month = form.cleaned_data.get("month") or ""
+        applied_month_date = form.cleaned_data.get("month")
     else:
         applied_period = form.initial.get("period") or "month"
-        applied_month = ""
+        applied_month_date = None
 
     current_month = timezone.localdate().strftime("%Y-%m")
+    applied_month = applied_month_date.strftime("%Y-%m") if applied_month_date else ""
     if applied_period == "month" and not applied_month:
         applied_month = current_month
 
