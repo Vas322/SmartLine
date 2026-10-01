@@ -1310,7 +1310,7 @@ class WebInterfaceTests(TestCase):
         self.assertIn("0,50", content)  # FARM hours
 
     def test_player_detail_reg_block(self):
-        """Блок «Реги» отображается при наличии регистраций."""
+        """Блок «Регистрации фортов» отображается при наличии регистраций."""
         self._login()
         player = Player.objects.create(nickname="RegBlock", is_active=True)
         msg = TelegramMessage.objects.create(
@@ -1329,17 +1329,16 @@ class WebInterfaceTests(TestCase):
         resp = self.client.get(reverse("player_detail", args=[player.pk]))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
-        self.assertIn("Реги", content)
-        self.assertIn("1", content)  # reg_count = 1
-        self.assertIn("3", content)  # КК = 3
+        self.assertIn("Регистрации фортов", content)
+        self.assertIn("3 шт.", content)  # reg_clans = 3
         self.assertIn("75", content)  # адена
 
     def test_player_detail_reg_block_hidden_when_no_regs(self):
-        """Блок «Реги» скрыт, если регистраций нет."""
+        """Блок «Регистрации фортов» скрыт, если регистраций нет."""
         self._login()
         player = Player.objects.create(nickname="NoRegs", is_active=True)
         resp = self.client.get(reverse("player_detail", args=[player.pk]))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
-        # Блок "Реги" не должен отображаться
-        self.assertNotIn("Реги", content)
+        # Блок "Регистрации фортов" не должен отображаться
+        self.assertNotIn("Регистрации фортов", content)
