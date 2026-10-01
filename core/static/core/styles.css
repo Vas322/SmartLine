@@ -315,6 +315,11 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--color-br
     margin: 0;
 }
 
+/* ===== MONTH / RESET FILTER ===== */
+#month-select-wrapper { display: none; }
+#reset-filter { display: none; }
+.period-month-group { display: flex; flex-direction: column; }
+
 /* ===== AUTH PAGES ===== */
 .auth-container { display: flex; justify-content: center; align-items: flex-start; padding-top: 40px; }
 .auth-card { background: rgba(11, 17, 32, 0.6); width: 100%; max-width: 400px; padding: 32px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.2); box-sizing: border-box; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }

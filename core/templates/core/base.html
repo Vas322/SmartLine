@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="{% static 'core/images/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'core/styles.css' %}?v=15">
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
     <div class="page-decor" aria-hidden="true">
         <div class="decor decor-castle"></div>
     </div>

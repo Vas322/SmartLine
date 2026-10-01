@@ -1,18 +1,48 @@
 (function () {
     "use strict";
 
-    // --- Переключение полей дат для произвольного периода ---
+    // --- Переключение полей дат/месяца и кнопки Сброс для фильтра периода ---
     var periodSelect = document.querySelector(".period-select");
     if (periodSelect) {
         var dateGroup = document.querySelector(".period-date-group");
-        function toggleDateFields() {
-            var show = periodSelect.value === "custom";
+        var monthWrapper = document.getElementById("month-select-wrapper");
+        var monthSelect = document.querySelector('[name="month"]');
+        var resetBtn = document.getElementById("reset-filter");
+        var currentMonth = document.body.dataset.currentMonth || "";
+
+        function toggleFilterFields() {
+            var val = periodSelect.value;
+            // Поля дат — только для произвольного периода.
             if (dateGroup) {
-                dateGroup.style.display = show ? "block" : "none";
+                dateGroup.style.display = (val === "custom") ? "block" : "none";
+            }
+            // Месяц — только для периода «Месяц».
+            if (monthWrapper) {
+                monthWrapper.style.display = (val === "month") ? "flex" : "none";
+            }
+            // Кнопка «Сброс» — показывать, если выбран не дефолтный фильтр.
+            if (resetBtn) {
+                var isDefault = (val === "today") ||
+                    (val === "month" && monthSelect && monthSelect.value === currentMonth);
+                resetBtn.style.display = isDefault ? "none" : "inline-flex";
             }
         }
-        toggleDateFields();
-        periodSelect.addEventListener("change", toggleDateFields);
+        toggleFilterFields();
+        periodSelect.addEventListener("change", toggleFilterFields);
+        if (monthSelect) {
+            monthSelect.addEventListener("change", toggleFilterFields);
+        }
+    }
+
+    // --- Кнопка «Сброс» фильтра (редирект без параметров) ---
+    var resetFilterBtn = document.getElementById("reset-filter");
+    if (resetFilterBtn) {
+        resetFilterBtn.addEventListener("click", function () {
+            var target = resetFilterBtn.getAttribute("data-url");
+            if (target) {
+                window.location.href = target;
+            }
+        });
     }
 
     // --- Модальное окно подтверждения удаления / уведомления ---
