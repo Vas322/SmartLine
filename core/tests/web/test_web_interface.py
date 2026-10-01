@@ -1158,7 +1158,13 @@ class WebInterfaceTests(TestCase):
         settings.enabled_at = timezone.now()  # активность старше даты включения
         settings.save()
 
-        resp = self.client.get(reverse("player_detail", args=[player.pk]))
+        today = timezone.localdate()
+        params = {
+            "period": "custom",
+            "date_from": (today - timedelta(days=30)).isoformat(),
+            "date_to": today.isoformat(),
+        }
+        resp = self.client.get(reverse("player_detail", args=[player.pk]), params)
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
         # Надбавка за строку = 0.00 (активность старше enabled_at).
