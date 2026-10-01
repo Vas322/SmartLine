@@ -1,9 +1,14 @@
 {% extends "core/base.html" %}
+{% load static %}
 {% block title %}Форты{% endblock %}
 {% block body_attrs %} data-current-month="{{ current_month }}"{% endblock %}
 {% block content %}
-<div class="page-head">
-    <h1>Форты</h1>
+<div class="main-wrapper">
+    <div class="page-title-banner">
+        <img src="{% static 'core/images/text.png' %}" alt="" class="banner-img">
+    </div>
+    <div class="page-head">
+        <h1>Форты</h1>
     <span class="period-info muted">Период: {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }} · {{ days_in_period }} дн.</span>
 </div>
 
@@ -105,4 +110,7 @@
     });
 })();
 </script>
+    <img src="{% static 'core/images/elf.png' %}" alt="" class="character-elf">
+    <img src="{% static 'core/images/man.png' %}" alt="" class="character-knight">
+</div><!-- /main-wrapper -->
 {% endblock %}

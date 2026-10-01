@@ -33,6 +33,12 @@
 /* ===== RESET ===== */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Базовый фон страницы — замок */
+body.has-decor-bg {
+    background: url('images/castle_new.png') no-repeat center bottom fixed;
+    background-size: cover;
+}
+
 body {
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
@@ -43,6 +49,56 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+}
+
+/* ===== MAIN CONTENT WRAPPER — защита от персонажей ===== */
+.main-wrapper {
+    position: relative;
+    z-index: 3;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-bottom: 40px;
+}
+
+/* ===== BANNER / LOGO ===== */
+.page-title-banner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 65px;  /* ближе к хедеру */
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+}
+.banner-img {
+    max-width: min(450px, 88vw);  /* адаптивно уменьшается */
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* ===== CHARACTERS ===== */
+.character-elf,
+.character-knight {
+    position: fixed;
+    bottom: 0;
+    width: auto;
+    object-fit: contain;
+    object-position: bottom;
+    pointer-events: none;
+    z-index: 1;
+}
+.character-elf {
+    left: 0;
+    transform: translateX(-20px);  /* ← сдвиг влево */
+    height: 89.1vh;  /* 81vh × 1.1 */
+    max-height: 89.1vh;
+}
+.character-knight {
+    right: 0;
+    transform: translateX(20px);   /* ← сдвиг вправо */
+    height: 83.7vh;  /* 93vh - 10% */
+    max-height: 83.7vh;
 }
 
 /* ===== TYPOGRAPHY ===== */
@@ -523,20 +579,6 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 .boss-window { margin: 0 0 6px; font-size: 13px; color: var(--color-text-secondary); }
 .boss-countdown { margin: 0; font-size: 13px; color: var(--color-text); font-family: Consolas, Monaco, "Courier New", monospace; }
 
-/* ===== PAGE DECOR ===== */
-.page-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; user-select: none; overflow: hidden; }
-.decor { position: fixed; bottom: 0; pointer-events: none; }
-.decor-castle {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    top: 60px;  /* ниже хедера */
-    background: url('images/castle.png?v=2') no-repeat center center;
-    background-size: 100% 100%;
-    pointer-events: none;
-}
-
 /* ===== SCHEDULE MIRROR ===== */
 .mirror-info { background: var(--color-subtle); border: 1px solid var(--color-border); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
 .mirror-text { margin-top: 16px; }
@@ -545,6 +587,19 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
     main { padding: 20px; }
+    /* Персонажи скрыты, только замок и логотип */
+    .character-elf,
+    .character-knight {
+        display: none;
+    }
+    .main-wrapper {
+        max-width: 100%;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    .banner-img {
+        max-width: min(380px, 85vw);
+    }
 }
 
 @media (max-width: 768px) {
@@ -552,7 +607,6 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
     .site-header .nav-link { padding: 12px 2px; }
     .site-header nav { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
     .site-header nav::-webkit-scrollbar { display: none; }
-    .page-decor { display: none; }
     .table-wrap { overflow-x: auto; margin: 0 -20px -20px; }
     table { min-width: 640px; }
     .card { padding: 16px; }
@@ -572,6 +626,12 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
     .instruction-content .instruction-code-block { font-size: 12px; padding: 8px 12px; }
     .instruction-content .instruction-subheading { font-size: 16px; }
     .boss-grid { grid-template-columns: 1fr; }
+    .page-title-banner {
+        margin-top: 58px;
+    }
+    .banner-img {
+        max-width: min(400px, 85vw);
+    }
 }
 
 .bonus-info { font-size: 0.95em; color: var(--color-text); }

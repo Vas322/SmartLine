@@ -8,12 +8,9 @@
     <link rel="icon" href="{% static 'core/images/favicon.ico' %}">
     <link rel="icon" sizes="192x192" href="{% static 'core/images/icon-192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'core/images/apple-touch-icon.png' %}">
-    <link rel="stylesheet" href="{% static 'core/styles.css' %}?v=15">
+    <link rel="stylesheet" href="{% static 'core/styles.css' %}?v=16">
 </head>
-<body{% block body_attrs %}{% endblock %}>
-    <div class="page-decor" aria-hidden="true">
-        <div class="decor decor-castle"></div>
-    </div>
+<body class="has-decor-bg"{% block body_attrs %}{% endblock %}>
     <header class="site-header">
         <a class="brand" href="{% url 'dashboard' %}" aria-label="Smartline">
             <span class="brand-name">Smartline</span>
