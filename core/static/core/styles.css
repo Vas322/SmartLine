@@ -79,7 +79,7 @@ body {
 /* Слой 3: надпись text.png — z-index: 2 */
 .header-top-area {
     position: sticky;
-    top: 50px;
+    top: 40px;
     z-index: 2;
     text-align: center;
     margin-top: -32px;
