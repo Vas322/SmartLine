@@ -79,10 +79,10 @@ body {
 /* Слой 3: надпись text.png — z-index: 2 */
 .header-top-area {
     position: sticky;
-    top: 60px;
+    top: 50px;
     z-index: 2;
     text-align: center;
-    margin-top: -42px;
+    margin-top: -32px;
 }
 .header-top-area .banner-img {
     width: min(495px, 60vw);
@@ -136,7 +136,7 @@ main {
     flex: 1;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 10px 24px 24px;
+    padding: 0px 24px 24px;
     width: 100%;
     position: relative;
     z-index: 3;
