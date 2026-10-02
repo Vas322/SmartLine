@@ -81,7 +81,7 @@ body {
     position: relative;
     z-index: 2;
     text-align: center;
-    margin-top: 8px;
+    margin-top: -12px;
 }
 .header-top-area .banner-img {
     width: min(450px, 55vw);
