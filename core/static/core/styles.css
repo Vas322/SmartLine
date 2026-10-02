@@ -82,7 +82,7 @@ body {
     top: 60px;
     z-index: 2;
     text-align: center;
-    margin-top: -32px;
+    margin-top: -42px;
 }
 .header-top-area .banner-img {
     width: min(495px, 60vw);
@@ -139,7 +139,7 @@ main {
     padding: 10px 24px 24px;
     width: 100%;
     position: relative;
-    z-index: 1;
+    z-index: 3;
 }
 
 .page-head {
