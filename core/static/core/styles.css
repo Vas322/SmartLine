@@ -51,54 +51,72 @@ body {
     min-height: 100vh;
 }
 
-/* ===== MAIN CONTENT WRAPPER — защита от персонажей ===== */
+/* ===== MAIN CONTENT WRAPPER ===== */
 .main-wrapper {
     position: relative;
     z-index: 3;
     max-width: 1180px;
     margin: 0 auto;
-    padding-bottom: 40px;
+    padding: 0 100px 40px 80px;
 }
 
-/* ===== BANNER / LOGO ===== */
-.page-title-banner {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 65px;  /* ближе к хедеру */
-    margin-bottom: 16px;
-    position: relative;
-    z-index: 2;
-}
-.banner-img {
-    max-width: min(450px, 88vw);  /* адаптивно уменьшается */
-    width: 100%;
-    height: auto;
-    display: block;
-}
-
-/* ===== CHARACTERS ===== */
-.character-elf,
-.character-knight {
+/* ===== HEADER BANNER + CHARACTERS (все страницы) ===== */
+.site-character {
     position: fixed;
-    bottom: 0;
     width: auto;
     object-fit: contain;
     object-position: bottom;
     pointer-events: none;
     z-index: 1;
 }
-.character-elf {
+.site-character--elf {
     left: 0;
-    transform: translateX(-20px);  /* ← сдвиг влево */
-    height: 89.1vh;  /* 81vh × 1.1 */
-    max-height: 89.1vh;
+    bottom: 0;
+    height: 100vh;
 }
-.character-knight {
+.site-character--knight {
     right: 0;
-    transform: translateX(20px);   /* ← сдвиг вправо */
-    height: 83.7vh;  /* 93vh - 10% */
-    max-height: 83.7vh;
+    bottom: 0;
+    height: 100vh;
+}
+
+.header-top-area {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    margin-top: 0;
+    padding: 8px 100px 0 100px;  /* место для персонажей */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 20px;
+}
+.header-top-area .banner-img {
+    max-width: min(400px, 80vw);
+    width: 100%;
+    height: auto;
+    display: block;
+}
+.banner-character {
+    width: auto;
+    height: 80px;
+    object-fit: contain;
+    object-position: bottom;
+}
+.banner-character--left { align-self: flex-end; }
+.banner-character--right { align-self: flex-end; }
+
+@media (max-width: 1024px) {
+    .site-character {
+        display: none;
+    }
+    .header-top-area {
+        margin-top: 16px;
+    }
+    .main-wrapper {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
 }
 
 /* ===== TYPOGRAPHY ===== */
@@ -308,9 +326,22 @@ html { scroll-behavior: smooth; }
 .settings-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); border-color: rgba(212, 175, 55, 0.4); }
 
 /* ===== TABLE ===== */
-.table-wrap { overflow-x: auto; margin: 0 -24px -20px; border-radius: 8px; border: 1px solid var(--color-border); }
+.table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 55vh;
+    margin: 0 -24px -20px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+}
 table { border-collapse: collapse; width: 100%; min-width: 640px; background: var(--color-card); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
 th { background: linear-gradient(180deg, #1E293B 0%, #111827 100%); color: var(--color-gold); padding: 14px 16px; border-bottom: 2px solid var(--color-gold); text-align: left; white-space: nowrap; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+thead th {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, #1E293B 0%, #111827 100%);
+    z-index: 1;
+}
 td { padding: 14px 16px; border-bottom: 1px solid var(--color-border); font-size: 14px; vertical-align: middle; color: var(--color-text); }
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: background-color 0.15s ease; }
@@ -587,18 +618,14 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
     main { padding: 20px; }
-    /* Персонажи скрыты, только замок и логотип */
-    .character-elf,
-    .character-knight {
+    .header-top-area .character-elf,
+    .header-top-area .character-knight {
         display: none;
     }
     .main-wrapper {
         max-width: 100%;
         padding-left: 12px;
         padding-right: 12px;
-    }
-    .banner-img {
-        max-width: min(380px, 85vw);
     }
 }
 
@@ -626,12 +653,6 @@ textarea.field-content { width: 100%; max-width: 100%; box-sizing: border-box; r
     .instruction-content .instruction-code-block { font-size: 12px; padding: 8px 12px; }
     .instruction-content .instruction-subheading { font-size: 16px; }
     .boss-grid { grid-template-columns: 1fr; }
-    .page-title-banner {
-        margin-top: 58px;
-    }
-    .banner-img {
-        max-width: min(400px, 85vw);
-    }
 }
 
 .bonus-info { font-size: 0.95em; color: var(--color-text); }

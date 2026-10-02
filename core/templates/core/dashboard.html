@@ -4,46 +4,43 @@
 {% block body_attrs %} data-current-month="{{ current_month }}"{% endblock %}
 {% block content %}
 <div class="main-wrapper">
-    <div class="page-title-banner">
-        <img src="{% static 'core/images/text.png' %}" alt="" class="banner-img">
-    </div>
     <div class="page-head">
-        <h1>Форты</h1>
-    <span class="period-info muted">Период: {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }} · {{ days_in_period }} дн.</span>
-</div>
+            <h1>Форты</h1>
+        <span class="period-info muted">Период: {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }} · {{ days_in_period }} дн.</span>
+    </div>
 
-<div class="card">
-    <form method="get" action="{% url 'dashboard' %}" class="filter-form">
-        {{ form.period.label_tag }} {{ form.period }}
-        <div class="period-date-group">
-            {{ form.date_from.label_tag }} {{ form.date_from }}
-            {{ form.date_to.label_tag }} {{ form.date_to }}
-        </div>
-        <div class="period-month-group" id="month-select-wrapper">
-            {{ form.month.label_tag }} {{ form.month }}
-        </div>
-        <button type="submit" class="btn">Применить</button>
-        <button type="button" class="btn btn-ghost" id="reset-filter" data-url="{% url 'dashboard' %}">Сброс</button>
-    </form>
-</div>
+    <div class="card">
+        <form method="get" action="{% url 'dashboard' %}" class="filter-form">
+            {{ form.period.label_tag }} {{ form.period }}
+            <div class="period-date-group">
+                {{ form.date_from.label_tag }} {{ form.date_from }}
+                {{ form.date_to.label_tag }} {{ form.date_to }}
+            </div>
+            <div class="period-month-group" id="month-select-wrapper">
+                {{ form.month.label_tag }} {{ form.month }}
+            </div>
+            <button type="submit" class="btn">Применить</button>
+            <button type="button" class="btn btn-ghost" id="reset-filter" data-url="{% url 'dashboard' %}">Сброс</button>
+        </form>
+    </div>
 
-<div class="stats">
-    <div class="stat-card stat-card--red">
-        <h3>Игроков с активностью</h3>
-        <div class="value">{{ rows|length }}</div>
+    <div class="stats">
+        <div class="stat-card stat-card--red">
+            <h3>Игроков с активностью</h3>
+            <div class="value">{{ rows|length }}</div>
+        </div>
+        <div class="stat-card stat-card--gold">
+            <h3>Дней в периоде</h3>
+            <div class="value">{{ days_in_period }}</div>
+        </div>
+        <div class="stat-card stat-card--green">
+            <h3>Итого к выплате</h3>
+            <div class="value">{{ total_payout }}</div>
+            {% if bonus_settings.is_enabled %}
+            <div class="bonus-note">* Включая надбавки за суммонеров</div>
+            {% endif %}
+        </div>
     </div>
-    <div class="stat-card stat-card--gold">
-        <h3>Дней в периоде</h3>
-        <div class="value">{{ days_in_period }}</div>
-    </div>
-    <div class="stat-card stat-card--green">
-        <h3>Итого к выплате</h3>
-        <div class="value">{{ total_payout }}</div>
-        {% if bonus_settings.is_enabled %}
-        <div class="bonus-note">* Включая надбавки за суммонеров</div>
-        {% endif %}
-    </div>
-</div>
 
 <div class="card">
     {% if not rows %}
@@ -110,7 +107,5 @@
     });
 })();
 </script>
-    <img src="{% static 'core/images/elf.png' %}" alt="" class="character-elf">
-    <img src="{% static 'core/images/man.png' %}" alt="" class="character-knight">
 </div><!-- /main-wrapper -->
 {% endblock %}

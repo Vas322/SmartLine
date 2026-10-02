@@ -45,6 +45,16 @@
             {% endif %}
         {% endif %}
     </header>
+
+    <img src="{% static 'core/images/elf.png' %}" alt="" class="site-character site-character--elf">
+    <img src="{% static 'core/images/man.png' %}" alt="" class="site-character site-character--knight">
+
+    <div class="header-top-area">
+        <img src="{% static 'core/images/elf.png' %}" alt="" class="banner-character banner-character--left">
+        <img src="{% static 'core/images/text.png' %}" alt="" class="banner-img">
+        <img src="{% static 'core/images/man.png' %}" alt="" class="banner-character banner-character--right">
+    </div>
+
     <main>
         {% block content %}{% endblock %}
     </main>
