@@ -84,8 +84,8 @@ body {
     margin-top: -32px;
 }
 .header-top-area .banner-img {
-    width: min(450px, 55vw);
-    max-width: 55vw;
+    width: min(495px, 60vw);
+    max-width: 60vw;
     height: auto;
     display: block;
     margin: 0 auto;
@@ -97,8 +97,8 @@ body {
         display: none;
     }
     .header-top-area .banner-img {
-        width: min(450px, 80vw);
-        max-width: 80vw;
+        width: min(495px, 88vw);
+        max-width: 88vw;
     }
 }
 
