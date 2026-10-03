@@ -73,7 +73,10 @@ body {
     pointer-events: none;
     z-index: 1;
 }
-.site-character--elf { left: 0; }
+.site-character--elf {
+    left: 0;
+    transform: translate(-20px, 10px);
+}
 .site-character--knight { right: 0; }
 
 /* Слой 3: надпись text.png — z-index: 2 */
