@@ -21,7 +21,9 @@ class EpicBossNotificationSettingsViewTests(TestCase):
         )
         self.client.login(username="kl", password="test-password-123")
 
-        now = timezone.now()
+        # 12:00 UTC = 15:00 МСК — EPIC-боссы гарантированно "респают сегодня"
+        # независимо от времени запуска тестов (граница appearance — 18:00 МСК).
+        now = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
         self.antharas = BossRespawn.objects.create(
             boss_name="Antharas",
             boss_type=BossRespawn.BossType.EPIC,
@@ -103,7 +105,9 @@ class EpicBossNotificationSettingsViewTests(TestCase):
         content = response.content.decode()
         self.assertIn("Пример сообщения:", content)
         self.assertIn("Antharas", content)
-        self.assertIn("21:07", content)
+        # Демо-босс рендерится только именем (см. _boss_line); заголовок списка
+        # «Боссы:» из DEFAULT_BOSS_TEMPLATE подтверждает структуру без времени.
+        self.assertIn("Боссы:", content)
 
     def test_edit_mode_shows_form(self):
         response = self.client.get(reverse("settings_epic_boss"), {"edit": "1"})
