@@ -75,6 +75,7 @@ body {
 }
 .site-character--elf {
     left: 0;
+    height: min(101.2dvh, 990px);
     transform: translate(-40px, 10px);
 }
 .site-character--knight { right: 0; }
