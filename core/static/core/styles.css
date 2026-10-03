@@ -79,7 +79,10 @@ body {
     max-width: 26.4vw;
     transform: translate(-60px, 10px);
 }
-.site-character--knight { right: 0; }
+.site-character--knight {
+    right: 0;
+    transform: translate(40px, 10px);
+}
 
 /* Слой 3: надпись text.png — z-index: 2 */
 .header-top-area {
