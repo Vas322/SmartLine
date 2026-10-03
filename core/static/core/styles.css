@@ -77,7 +77,7 @@ body {
     left: 0;
     height: min(101.2dvh, 990px);
     max-width: 26.4vw;
-    transform: translate(-60px, 10px);
+    transform: translate(-60px, 20px);
 }
 .site-character--knight {
     right: 0;
