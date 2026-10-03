@@ -81,7 +81,7 @@ body {
 }
 .site-character--knight {
     right: 0;
-    transform: translate(60px, 10px);
+    transform: translate(70px, 20px);
 }
 
 /* Слой 3: надпись text.png — z-index: 2 */
